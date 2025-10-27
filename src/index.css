@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 34%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 34%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 34%;
+
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 34%;
+
+    --secondary: 24 44% 72%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 24 44% 95%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 24 44% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 24 44% 88%;
+    --input: 24 44% 88%;
+    --ring: 24 44% 60%;
+
+    --radius: 0.75rem;
+
+    /* Hub colors - using accent palette */
+    --hub-marketing: 24 44% 60%;
+    --hub-finance: 24 44% 60%;
+    --hub-ops: 24 44% 60%;
+    --hub-hiring: 24 44% 60%;
+    --hub-sales: 24 44% 60%;
+
+    /* Gradients - warm accent tones */
+    --gradient-hero: linear-gradient(135deg, hsl(24 44% 95%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(24 44% 98%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(24 44% 97%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(24 44% 72%) 0%, hsl(24 44% 60%) 100%);
+
+    /* Shadows - warm subtle */
+    --shadow-sm: 0 1px 2px 0 hsl(24 44% 60% / 0.1);
+    --shadow-md: 0 4px 6px -1px hsl(24 44% 60% / 0.15), 0 2px 4px -2px hsl(24 44% 60% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(24 44% 60% / 0.2), 0 4px 6px -4px hsl(24 44% 60% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(24 44% 60% / 0.2), 0 8px 10px -6px hsl(24 44% 60% / 0.1);
+    --shadow-card: 0 1px 3px 0 hsl(24 44% 60% / 0.12), 0 1px 2px -1px hsl(24 44% 60% / 0.08);
+    --shadow-accent: 0 4px 12px 0 hsl(24 44% 60% / 0.25);
+
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  .dark {
+    --background: 0 0% 9%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 24 44% 72%;
+    --primary-foreground: 0 0% 9%;
+
+    --secondary: 24 44% 60%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 18%;
+    --muted-foreground: 24 44% 80%;
+
+    --accent: 24 44% 60%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 24 44% 72%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  h1 {
+    @apply text-5xl md:text-6xl lg:text-7xl;
+  }
+
+  h2 {
+    @apply text-4xl md:text-5xl lg:text-6xl;
+  }
+
+  h3 {
+    @apply text-3xl md:text-4xl;
+  }
+}
+
+@layer utilities {
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-subtle {
+    background: var(--gradient-subtle);
+  }
+
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-accent {
+    box-shadow: var(--shadow-accent);
+  }
+
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+
+  .transition-bounce {
+    transition: var(--transition-bounce);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Custom Scrollbar for Sales Hub AI Insights */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 122, 255, 0.3);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 122, 255, 0.5);
+  }
+}
