@@ -16,6 +16,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -25,19 +26,22 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
         
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully logged in.",
-        });
-        navigate("/dashboard");
+        if (data.user) {
+          toast({
+            title: "Welcome back!",
+            description: "You have successfully logged in.",
+          });
+          navigate("/dashboard");
+        }
       } else {
-        const { error } = await supabase.auth.signUp({
+        // Sign up the user
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -47,24 +51,107 @@ const Auth = () => {
             emailRedirectTo: `${window.location.origin}/dashboard`,
           },
         });
+        
         if (error) throw error;
         
-        toast({
-          title: "Account created!",
-          description: "Welcome to Acharya Ventures OS",
-        });
-        navigate("/dashboard");
+        // Check if email confirmation is required
+        if (data.user && !data.session) {
+          // Email confirmation is required
+          setShowEmailConfirmation(true);
+          toast({
+            title: "Check your email!",
+            description: "We've sent you a confirmation link. Please check your inbox and click the link to activate your account.",
+            duration: 8000,
+          });
+          // Don't navigate, stay on auth page and show confirmation message
+        } else if (data.user && data.session) {
+          // No email confirmation required, user is logged in
+          toast({
+            title: "Account created!",
+            description: "Welcome to EERA OS",
+          });
+          navigate("/dashboard");
+        }
       }
     } catch (error: any) {
+      console.error("Auth error:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "An error occurred during authentication",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
+
+  // Show email confirmation message if needed
+  if (showEmailConfirmation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/30 to-background p-6">
+        <Card className="w-full max-w-md border-2 shadow-2xl">
+          <CardHeader className="space-y-4 text-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-fit mb-2"
+              onClick={() => {
+                setShowEmailConfirmation(false);
+                setEmail("");
+                setPassword("");
+                setFullName("");
+              }}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Sign Up
+            </Button>
+            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <svg
+                className="w-8 h-8 text-primary"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+            <CardTitle className="text-2xl">Check your email</CardTitle>
+            <CardDescription className="text-base">
+              We've sent a confirmation link to <strong>{email}</strong>
+              <br />
+              <br />
+              Click the link in the email to activate your account and get started.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
+              <p className="font-medium mb-2">💡 Tips:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Check your spam folder</li>
+                <li>The link expires in 24 hours</li>
+                <li>Make sure {email} is correct</li>
+              </ul>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setShowEmailConfirmation(false);
+                setIsLogin(true);
+              }}
+            >
+              Go to Sign In
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/30 to-background p-6">
