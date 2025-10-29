@@ -14,10 +14,10 @@ const Navbar = () => {
 
           {/* CTA */}
           <div className="flex items-center gap-3">
-            <Link to="/auth">
+            <Link to="/auth?mode=login">
               <Button variant="ghost">Sign In</Button>
             </Link>
-            <Link to="/auth">
+            <Link to="/auth?mode=signup">
               <Button className="transition-smooth hover:scale-105">
                 Get Started
               </Button>
