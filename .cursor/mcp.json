@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref",
+        "pqnjcombcbdruhixbabf"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_050eabb18d83d4996c20c7f10c82da2ade941b32"
+      },
+      "description": "Official Supabase MCP server for database access and management"
+    },
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres.pqnjcombcbdruhixbabf:%3Fm_HZ.5q8_R!ipg@aws-0-ap-south-1.pooler.supabase.com:6543/postgres"
+      ],
+      "description": "Direct PostgreSQL connection to Supabase database"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "description": "Browser automation for web scraping and testing"
+    }
+  }
+}
+

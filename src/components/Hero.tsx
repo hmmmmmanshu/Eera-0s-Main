@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 
 const Hero = () => {
   const [typewriterText, setTypewriterText] = useState("");
-  const fullText = "simplify anything, build everything";
+  const fullText = "simplify everything, build anything";
 
   useEffect(() => {
     let index = 0;
