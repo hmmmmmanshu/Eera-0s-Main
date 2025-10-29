@@ -12,7 +12,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     checkOnboardingStatus();
-  }, [user]);
+  }, [user, location.pathname]); // Re-check when location changes
 
   const checkOnboardingStatus = async () => {
     if (!user) {
@@ -20,6 +20,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
+    setCheckingOnboarding(true);
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -29,9 +30,19 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
       if (error) throw error;
 
-      setNeedsOnboarding(!data?.onboarding_completed);
+      const needsOnboard = !data?.onboarding_completed;
+      setNeedsOnboarding(needsOnboard);
+      
+      console.log("Onboarding check:", {
+        userId: user.id,
+        onboarding_completed: data?.onboarding_completed,
+        needsOnboarding: needsOnboard,
+        currentPath: location.pathname
+      });
     } catch (error) {
       console.error("Error checking onboarding status:", error);
+      // On error, assume onboarding is not needed to avoid blocking
+      setNeedsOnboarding(false);
     } finally {
       setCheckingOnboarding(false);
     }

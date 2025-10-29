@@ -57,35 +57,53 @@ const Onboarding = () => {
   });
 
   const onSubmit = async (data: OnboardingFormData) => {
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to complete onboarding.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
+      console.log("Updating profile for user:", user.id);
+      
+      const { data: updateData, error } = await supabase
         .from("profiles")
         .update({
           ...data,
           onboarding_completed: true,
           profile_completion_percentage: 30,
         })
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase update error:", error);
+        throw error;
+      }
+
+      console.log("Profile updated successfully:", updateData);
 
       toast({
-        title: "Welcome aboard!",
+        title: "Welcome aboard! 🎉",
         description: "Your profile has been created successfully.",
       });
 
-      navigate("/dashboard");
-    } catch (error) {
+      // Small delay to ensure database is updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Use window.location for a hard navigation to ensure fresh state
+      window.location.href = "/dashboard";
+    } catch (error: any) {
       console.error("Error saving onboarding data:", error);
       toast({
         title: "Error",
-        description: "Failed to save your information. Please try again.",
+        description: error.message || "Failed to save your information. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
