@@ -107,15 +107,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     { id: "video" as const, icon: Video, label: "Reel/Short", platforms: ["instagram"] },
   ];
 
-  // Update aspect ratio based on platform
-  useEffect(() => {
-    if (platform === "linkedin") {
-      setAspectRatio("16:9");
-    } else {
-      setAspectRatio("1:1");
-    }
-  }, [platform]);
-
   // Auto-trigger generation when reaching step 4
   useEffect(() => {
     if (step === 4 && !generatedContent && !isGenerating) {
