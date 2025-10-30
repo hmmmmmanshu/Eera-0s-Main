@@ -71,8 +71,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
   const savedDraft = loadDraft();
 
-  // Step management
-  const [step, setStep] = useState(savedDraft?.step || 1);
+  // Step management (always start at Step 1 to avoid unintended resume)
+  const [step, setStep] = useState(1);
   
   // Form data with auto-restore
   const [platform, setPlatform] = useState<"linkedin" | "instagram">(savedDraft?.platform || "linkedin");
@@ -116,11 +116,10 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const { data: profile } = useBrandProfile();
   const createPostMutation = useCreatePost();
 
-  // Auto-save form data to localStorage
+  // Auto-save form data to localStorage (do not persist step to avoid auto-resume)
   useEffect(() => {
     if (open) {
       const draftData = {
-        step,
         platform,
         contentType,
         headline,
@@ -131,7 +130,28 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       };
       localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(draftData));
     }
-  }, [open, step, platform, contentType, headline, keyPoints, tone, objective]);
+  }, [open, platform, contentType, headline, keyPoints, tone, objective]);
+
+  // Reset wizard when modal opens
+  useEffect(() => {
+    if (open) {
+      setStep(1);
+      setGeneratedContent(null);
+      setGeneratedImageUrl(null);
+      setSlides([]);
+      setGenerationStatus({ brandAnalysis: "pending", contentGen: "pending", imageGen: "pending", optimization: "pending" });
+    }
+  }, [open]);
+
+  // When platform or content type changes, clear generated state and keep user in editing steps only
+  useEffect(() => {
+    setGeneratedContent(null);
+    setGeneratedImageUrl(null);
+    setSlides([]);
+    if (step > 3) {
+      setStep(3);
+    }
+  }, [platform, contentType]);
 
   const resetAndClose = () => {
     setStep(1);
