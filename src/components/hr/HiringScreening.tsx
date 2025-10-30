@@ -22,7 +22,7 @@ export function HiringScreening() {
             Job Description
           </TabsTrigger>
           <TabsTrigger value="resume-screener">
-            <Sparkles className="h-4 w-4 mr-2" />
+              <Sparkles className="h-4 w-4 mr-2" />
             Resume Screener
           </TabsTrigger>
           <TabsTrigger value="offer-letter">
@@ -62,30 +62,30 @@ export function HiringScreening() {
               No candidates yet. Add candidates using the tools above.
             </div>
           ) : (
-            <div className="space-y-3">
-              {candidates.map((candidate, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-accent/50 transition-all">
-                  <div>
-                    <p className="font-medium">{candidate.name}</p>
+          <div className="space-y-3">
+            {candidates.map((candidate, idx) => (
+              <div key={idx} className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-accent/50 transition-all">
+                <div>
+                  <p className="font-medium">{candidate.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {typeof candidate.role === 'string' ? candidate.role : 'Role not specified'}
                     </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-center">
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
                       <p className="text-2xl font-bold text-accent">
                         {candidate.score || 'N/A'}
                       </p>
-                      <p className="text-xs text-muted-foreground">AI Score</p>
-                    </div>
+                    <p className="text-xs text-muted-foreground">AI Score</p>
+                  </div>
                     <Badge variant={candidate.status?.includes("Offer") || candidate.status === "offer" ? "default" : "outline"}>
                       {candidate.status || 'Applied'}
-                    </Badge>
-                    <Button size="sm" variant="outline">View Profile</Button>
-                  </div>
+                  </Badge>
+                  <Button size="sm" variant="outline">View Profile</Button>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
           )}
         </CardContent>
       </Card>

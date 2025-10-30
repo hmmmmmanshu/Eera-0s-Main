@@ -17,8 +17,15 @@ export function WeeklyOverview() {
       if (!user?.id) return;
       try {
         setLoading(true);
+        const weekKey = getMondayISO(new Date());
+        const cached = localStorage.getItem(`cog_week_snap_${weekKey}`);
+        if (cached) {
+          try { setSnapshot(JSON.parse(cached)); } catch {}
+        }
         const snap = await weeklyOverview();
-        setSnapshot(snap?.payload || snap);
+        const payload = snap?.payload || snap;
+        setSnapshot(payload);
+        localStorage.setItem(`cog_week_snap_${weekKey}`, JSON.stringify(payload));
       } catch (e: any) {
         toast.error(e?.message || "Failed to load weekly overview");
       } finally {
@@ -37,14 +44,24 @@ export function WeeklyOverview() {
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="outline">This Week</Badge>
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <button onClick={async () => {
+              try {
+                setLoading(true);
+                const snap = await weeklyOverview();
+                const payload = snap?.payload || snap;
+                setSnapshot(payload);
+                localStorage.setItem(`cog_week_snap_${getMondayISO(new Date())}`, JSON.stringify(payload));
+              } catch (e: any) { toast.error(e?.message || "Refresh failed"); } finally { setLoading(false); }
+            }}>
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Metrics Grid (derived from snapshot when available) */}
         {snapshot ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Target className="h-4 w-4 text-green-500" />
@@ -73,7 +90,7 @@ export function WeeklyOverview() {
               </div>
               <p className="text-xs text-muted-foreground">Actions</p>
             </div>
-          </div>
+        </div>
         ) : (
           <div className="text-sm text-muted-foreground">Loading weekly snapshot…</div>
         )}
@@ -99,11 +116,20 @@ export function WeeklyOverview() {
               <div key={idx} className="flex items-center justify-between">
                 <span className="text-sm">{a}</span>
                 <Badge variant="secondary" className="text-xs">Recommended</Badge>
-              </div>
+            </div>
             ))}
           </div>
         </div>
       </CardContent>
     </Card>
   );
+}
+
+function getMondayISO(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
 }

@@ -64,16 +64,16 @@ export const TopPostsCarousel = ({ platform }: TopPostsCarouselProps) => {
               <CarouselItem key={post.id} className="md:basis-1/2 lg:basis-1/3">
                 <Card className="overflow-hidden">
                   {post.media_urls && post.media_urls.length > 0 && (
-                    <div className="aspect-video relative overflow-hidden">
-                      <img 
+                  <div className="aspect-video relative overflow-hidden">
+                    <img 
                         src={post.media_urls[0]} 
-                        alt="Post preview"
-                        className="object-cover w-full h-full"
-                      />
+                      alt="Post preview"
+                      className="object-cover w-full h-full"
+                    />
                       <Badge className="absolute top-2 right-2 capitalize">
-                        {post.platform}
-                      </Badge>
-                    </div>
+                      {post.platform}
+                    </Badge>
+                  </div>
                   )}
                   <CardContent className="p-4 space-y-3">
                     <p className="text-sm line-clamp-2">{post.content}</p>

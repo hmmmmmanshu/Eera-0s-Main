@@ -24,7 +24,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     }
 
     if (showBlockingLoader || needsOnboarding === null) {
-      setCheckingOnboarding(true);
+    setCheckingOnboarding(true);
     }
     try {
       const { data, error } = await supabase

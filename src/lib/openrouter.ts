@@ -136,6 +136,34 @@ function enhancePromptWithBrand(
   return enhanced;
 }
 
+export async function preflightModel(model: string): Promise<{ ok: boolean; code?: number; message?: string }> {
+  try {
+    const apiKey = getOpenRouterKey();
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": window.location.origin,
+        "X-Title": "EERA OS Preflight",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+      }),
+    });
+    if (!res.ok) {
+      let msg = undefined;
+      try { msg = await res.text(); } catch {}
+      return { ok: false, code: res.status, message: msg };
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, message: e?.message };
+  }
+}
+
 
 // ========================================
 // MAIN API FUNCTIONS

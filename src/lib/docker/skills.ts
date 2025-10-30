@@ -32,7 +32,7 @@ export const SKILLS: Record<string, Skill> = {
   },
 };
 
-async function dockerAvailable(): Promise<boolean> {
+export async function isDockerAvailable(): Promise<boolean> {
   try {
     // Docker Desktop can expose 2375 if enabled; otherwise this will fail quickly.
     const res = await fetch("http://localhost:2375/_ping", { method: "GET" });
@@ -51,7 +51,7 @@ export async function ensureSkill(skill: Skill): Promise<boolean> {
   } catch {}
 
   // If Docker API not available, degrade
-  if (!(await dockerAvailable())) {
+  if (!(await isDockerAvailable())) {
     console.warn(`[docker skills] Docker not available; skipping start for ${skill.id}`);
     return false;
   }

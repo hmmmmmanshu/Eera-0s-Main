@@ -13,44 +13,44 @@ export const MetricsCards = ({ platform }: MetricsCardsProps) => {
   const thisWeekPosts = publishedPosts; // Can be refined with date filtering
 
   const metricsData = [
-    {
-      title: "Impressions",
+  {
+    title: "Impressions",
       value: totalViews >= 1000 ? `${(totalViews / 1000).toFixed(1)}K` : totalViews.toLocaleString(),
       change: `${metrics.reach.change >= 0 ? "+" : ""}${metrics.reach.change.toFixed(1)}%`,
-      icon: Eye,
+    icon: Eye,
       trend: metrics.reach.trend,
-    },
-    {
-      title: "Reach",
+  },
+  {
+    title: "Reach",
       value: metrics.reach.value >= 1000 
         ? `${(metrics.reach.value / 1000).toFixed(1)}K` 
         : metrics.reach.value.toLocaleString(),
       change: `${metrics.reach.change >= 0 ? "+" : ""}${metrics.reach.change.toFixed(1)}%`,
-      icon: Users,
+    icon: Users,
       trend: metrics.reach.trend,
-    },
-    {
-      title: "Engagement Rate",
+  },
+  {
+    title: "Engagement Rate",
       value: `${(metrics.engagement.value / 100).toFixed(1)}%`,
       change: `${metrics.engagement.change >= 0 ? "+" : ""}${metrics.engagement.change.toFixed(1)}%`,
-      icon: TrendingUp,
+    icon: TrendingUp,
       trend: metrics.engagement.trend,
-    },
-    {
-      title: "Posts This Week",
+  },
+  {
+    title: "Posts This Week",
       value: thisWeekPosts.toString(),
       change: `${totalPosts} total`,
-      icon: FileText,
-      trend: "neutral" as const,
-    },
-    {
-      title: "Scheduled",
+    icon: FileText,
+    trend: "neutral" as const,
+  },
+  {
+    title: "Scheduled",
       value: scheduledPosts.toString(),
-      change: "Next 7 days",
-      icon: Calendar,
-      trend: "neutral" as const,
-    },
-  ];
+    change: "Next 7 days",
+    icon: Calendar,
+    trend: "neutral" as const,
+  },
+];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

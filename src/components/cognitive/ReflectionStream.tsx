@@ -12,6 +12,7 @@ export function ReflectionStream() {
   const [newEntry, setNewEntry] = useState("");
   const { user } = useAuth();
   const { addReflection } = useCognitiveActions(user?.id);
+  const [lastRun, setLastRun] = useState<{ ok: boolean; details: string } | null>(null);
 
   const entries = [
     {
@@ -72,8 +73,10 @@ export function ReflectionStream() {
                 toast.success("Reflection added with AI tags & summary");
                 setNewEntry("");
                 console.log("[cognitive] reflection result", res);
+                setLastRun({ ok: true, details: `tags=${(res as any).tags?.join(', ') || '—'}, sentiment=${(res as any).sentiment_score ?? '—'}` });
               } catch (e: any) {
                 toast.error(e?.message || "Failed to add reflection");
+                setLastRun({ ok: false, details: "Local skills unavailable; used LLM-only summarization." });
               }
             }}>
               <Plus className="h-4 w-4 mr-2" />
@@ -84,6 +87,13 @@ export function ReflectionStream() {
             </Button>
           </div>
         </div>
+
+        {/* Skills status */}
+        {lastRun && (
+          <div className={`text-xs ${lastRun.ok ? 'text-muted-foreground' : 'text-amber-600'}`}>
+            Local skills {lastRun.ok ? 'ran' : 'fallback'} • {lastRun.details}
+          </div>
+        )}
 
         {/* Entries */}
         <div className="space-y-3 max-h-96 overflow-y-auto">

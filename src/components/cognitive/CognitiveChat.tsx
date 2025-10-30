@@ -7,6 +7,9 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCognitiveActions } from "@/hooks/useCognitive";
 import { toast } from "sonner";
+import { isDockerAvailable } from "@/lib/docker/skills";
+import { useEffect } from "react";
+import { preflightModel } from "@/lib/openrouter";
 
 interface CognitiveChatProps {
   mode: "friend" | "guide" | "mentor" | "ea";
@@ -19,6 +22,25 @@ export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
   const [busy, setBusy] = useState(false);
   const { user } = useAuth();
   const { cognitiveChat } = useCognitiveActions(user?.id);
+  const [dockerOn, setDockerOn] = useState<boolean | null>(null);
+  const [orStatus, setOrStatus] = useState<"ok" | "nocredits" | "unavailable" | "checking">("checking");
+
+  useEffect(() => {
+    (async () => {
+      try { setDockerOn(await isDockerAvailable()); } catch { setDockerOn(false); }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const pf = await preflightModel("google/gemini-2.0-flash-exp:free");
+        if (pf.ok) setOrStatus("ok");
+        else if (pf.code === 402) setOrStatus("nocredits");
+        else setOrStatus("unavailable");
+      } catch { setOrStatus("unavailable"); }
+    })();
+  }, []);
 
   const modes = [
     { id: "friend" as const, label: "Friend", icon: Heart, color: "text-pink-500" },
@@ -39,9 +61,15 @@ export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
             <Bot className="h-5 w-5 text-accent" />
             Acharya AI
           </CardTitle>
-          <Badge variant="outline" className="animate-pulse">
-            Active
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">Active</Badge>
+            <Badge variant={dockerOn ? "default" : "outline"} className="text-xs">
+              Local skills: {dockerOn === null ? "…" : dockerOn ? "On" : "Off"}
+            </Badge>
+            <Badge variant={orStatus === "ok" ? "default" : "outline"} className="text-xs">
+              OpenRouter: {orStatus === "checking" ? "…" : orStatus === "ok" ? "OK" : orStatus === "nocredits" ? "No credits" : "Unavailable"}
+            </Badge>
+          </div>
         </div>
         
         {/* Mode Selector */}

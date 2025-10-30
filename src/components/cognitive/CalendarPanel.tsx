@@ -2,19 +2,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Plus, Video } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCognitiveActions } from "@/hooks/useCognitive";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export function CalendarPanel() {
-  const events = [
-    { time: "10:00 AM", title: "Team Standup", type: "meeting", duration: "30m" },
-    { time: "2:00 PM", title: "Investor Call", type: "important", duration: "1h" },
-    { time: "4:30 PM", title: "Review Pitch Deck", type: "task", duration: "45m" },
-  ];
+  const { user } = useAuth();
+  const { suggestSlots, createEvent } = useCognitiveActions(user?.id);
+  const [slots, setSlots] = useState<{ start: string; end: string }[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const reminders = [
-    { text: "Finalize Q4 financial report", urgent: true },
-    { text: "Review HR appraisals", urgent: false },
-    { text: "Schedule marketing campaign review", urgent: false },
-  ];
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const s = await suggestSlots();
+        setSlots(s || []);
+      } catch (e: any) {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user?.id]);
 
   return (
     <Card className="border-accent/20">
@@ -30,38 +41,41 @@ export function CalendarPanel() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Events */}
+        {/* Suggested slots */}
         <div className="space-y-2">
-          {events.map((event, idx) => (
-            <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-              <div className="flex flex-col items-center">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground mt-1">{event.time}</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">{event.title}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant={event.type === "important" ? "default" : "outline"} className="text-xs">
-                    {event.duration}
-                  </Badge>
-                  {event.type === "meeting" && <Video className="h-3 w-3 text-muted-foreground" />}
+          {slots.length === 0 ? (
+            <div className="text-sm text-muted-foreground">{loading ? "Analyzing mood patterns…" : "No suggestions yet."}</div>
+          ) : (
+            slots.map((s, idx) => {
+              const start = new Date(s.start);
+              const label = start.toLocaleString([], { hour: '2-digit', minute: '2-digit', weekday: 'short', month: 'short', day: 'numeric' });
+              return (
+                <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                  <div className="flex flex-col items-center">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground mt-1">{label}</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Deep Work / Important Task</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">1h</Badge>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={async () => {
+                    try {
+                      await createEvent({ title: "Deep Work", start_time: s.start, end_time: s.end });
+                      toast.success("Event created");
+                    } catch (e: any) { toast.error(e?.message || "Failed"); }
+                  }}>Add</Button>
                 </div>
-              </div>
-            </div>
-          ))}
+              );
+            })
+          )}
         </div>
 
-        {/* Reminders */}
-        <div className="pt-4 border-t border-border">
-          <p className="text-sm font-medium mb-3">Reminders</p>
-          <div className="space-y-2">
-            {reminders.map((reminder, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full ${reminder.urgent ? "bg-red-500 animate-pulse" : "bg-accent"}`} />
-                <p className="text-sm text-muted-foreground">{reminder.text}</p>
-              </div>
-            ))}
-          </div>
+        {/* Notes */}
+        <div className="pt-4 border-t border-border text-xs text-muted-foreground">
+          Energy-aware suggestions are based on recent mood intensity patterns and default focus windows.
         </div>
       </CardContent>
     </Card>
