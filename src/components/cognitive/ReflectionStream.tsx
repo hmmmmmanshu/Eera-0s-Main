@@ -4,9 +4,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Link2, Mic, Plus } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCognitiveActions } from "@/hooks/useCognitive";
+import { toast } from "sonner";
 
 export function ReflectionStream() {
   const [newEntry, setNewEntry] = useState("");
+  const { user } = useAuth();
+  const { addReflection } = useCognitiveActions(user?.id);
 
   const entries = [
     {
@@ -60,7 +65,17 @@ export function ReflectionStream() {
             className="resize-none"
           />
           <div className="flex gap-2">
-            <Button className="flex-1">
+            <Button className="flex-1" onClick={async () => {
+              if (!newEntry.trim()) { toast.error("Write a reflection first"); return; }
+              try {
+                const res = await addReflection({ type: "journal", content: newEntry.trim() });
+                toast.success("Reflection added with AI tags & summary");
+                setNewEntry("");
+                console.log("[cognitive] reflection result", res);
+              } catch (e: any) {
+                toast.error(e?.message || "Failed to add reflection");
+              }
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Reflection
             </Button>

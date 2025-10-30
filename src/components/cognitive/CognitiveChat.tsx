@@ -4,6 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Bot, Heart, Compass, GraduationCap, Briefcase, Send } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCognitiveActions } from "@/hooks/useCognitive";
+import { toast } from "sonner";
 
 interface CognitiveChatProps {
   mode: "friend" | "guide" | "mentor" | "ea";
@@ -12,6 +15,10 @@ interface CognitiveChatProps {
 
 export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
   const [input, setInput] = useState("");
+  const [history, setHistory] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const { user } = useAuth();
+  const { cognitiveChat } = useCognitiveActions(user?.id);
 
   const modes = [
     { id: "friend" as const, label: "Friend", icon: Heart, color: "text-pink-500" },
@@ -20,10 +27,8 @@ export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
     { id: "ea" as const, label: "EA", icon: Briefcase, color: "text-green-500" },
   ];
 
-  const conversations = [
-    { role: "assistant", text: "Morning, Aditya - yesterday you felt 'drained but motivated'. Want to review your week or start fresh?" },
-    { role: "user", text: "I'm anxious about investor updates." },
-    { role: "assistant", text: "I understand that feeling. Let's break this down. Would you like me to help draft the update, or do you want to reflect on what's causing the anxiety first?" },
+  const conversations = history.length ? history : [
+    { role: "assistant", text: "Hi! I loaded your week trends. How can I help right now?" },
   ];
 
   return (
@@ -77,9 +82,38 @@ export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
             placeholder={`Chat with your AI ${mode}...`}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && console.log("Send")}
+            onKeyPress={async (e) => {
+              if (e.key !== "Enter") return;
+              if (!input.trim()) return;
+              try {
+                setBusy(true);
+                const msg = input.trim();
+                setHistory((h) => [...h, { role: "user", text: msg }]);
+                setInput("");
+                const reply = await cognitiveChat(msg, mode);
+                setHistory((h) => [...h, { role: "assistant", text: reply }]);
+              } catch (err: any) {
+                toast.error(err?.message || "Chat failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
           />
-          <Button size="icon">
+          <Button size="icon" disabled={busy} onClick={async () => {
+            if (!input.trim()) return;
+            try {
+              setBusy(true);
+              const msg = input.trim();
+              setHistory((h) => [...h, { role: "user", text: msg }]);
+              setInput("");
+              const reply = await cognitiveChat(msg, mode);
+              setHistory((h) => [...h, { role: "assistant", text: reply }]);
+            } catch (err: any) {
+              toast.error(err?.message || "Chat failed");
+            } finally {
+              setBusy(false);
+            }
+          }}>
             <Send className="h-4 w-4" />
           </Button>
         </div>

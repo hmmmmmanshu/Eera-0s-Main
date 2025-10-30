@@ -1,22 +1,31 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { TrendingUp, Target, Award, Activity } from "lucide-react";
+import { TrendingUp, Target, Award, Activity, RefreshCw } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { useCognitiveActions } from "@/hooks/useCognitive";
+import { toast } from "sonner";
 
 export function WeeklyOverview() {
-  const metrics = [
-    { label: "Goals Achieved", value: 82, icon: Target, color: "text-green-500" },
-    { label: "Mood Trend", value: 74, trend: "+6.2%", icon: Activity, color: "text-purple-500" },
-    { label: "Productivity", value: 88, icon: TrendingUp, color: "text-blue-500" },
-    { label: "Focus Areas", value: 3, icon: Award, color: "text-amber-500" },
-  ];
+  const { user } = useAuth();
+  const { weeklyOverview } = useCognitiveActions(user?.id);
+  const [loading, setLoading] = useState(false);
+  const [snapshot, setSnapshot] = useState<any | null>(null);
 
-  const highlights = [
-    "✨ Engagement increased 20% - great work on content strategy",
-    "🎯 Completed 8/10 planned tasks this week",
-    "💡 Generated 5 actionable ideas from reflection",
-    "⚠️ Runway forecasting needs attention",
-  ];
+  useEffect(() => {
+    (async () => {
+      if (!user?.id) return;
+      try {
+        setLoading(true);
+        const snap = await weeklyOverview();
+        setSnapshot(snap?.payload || snap);
+      } catch (e: any) {
+        toast.error(e?.message || "Failed to load weekly overview");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user?.id]);
 
   return (
     <Card className="border-accent/20 bg-gradient-to-br from-accent/5 to-transparent">
@@ -26,36 +35,57 @@ export function WeeklyOverview() {
             <Activity className="h-5 w-5 text-accent" />
             Weekly Overview
           </CardTitle>
-          <Badge variant="outline">Oct 14-20, 2025</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">This Week</Badge>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {metrics.map((metric, idx) => (
-            <div key={idx} className="space-y-2">
+        {/* Metrics Grid (derived from snapshot when available) */}
+        {snapshot ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <metric.icon className={`h-4 w-4 ${metric.color}`} />
-                <span className="text-2xl font-bold">{metric.value}{typeof metric.value === 'number' && metric.value < 10 ? '' : '%'}</span>
+                <Target className="h-4 w-4 text-green-500" />
+                <span className="text-2xl font-bold">{snapshot.moodAverage ?? "–"}</span>
               </div>
-              <p className="text-xs text-muted-foreground">{metric.label}</p>
-              {metric.trend && (
-                <Badge variant="outline" className="text-xs">
-                  {metric.trend}
-                </Badge>
-              )}
+              <p className="text-xs text-muted-foreground">Mood Average</p>
             </div>
-          ))}
-        </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Activity className="h-4 w-4 text-purple-500" />
+                <span className="text-2xl font-bold">{(snapshot.topMoods?.length || 0)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Top Moods</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <TrendingUp className="h-4 w-4 text-blue-500" />
+                <span className="text-2xl font-bold">{(snapshot.themes?.length || 0)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Themes</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Award className="h-4 w-4 text-amber-500" />
+                <span className="text-2xl font-bold">3</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Actions</p>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">Loading weekly snapshot…</div>
+        )}
 
         {/* Highlights */}
         <div className="space-y-2">
           <p className="text-sm font-medium">Key Highlights</p>
           <div className="space-y-2">
-            {highlights.map((highlight, idx) => (
+            {(snapshot?.insights || []).slice(0, 3).map((s: string, idx: number) => (
               <div key={idx} className="flex items-start gap-2 text-sm">
                 <div className="h-1.5 w-1.5 rounded-full bg-accent mt-1.5" />
-                <p className="text-muted-foreground">{highlight}</p>
+                <p className="text-muted-foreground">{s}</p>
               </div>
             ))}
           </div>
@@ -65,14 +95,12 @@ export function WeeklyOverview() {
         <div className="p-4 rounded-lg bg-muted/50">
           <p className="text-sm font-medium mb-2">Suggested Focus Areas</p>
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Team clarity & 1-on-1s</span>
-              <Badge variant="secondary" className="text-xs">High Priority</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Runway forecasting</span>
-              <Badge variant="secondary" className="text-xs">Critical</Badge>
-            </div>
+            {(snapshot?.actions || []).slice(0, 3).map((a: string, idx: number) => (
+              <div key={idx} className="flex items-center justify-between">
+                <span className="text-sm">{a}</span>
+                <Badge variant="secondary" className="text-xs">Recommended</Badge>
+              </div>
+            ))}
           </div>
         </div>
       </CardContent>
