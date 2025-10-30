@@ -105,6 +105,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   // Slides (ordered) for carousel/reel
   const [slides, setSlides] = useState<PostImageMeta[]>([]);
   const [newSlidePrompt, setNewSlidePrompt] = useState("");
+  const [slidePoints, setSlidePoints] = useState("");
   const [slideActionsBusy, setSlideActionsBusy] = useState<number | null>(null);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number }>({ completed: 0, total: 0 });
@@ -212,7 +213,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   };
 
   const splitKeyPointsIntoPrompts = (): string[] => {
-    const points = (keyPoints || "")
+    const source = (contentType === "carousel" && slidePoints) ? slidePoints : keyPoints;
+    const points = (source || "")
       .split(/\n|•|\-|\u2022/)
       .map(p => p.trim())
       .filter(Boolean);
@@ -325,23 +327,21 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       if (contentType === "image" || contentType === "carousel") {
         setGenerationStatus(prev => ({ ...prev, imageGen: "in-progress" }));
         
-        console.log("[CreatePostModal] Starting AI image generation");
-        const imagePrompt = `${headline}. ${keyPoints || ""}`;
-        
-        const imageResult = await generateImageWithFallback({
-          model: selectedModel,
-          prompt: imagePrompt,
-          brandContext,
-          aspectRatio: aspectRatio,
-          negativePrompt: negativePrompt || undefined,
-        });
-        
-        imageUrl = imageResult.url;
-        setGeneratedImageUrl(imageUrl);
-        // If carousel, append to slides; if single image, replace
         if (contentType === "carousel") {
-          setSlides(prev => [...prev, { url: imageUrl, prompt: imagePrompt, aspectRatio, seed: consistentStyle ? seed : undefined }]);
+          // Batch generate from slide points
+          await generateSlidesFromKeyPoints();
         } else {
+          console.log("[CreatePostModal] Starting AI image generation");
+          const imagePrompt = `${headline}. ${keyPoints || ""}`;
+          const imageResult = await generateImageWithFallback({
+            model: selectedModel,
+            prompt: imagePrompt,
+            brandContext,
+            aspectRatio: aspectRatio,
+            negativePrompt: negativePrompt || undefined,
+          });
+          imageUrl = imageResult.url;
+          setGeneratedImageUrl(imageUrl);
           setSlides([{ url: imageUrl, prompt: imagePrompt, aspectRatio, seed: consistentStyle ? seed : undefined }]);
         }
         setGenerationStatus(prev => ({ ...prev, imageGen: "complete" }));
@@ -525,16 +525,30 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="keypoints">Key Points (optional)</Label>
-              <Textarea 
-                id="keypoints" 
-                placeholder="• Point 1&#10;• Point 2&#10;• Point 3"
-                rows={4}
-                value={keyPoints}
-                onChange={(e) => setKeyPoints(e.target.value)}
-              />
-            </div>
+            {contentType === "carousel" ? (
+              <div className="space-y-2">
+                <Label htmlFor="slidepoints">Slide Points (one per line)</Label>
+                <Textarea 
+                  id="slidepoints" 
+                  placeholder="Slide 1\nSlide 2\nSlide 3"
+                  rows={6}
+                  value={slidePoints}
+                  onChange={(e) => setSlidePoints(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">We’ll generate one visual per line with brand-aware prompts.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="keypoints">Key Points (optional)</Label>
+                <Textarea 
+                  id="keypoints" 
+                  placeholder="• Point 1&#10;• Point 2&#10;• Point 3"
+                  rows={4}
+                  value={keyPoints}
+                  onChange={(e) => setKeyPoints(e.target.value)}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
