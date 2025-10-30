@@ -37,7 +37,6 @@ export interface GeneratedText {
 export interface GeneratedImage {
   url: string; // Supabase Storage URL
   model: string;
-  cost: number;
   generationTime: number;
 }
 
@@ -74,20 +73,16 @@ export const TEXT_MODELS = {
 
 export const IMAGE_MODELS = {
   "google/gemini-2.5-flash-image-preview:free": {
-    name: "Gemini 2.5 Flash Image (Free)",
-    provider: "Google",
-    cost: 0,
-    badge: "FREE",
-    speed: "fast",
-    description: "Free image generation with Gemini 2.5 Flash",
+    name: "Standard Quality",
+    badge: "RECOMMENDED",
+    speed: "Fast",
+    description: "High-quality images optimized for social media",
   },
   "google/gemini-2.5-flash-image-preview": {
-    name: "Gemini 2.5 Flash Image (Paid)",
-    provider: "Google",
-    cost: 0.0000625, // $0.0625 per 1K images = ~$0.0000625 per image
-    badge: "PREMIUM",
-    speed: "fast",
-    description: "Premium Gemini model with improved image quality",
+    name: "Premium Quality",
+    badge: "BEST",
+    speed: "Fast",
+    description: "Highest quality images with enhanced details",
   },
 } as const;
 
@@ -348,19 +343,15 @@ export async function generateImage(
     } = supabase.storage.from("marketing-images").getPublicUrl(uploadData.path);
 
     const generationTime = Date.now() - startTime;
-    const modelInfo = IMAGE_MODELS[model as keyof typeof IMAGE_MODELS];
-    const cost = modelInfo?.cost || 0;
 
-    console.log("[OpenRouter Image] Generation complete:", {
+    console.log("[AI Image] Generation complete:", {
       url: publicUrl,
-      cost,
       time: generationTime,
     });
 
     return {
       url: publicUrl,
       model,
-      cost,
       generationTime,
     };
   } catch (error) {

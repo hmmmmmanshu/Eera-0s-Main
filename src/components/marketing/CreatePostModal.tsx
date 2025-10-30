@@ -55,17 +55,31 @@ interface CreatePostModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const FORM_STORAGE_KEY = "eera_create_post_draft";
+
 export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) => {
+  // Load saved draft from localStorage
+  const loadDraft = () => {
+    try {
+      const saved = localStorage.getItem(FORM_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const savedDraft = loadDraft();
+
   // Step management
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(savedDraft?.step || 1);
   
-  // Form data
-  const [platform, setPlatform] = useState<"linkedin" | "instagram">("linkedin");
-  const [contentType, setContentType] = useState<"text" | "image" | "carousel" | "video">("text");
-  const [headline, setHeadline] = useState("");
-  const [keyPoints, setKeyPoints] = useState("");
-  const [tone, setTone] = useState<"quirky" | "humble" | "inspirational" | "professional" | "witty">("professional");
-  const [objective, setObjective] = useState<"awareness" | "leads" | "engagement" | "recruitment">("engagement");
+  // Form data with auto-restore
+  const [platform, setPlatform] = useState<"linkedin" | "instagram">(savedDraft?.platform || "linkedin");
+  const [contentType, setContentType] = useState<"text" | "image" | "carousel" | "video">(savedDraft?.contentType || "text");
+  const [headline, setHeadline] = useState(savedDraft?.headline || "");
+  const [keyPoints, setKeyPoints] = useState(savedDraft?.keyPoints || "");
+  const [tone, setTone] = useState<"quirky" | "humble" | "inspirational" | "professional" | "witty">(savedDraft?.tone || "professional");
+  const [objective, setObjective] = useState<"awareness" | "leads" | "engagement" | "recruitment">(savedDraft?.objective || "engagement");
   
   // Image generation (Step 3.5)
   const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("google/gemini-2.5-flash-image-preview:free");
@@ -81,7 +95,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     optimization: "pending",
   });
   const [generationTime, setGenerationTime] = useState(0);
-  const [actualCost, setActualCost] = useState(0);
   
   // Generated content
   const [generatedContent, setGeneratedContent] = useState<GeneratedPostContent | null>(null);
@@ -91,12 +104,30 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const { data: profile } = useBrandProfile();
   const createPostMutation = useCreatePost();
 
+  // Auto-save form data to localStorage
+  useEffect(() => {
+    if (open) {
+      const draftData = {
+        step,
+        platform,
+        contentType,
+        headline,
+        keyPoints,
+        tone,
+        objective,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(draftData));
+    }
+  }, [open, step, platform, contentType, headline, keyPoints, tone, objective]);
+
   const resetAndClose = () => {
     setStep(1);
     setHeadline("");
     setKeyPoints("");
     setGeneratedContent(null);
     setGeneratedImageUrl(null);
+    localStorage.removeItem(FORM_STORAGE_KEY); // Clear saved draft
     onOpenChange(false);
   };
 
@@ -152,11 +183,10 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
       // 3. Generate Image (if needed)
       let imageUrl = null;
-      let imageCost = 0;
       if (contentType === "image" || contentType === "carousel") {
         setGenerationStatus(prev => ({ ...prev, imageGen: "in-progress" }));
         
-        console.log("[CreatePostModal] Starting image generation with OpenRouter");
+        console.log("[CreatePostModal] Starting AI image generation");
         const imagePrompt = `${headline}. ${keyPoints || ""}`;
         
         const imageResult = await generateImageWithFallback({
@@ -168,14 +198,11 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         });
         
         imageUrl = imageResult.url;
-        imageCost = imageResult.cost;
         setGeneratedImageUrl(imageUrl);
         setGenerationStatus(prev => ({ ...prev, imageGen: "complete" }));
         
         console.log("[CreatePostModal] Image generation complete:", {
           url: imageUrl,
-          model: imageResult.model,
-          cost: imageCost,
           time: imageResult.generationTime
         });
       } else {
@@ -189,13 +216,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
       const endTime = Date.now();
       setGenerationTime((endTime - startTime) / 1000);
-      
-      // Calculate actual cost
-      let cost = 0; // Gemini text generation is FREE
-      if (contentType === "image" || contentType === "carousel") {
-        cost += imageCost;
-      }
-      setActualCost(cost);
 
       toast.success("Content generated successfully!");
       
@@ -448,9 +468,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                       </div>
                       <p className="font-semibold text-sm">{info.name}</p>
                       <p className="text-xs text-muted-foreground line-clamp-2">{info.description}</p>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground font-medium">${info.cost}/img</span>
-                        <span className="text-muted-foreground">{info.speed}</span>
+                      <div className="flex items-center justify-end text-xs">
+                        <span className="text-muted-foreground">{info.speed} Generation</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -500,7 +519,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               </Button>
               <Button className="flex-1 gap-2" onClick={() => setStep(4)}>
                 <Zap className="w-4 h-4" />
-                Generate with {IMAGE_MODELS[selectedModel].name}
+                Generate Content
               </Button>
             </div>
           </div>
@@ -550,9 +569,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   />
                 </div>
                 
-                {/* Cost Estimate */}
+                {/* Generation Info */}
                 <div className="text-center text-xs text-muted-foreground">
-                  Estimated cost: ${contentType === "image" || contentType === "carousel" ? IMAGE_MODELS[selectedModel].cost.toFixed(3) : "0.000"} (Text is FREE!)
+                  AI-powered content generation with brand awareness
                 </div>
               </>
             ) : generatedContent ? (
@@ -561,8 +580,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   <CheckCircle className="w-16 h-16 mx-auto" />
                   <p className="font-semibold">Content generated successfully!</p>
                   <p className="text-sm text-muted-foreground">
-                    {contentType === "image" || contentType === "carousel" ? `${IMAGE_MODELS[selectedModel].name} • ` : "Gemini 2.0 Flash • "}
-                    Time: {generationTime.toFixed(1)}s • Cost: ${actualCost.toFixed(3)}
+                    {contentType === "image" || contentType === "carousel" ? `${IMAGE_MODELS[selectedModel].name} • ` : ""}
+                    Generated in {generationTime.toFixed(1)}s
                   </p>
                 </div>
                 <Button onClick={() => setStep(5)} className="w-full">
