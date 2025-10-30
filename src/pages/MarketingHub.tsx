@@ -74,15 +74,15 @@ const MarketingHub = () => {
                 <AIInsightCard platform={platform} />
 
                 {/* KPI Strip */}
-                <KPIStrip />
+                <KPIStrip platform={platform === "all" ? undefined : platform} />
 
                 {/* Activity Heatmap */}
                 <ActivityHeatmap />
 
                 {/* Metrics Cards and Top Posts */}
                 <div className="grid lg:grid-cols-2 gap-6">
-                  <MetricsCards />
-                  <TopPostsCarousel />
+                  <MetricsCards platform={platform === "all" ? undefined : platform} />
+                  <TopPostsCarousel platform={platform === "all" ? undefined : platform} />
                 </div>
 
                 {/* Targets Progress */}

@@ -1,48 +1,60 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye, Users, TrendingUp, FileText, Calendar } from "lucide-react";
+import { useMarketingStats, type Platform } from "@/hooks/useMarketingData";
 
-const metrics = [
-  {
-    title: "Impressions",
-    value: "12,453",
-    change: "+23.1%",
-    icon: Eye,
-    trend: "up" as const,
-  },
-  {
-    title: "Reach",
-    value: "8,234",
-    change: "+18.2%",
-    icon: Users,
-    trend: "up" as const,
-  },
-  {
-    title: "Engagement Rate",
-    value: "4.2%",
-    change: "+0.8%",
-    icon: TrendingUp,
-    trend: "up" as const,
-  },
-  {
-    title: "Posts This Week",
-    value: "7",
-    change: "Target: 5",
-    icon: FileText,
-    trend: "neutral" as const,
-  },
-  {
-    title: "Scheduled",
-    value: "12",
-    change: "Next 7 days",
-    icon: Calendar,
-    trend: "neutral" as const,
-  },
-];
+interface MetricsCardsProps {
+  platform?: Platform;
+}
 
-export const MetricsCards = () => {
+export const MetricsCards = ({ platform }: MetricsCardsProps) => {
+  const { metrics, totalViews, totalPosts, scheduledPosts, publishedPosts } = useMarketingStats(platform);
+
+  // Calculate posts this week
+  const thisWeekPosts = publishedPosts; // Can be refined with date filtering
+
+  const metricsData = [
+    {
+      title: "Impressions",
+      value: totalViews >= 1000 ? `${(totalViews / 1000).toFixed(1)}K` : totalViews.toLocaleString(),
+      change: `${metrics.reach.change >= 0 ? "+" : ""}${metrics.reach.change.toFixed(1)}%`,
+      icon: Eye,
+      trend: metrics.reach.trend,
+    },
+    {
+      title: "Reach",
+      value: metrics.reach.value >= 1000 
+        ? `${(metrics.reach.value / 1000).toFixed(1)}K` 
+        : metrics.reach.value.toLocaleString(),
+      change: `${metrics.reach.change >= 0 ? "+" : ""}${metrics.reach.change.toFixed(1)}%`,
+      icon: Users,
+      trend: metrics.reach.trend,
+    },
+    {
+      title: "Engagement Rate",
+      value: `${(metrics.engagement.value / 100).toFixed(1)}%`,
+      change: `${metrics.engagement.change >= 0 ? "+" : ""}${metrics.engagement.change.toFixed(1)}%`,
+      icon: TrendingUp,
+      trend: metrics.engagement.trend,
+    },
+    {
+      title: "Posts This Week",
+      value: thisWeekPosts.toString(),
+      change: `${totalPosts} total`,
+      icon: FileText,
+      trend: "neutral" as const,
+    },
+    {
+      title: "Scheduled",
+      value: scheduledPosts.toString(),
+      change: "Next 7 days",
+      icon: Calendar,
+      trend: "neutral" as const,
+    },
+  ];
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-      {metrics.map((metric) => {
+      {metricsData.map((metric) => {
         const Icon = metric.icon;
         return (
           <Card key={metric.title}>
@@ -58,6 +70,8 @@ export const MetricsCards = () => {
                 <p className={`text-xs ${
                   metric.trend === "up" 
                     ? "text-green-600" 
+                    : metric.trend === "down"
+                    ? "text-red-600"
                     : "text-muted-foreground"
                 }`}>
                   {metric.change}

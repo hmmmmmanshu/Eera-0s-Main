@@ -1,38 +1,55 @@
 import { Card } from "@/components/ui/card";
 import { TrendingUp, Users, Heart, Award } from "lucide-react";
+import { useMarketingStats, type Platform } from "@/hooks/useMarketingData";
 
-const kpis = [
-  {
-    label: "Impressions",
-    value: "12.4K",
-    change: "+23%",
-    trend: "up" as const,
-    icon: TrendingUp,
-  },
-  {
-    label: "Engagement Rate",
-    value: "4.2%",
-    change: "+0.8%",
-    trend: "up" as const,
-    icon: Heart,
-  },
-  {
-    label: "New Followers",
-    value: "+156",
-    change: "+12%",
-    trend: "up" as const,
-    icon: Users,
-  },
-  {
-    label: "Top Platform",
-    value: "LinkedIn",
-    change: "2.1K reach",
-    trend: "neutral" as const,
-    icon: Award,
-  },
-];
+interface KPIStripProps {
+  platform?: Platform;
+}
 
-export const KPIStrip = () => {
+export const KPIStrip = ({ platform }: KPIStripProps) => {
+  const { metrics, totalViews, totalLikes, publishedPosts } = useMarketingStats(platform);
+
+  // Calculate engagement rate
+  const engagementRate = totalViews > 0 
+    ? ((totalLikes / totalViews) * 100).toFixed(1)
+    : "0.0";
+
+  // Determine top platform by reach
+  const topPlatform = platform || "All";
+
+  const kpis = [
+    {
+      label: "Reach",
+      value: metrics.reach.value >= 1000 
+        ? `${(metrics.reach.value / 1000).toFixed(1)}K` 
+        : metrics.reach.value.toString(),
+      change: `${metrics.reach.change >= 0 ? "+" : ""}${metrics.reach.change.toFixed(1)}%`,
+      trend: metrics.reach.trend,
+      icon: TrendingUp,
+    },
+    {
+      label: "Engagement Rate",
+      value: `${engagementRate}%`,
+      change: `${metrics.engagement.change >= 0 ? "+" : ""}${metrics.engagement.change.toFixed(1)}%`,
+      trend: metrics.engagement.trend,
+      icon: Heart,
+    },
+    {
+      label: "Total Posts",
+      value: publishedPosts.toString(),
+      change: `${publishedPosts} published`,
+      trend: "neutral" as const,
+      icon: Users,
+    },
+    {
+      label: "Top Platform",
+      value: topPlatform,
+      change: `${metrics.reach.value} reach`,
+      trend: "neutral" as const,
+      icon: Award,
+    },
+  ];
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
       {kpis.map((kpi) => {

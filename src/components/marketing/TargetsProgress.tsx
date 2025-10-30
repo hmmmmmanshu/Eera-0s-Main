@@ -1,34 +1,40 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-
-const targets = [
-  {
-    label: "Posts This Week",
-    current: 7,
-    target: 5,
-    unit: "posts",
-  },
-  {
-    label: "Monthly Impressions",
-    current: 45200,
-    target: 50000,
-    unit: "impressions",
-  },
-  {
-    label: "Engagement Rate",
-    current: 4.2,
-    target: 5.0,
-    unit: "%",
-  },
-  {
-    label: "New Followers",
-    current: 156,
-    target: 200,
-    unit: "followers",
-  },
-];
+import { useMarketingTargets } from "@/hooks/useMarketingData";
 
 export const TargetsProgress = () => {
+  const { data: targets = [], isLoading } = useMarketingTargets();
+
+  if (isLoading) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle>Weekly & Monthly Targets</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            Loading targets...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (targets.length === 0) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle>Weekly & Monthly Targets</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            No targets set yet. Create your first target to track progress!
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="h-full">
       <CardHeader>
@@ -36,18 +42,15 @@ export const TargetsProgress = () => {
       </CardHeader>
       <CardContent className="space-y-6">
         {targets.map((target) => {
-          const progress = (target.current / target.target) * 100;
+          const progress = (target.current_value / target.target_value) * 100;
           const isOverTarget = progress >= 100;
           
           return (
-            <div key={target.label} className="space-y-2">
+            <div key={target.id} className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{target.label}</span>
+                <span className="font-medium">{target.name}</span>
                 <span className={isOverTarget ? "text-green-600 font-medium" : "text-muted-foreground"}>
-                  {target.unit === "impressions" 
-                    ? target.current.toLocaleString() 
-                    : target.current.toFixed(target.unit === "%" ? 1 : 0)}
-                  /{target.target.toLocaleString()} {target.unit}
+                  {target.current_value.toLocaleString()}/{target.target_value.toLocaleString()}
                 </span>
               </div>
               <Progress 
