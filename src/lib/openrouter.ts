@@ -22,7 +22,7 @@ export interface TextGenerationOptions {
 export interface ImageGenerationOptions {
   model: string;
   prompt: string;
-  size?: "1024x1024" | "1792x1024" | "1024x1792";
+  aspectRatio?: "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "4:5" | "5:4" | "2:3" | "3:2" | "21:9";
   brandContext?: BrandContext;
   negativePrompt?: string;
 }
@@ -73,37 +73,21 @@ export const TEXT_MODELS = {
 } as const;
 
 export const IMAGE_MODELS = {
-  "openai/dall-e-3": {
-    name: "DALL-E 3",
-    provider: "OpenAI",
-    cost: 0.04,
-    badge: "RELIABLE",
+  "google/gemini-2.0-flash-exp-image:free": {
+    name: "Gemini 2.0 Flash Image",
+    provider: "Google",
+    cost: 0,
+    badge: "FREE",
     speed: "fast",
-    description: "Best for text in images, professional layouts",
+    description: "Free image generation with Gemini 2.0 Flash",
   },
-  "black-forest-labs/flux-dev": {
-    name: "Flux Dev",
-    provider: "Black Forest Labs",
-    cost: 0.025,
-    badge: "BALANCED",
+  "google/gemini-2.5-flash-image-preview": {
+    name: "Gemini 2.5 Flash Image",
+    provider: "Google",
+    cost: 0.0000625, // $0.0625 per 1K images = ~$0.0000625 per image
+    badge: "LATEST",
     speed: "fast",
-    description: "Great balance of quality and cost",
-  },
-  "black-forest-labs/flux-pro": {
-    name: "Flux Pro",
-    provider: "Black Forest Labs",
-    cost: 0.055,
-    badge: "PREMIUM",
-    speed: "medium",
-    description: "Highest quality photorealistic images",
-  },
-  "stability-ai/stable-diffusion-xl": {
-    name: "SDXL",
-    provider: "Stability AI",
-    cost: 0.003,
-    badge: "CHEAPEST",
-    speed: "fast",
-    description: "Ultra-low cost, great for testing and high-volume",
+    description: "Latest Gemini model with improved image quality",
   },
 } as const;
 
@@ -157,50 +141,6 @@ function enhancePromptWithBrand(
   return enhanced;
 }
 
-async function uploadToSupabase(
-  imageUrl: string,
-  filename: string
-): Promise<string> {
-  console.log("[OpenRouter] Downloading image from:", imageUrl);
-
-  // Download image from OpenRouter
-  const response = await fetch(imageUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.statusText}`);
-  }
-
-  const blob = await response.blob();
-  console.log("[OpenRouter] Image downloaded, size:", blob.size);
-
-  // Get current user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  // Upload to Supabase Storage
-  const path = `${user.id}/marketing/${Date.now()}-${filename}`;
-
-  const { data, error } = await supabase.storage
-    .from("marketing-images")
-    .upload(path, blob, {
-      contentType: blob.type,
-      upsert: false,
-    });
-
-  if (error) {
-    console.error("[OpenRouter] Upload error:", error);
-    throw error;
-  }
-
-  // Get public URL
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from("marketing-images").getPublicUrl(data.path);
-
-  console.log("[OpenRouter] Upload successful:", publicUrl);
-  return publicUrl;
-}
 
 // ========================================
 // MAIN API FUNCTIONS
@@ -295,14 +235,16 @@ export async function generateText(
 }
 
 /**
- * Generate image using OpenRouter
+ * Generate image using OpenRouter with Gemini models
+ * Uses /chat/completions endpoint with modalities parameter
+ * Reference: https://openrouter.ai/docs/features/multimodal/image-generation
  */
 export async function generateImage(
   options: ImageGenerationOptions
 ): Promise<GeneratedImage> {
-  const { model, prompt, size = "1024x1024", brandContext, negativePrompt } = options;
+  const { model, prompt, aspectRatio = "1:1", brandContext } = options;
 
-  console.log("[OpenRouter Image] Starting generation:", { model, prompt, size });
+  console.log("[OpenRouter Image] Starting generation:", { model, prompt, aspectRatio });
 
   const startTime = Date.now();
   const apiKey = getOpenRouterKey();
@@ -312,8 +254,9 @@ export async function generateImage(
   console.log("[OpenRouter Image] Enhanced prompt:", enhancedPrompt);
 
   try {
+    // Use /chat/completions endpoint with modalities parameter
     const response = await fetch(
-      "https://openrouter.ai/api/v1/images/generations",
+      "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
         headers: {
@@ -324,48 +267,98 @@ export async function generateImage(
         },
         body: JSON.stringify({
           model,
-          prompt: enhancedPrompt,
-          ...(negativePrompt && { negative_prompt: negativePrompt }),
-          size,
-          n: 1,
+          messages: [
+            {
+              role: "user",
+              content: enhancedPrompt,
+            },
+          ],
+          modalities: ["image", "text"],
+          image_config: {
+            aspect_ratio: aspectRatio,
+          },
         }),
       }
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("[OpenRouter Image] API Error:", errorData);
+      const errorText = await response.text();
+      console.error("[OpenRouter Image] API Error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+      });
       throw new Error(
-        `OpenRouter API error: ${response.status} - ${JSON.stringify(errorData)}`
+        `OpenRouter API error: ${response.status} - ${errorText}`
       );
     }
 
     const data = await response.json();
-    console.log("[OpenRouter Image] Response received:", data);
+    console.log("[OpenRouter Image] Response received");
 
-    // Extract image URL from response
-    const imageUrl = data.data?.[0]?.url;
-    if (!imageUrl) {
+    // Extract base64 image from response
+    const images = data.choices?.[0]?.message?.images;
+    if (!images || images.length === 0) {
+      console.error("[OpenRouter Image] No images in response:", data);
+      throw new Error("No images in response");
+    }
+
+    const base64DataUrl = images[0]?.image_url?.url;
+    if (!base64DataUrl) {
       throw new Error("No image URL in response");
     }
 
-    console.log("[OpenRouter Image] Temporary URL:", imageUrl);
+    console.log("[OpenRouter Image] Received base64 image, size:", base64DataUrl.length);
 
-    // Upload to Supabase Storage for permanent hosting
-    const permanentUrl = await uploadToSupabase(imageUrl, `${model.replace(/\//g, "-")}-${Date.now()}.png`);
+    // Convert base64 data URL to blob
+    const base64Data = base64DataUrl.split(",")[1];
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: "image/png" });
+
+    console.log("[OpenRouter Image] Converted to blob, size:", blob.size);
+
+    // Upload to Supabase Storage
+    const filename = `${model.replace(/\//g, "-")}-${Date.now()}.png`;
+    
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const path = `${user.id}/marketing/${Date.now()}-${filename}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("marketing-images")
+      .upload(path, blob, {
+        contentType: "image/png",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("[OpenRouter Image] Upload error:", uploadError);
+      throw uploadError;
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("marketing-images").getPublicUrl(uploadData.path);
 
     const generationTime = Date.now() - startTime;
     const modelInfo = IMAGE_MODELS[model as keyof typeof IMAGE_MODELS];
     const cost = modelInfo?.cost || 0;
 
     console.log("[OpenRouter Image] Generation complete:", {
-      url: permanentUrl,
+      url: publicUrl,
       cost,
       time: generationTime,
     });
 
     return {
-      url: permanentUrl,
+      url: publicUrl,
       model,
       cost,
       generationTime,
@@ -378,10 +371,11 @@ export async function generateImage(
 
 /**
  * Generate with automatic fallback
+ * Falls back from paid Gemini model to free one if it fails
  */
 export async function generateImageWithFallback(
   options: ImageGenerationOptions,
-  fallbackModels: string[] = ["openai/dall-e-3", "black-forest-labs/flux-dev", "stability-ai/stable-diffusion-xl"]
+  fallbackModels: string[] = ["google/gemini-2.0-flash-exp-image:free"]
 ): Promise<GeneratedImage> {
   const models = [options.model, ...fallbackModels.filter(m => m !== options.model)];
 

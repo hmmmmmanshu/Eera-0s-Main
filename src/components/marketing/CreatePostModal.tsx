@@ -68,8 +68,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [objective, setObjective] = useState<"awareness" | "leads" | "engagement" | "recruitment">("engagement");
   
   // Image generation (Step 3.5)
-  const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("openai/dall-e-3");
-  const [imageSize, setImageSize] = useState<"1024x1024" | "1792x1024" | "1024x1792">("1024x1024");
+  const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("google/gemini-2.0-flash-exp-image:free");
+  const [aspectRatio, setAspectRatio] = useState<"1:1" | "16:9" | "9:16">("1:1");
   const [negativePrompt, setNegativePrompt] = useState("");
   
   // Generation state
@@ -163,7 +163,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           model: selectedModel,
           prompt: imagePrompt,
           brandContext,
-          size: imageSize,
+          aspectRatio: aspectRatio,
           negativePrompt: negativePrompt || undefined,
         });
         
@@ -442,10 +442,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     <CardContent className="p-4 space-y-2">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
-                          {model === "openai/dall-e-3" && <ImageIcon className="w-5 h-5 text-primary" />}
-                          {model === "black-forest-labs/flux-dev" && <Zap className="w-5 h-5 text-primary" />}
-                          {model === "black-forest-labs/flux-pro" && <Sparkles className="w-5 h-5 text-primary" />}
-                          {model === "stability-ai/stable-diffusion-xl" && <Settings className="w-5 h-5 text-primary" />}
+                          <Sparkles className="w-5 h-5 text-primary" />
                         </div>
                         <Badge variant="secondary" className="text-xs">{info.badge}</Badge>
                       </div>
@@ -466,19 +463,19 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               <AccordionItem value="advanced">
                 <AccordionTrigger className="text-sm">Advanced Options</AccordionTrigger>
                 <AccordionContent className="space-y-3 pt-2">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Image Size</Label>
-                    <Select value={imageSize} onValueChange={(v: any) => setImageSize(v)}>
-                      <SelectTrigger className="text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1024x1024">Square (1024×1024) - Instagram/LinkedIn</SelectItem>
-                        <SelectItem value="1792x1024">Landscape (1792×1024) - LinkedIn</SelectItem>
-                        <SelectItem value="1024x1792">Portrait (1024×1792) - Instagram Stories</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Aspect Ratio</Label>
+                <Select value={aspectRatio} onValueChange={(v: any) => setAspectRatio(v)}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1:1">Square (1:1) - Instagram/LinkedIn</SelectItem>
+                    <SelectItem value="16:9">Landscape (16:9) - LinkedIn Post</SelectItem>
+                    <SelectItem value="9:16">Portrait (9:16) - Instagram Stories</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
                   
                   <div className="space-y-2">
                     <Label className="text-xs">Negative Prompt (Optional)</Label>
