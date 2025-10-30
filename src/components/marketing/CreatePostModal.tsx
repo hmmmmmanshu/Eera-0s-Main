@@ -780,8 +780,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           </div>
         )}
 
-        {/* Slides Tray for Carousel */}
-        {(contentType === "carousel" || contentType === "video") && (
+        {/* Slides Tray for Carousel - visible only after generation flow begins */}
+        {step >= 4 && (contentType === "carousel" || contentType === "video") && (
           <div className="space-y-4 mt-6">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">Slides ({slides.length}/{contentType === "video" ? 16 : 10})</p>
