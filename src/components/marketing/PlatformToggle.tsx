@@ -16,15 +16,15 @@ export const PlatformToggle = ({ value, onChange }: PlatformToggleProps) => {
   ];
 
   return (
-    <div className="relative inline-flex items-center gap-1 p-1 rounded-lg bg-muted/50 border border-border">
+    <div className="relative inline-flex items-center gap-1 p-1 rounded-lg bg-background border border-border shadow-sm">
       {options.map((option) => (
         <button
           key={option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            "relative px-4 py-2 text-sm font-medium transition-colors rounded-md",
+            "relative px-4 py-2 text-sm font-semibold transition-all rounded-md focus:outline-none",
             value === option.value
-              ? "text-foreground"
+              ? "text-primary"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -32,12 +32,12 @@ export const PlatformToggle = ({ value, onChange }: PlatformToggleProps) => {
             <motion.div
               layoutId="platform-toggle"
               className={cn(
-                "absolute inset-0 rounded-md",
-                option.value === "linkedin" && "bg-blue-500/10 border border-blue-500/20",
-                option.value === "instagram" && "bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20",
-                option.value === "all" && "bg-accent/50 border border-accent"
+                "absolute inset-0 rounded-md ring-2",
+                option.value === "linkedin" && "bg-blue-600/10 ring-blue-500/40",
+                option.value === "instagram" && "bg-gradient-to-r from-purple-600/10 to-pink-600/10 ring-purple-500/40",
+                option.value === "all" && "bg-primary/10 ring-primary/40"
               )}
-              transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+              transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
             />
           )}
           <span className="relative z-10">{option.label}</span>

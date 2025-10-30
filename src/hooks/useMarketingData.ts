@@ -11,10 +11,35 @@ export type Platform = "linkedin" | "instagram" | "twitter" | "facebook";
 export type PostStatus = "draft" | "scheduled" | "published" | "failed";
 export type PostFormat = "text" | "image" | "video" | "carousel" | "story";
 
+export interface PostImageMeta {
+  url: string;
+  caption?: string;
+  prompt?: string;
+  negativePrompt?: string;
+  model?: string;
+  seed?: number;
+  aspectRatio?: "1:1" | "4:5" | "9:16";
+}
+
+export interface PostMeta {
+  images?: PostImageMeta[]; // ordered, mirrors media_urls order
+  reel_storyboard?: {
+    slides: Array<{
+      imageUrl: string;
+      durationSec: number;
+      overlayText?: string;
+      transition?: string;
+    }>;
+    voiceoverScript?: string[];
+    backgroundTrack?: string;
+  };
+}
+
 export interface MarketingPost {
   id: string;
   user_id: string;
   platform: Platform;
+  content_type?: PostFormat;
   content: string;
   media_urls: string[];
   status: PostStatus;
@@ -26,6 +51,7 @@ export interface MarketingPost {
   shares: number;
   created_at: string;
   updated_at: string;
+  post_meta?: PostMeta | null;
 }
 
 export interface MarketingMetric {
