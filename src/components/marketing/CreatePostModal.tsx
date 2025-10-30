@@ -45,14 +45,10 @@ import { assembleBrandContext } from "@/lib/brandContext";
 // AI Functions
 import { generatePostContent, type GeneratedPostContent } from "@/lib/gemini";
 import { 
-  generateImage, 
-  MODEL_INFO, 
-  type ImageModel, 
-  type AspectRatio, 
-  type ImageStyle,
-  estimateCost,
-  estimateTime
-} from "@/lib/imageGeneration";
+  generateImageWithFallback,
+  IMAGE_MODELS,
+  type ImageGenerationOptions
+} from "@/lib/openrouter";
 
 interface CreatePostModalProps {
   open: boolean;
@@ -72,11 +68,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [objective, setObjective] = useState<"awareness" | "leads" | "engagement" | "recruitment">("engagement");
   
   // Image generation (Step 3.5)
-  const [selectedModel, setSelectedModel] = useState<ImageModel>("gemini");
-  const [imageStyle, setImageStyle] = useState<ImageStyle>("photorealistic");
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+  const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("openai/dall-e-3");
+  const [imageSize, setImageSize] = useState<"1024x1024" | "1792x1024" | "1024x1792">("1024x1024");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [seed, setSeed] = useState("");
   
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -167,23 +161,32 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
       // 3. Generate Image (if needed)
       let imageUrl = null;
+      let imageCost = 0;
       if (contentType === "image" || contentType === "carousel") {
         setGenerationStatus(prev => ({ ...prev, imageGen: "in-progress" }));
         
+        console.log("[CreatePostModal] Starting image generation with OpenRouter");
         const imagePrompt = `${headline}. ${keyPoints || ""}`;
-        const imageResult = await generateImage({
+        
+        const imageResult = await generateImageWithFallback({
           model: selectedModel,
           prompt: imagePrompt,
           brandContext,
-          aspectRatio,
-          style: imageStyle,
+          size: imageSize,
           negativePrompt: negativePrompt || undefined,
-          seed: seed ? parseInt(seed) : undefined,
         });
         
         imageUrl = imageResult.url;
+        imageCost = imageResult.cost;
         setGeneratedImageUrl(imageUrl);
         setGenerationStatus(prev => ({ ...prev, imageGen: "complete" }));
+        
+        console.log("[CreatePostModal] Image generation complete:", {
+          url: imageUrl,
+          model: imageResult.model,
+          cost: imageCost,
+          time: imageResult.generationTime
+        });
       } else {
         setGenerationStatus(prev => ({ ...prev, imageGen: "skipped" }));
       }
@@ -197,9 +200,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setGenerationTime((endTime - startTime) / 1000);
       
       // Calculate actual cost
-      let cost = 0.001; // Text generation
+      let cost = 0; // Gemini text generation is FREE
       if (contentType === "image" || contentType === "carousel") {
-        cost += estimateCost(selectedModel);
+        cost += imageCost;
       }
       setActualCost(cost);
 
@@ -428,30 +431,37 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         {/* Step 3.5: Model Selection (for image/video content) */}
         {step === 3.5 && (contentType === "image" || contentType === "carousel" || contentType === "video") && (
           <div className="space-y-4">
-            <Label>Choose AI Model</Label>
+            <div>
+              <Label>Choose AI Model</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                All models automatically apply your brand colors
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              {Object.entries(MODEL_INFO).map(([modelKey, info]) => {
-                const model = modelKey as ImageModel;
+              {Object.entries(IMAGE_MODELS).map(([modelKey, info]) => {
+                const model = modelKey as keyof typeof IMAGE_MODELS;
                 return (
                   <Card
                     key={model}
-                    className={`cursor-pointer transition-all ${selectedModel === model ? "ring-2 ring-primary" : ""}`}
+                    className={`cursor-pointer transition-all hover:border-primary/50 ${
+                      selectedModel === model ? "ring-2 ring-primary border-primary" : ""
+                    }`}
                     onClick={() => setSelectedModel(model)}
                   >
                     <CardContent className="p-4 space-y-2">
                       <div className="flex items-start justify-between">
-                        <div>
-                          {model === "gemini" && <Sparkles className="w-5 h-5 text-primary" />}
-                          {model === "dalle3" && <ImageIcon className="w-5 h-5 text-primary" />}
-                          {model === "sdxl" && <Settings className="w-5 h-5 text-primary" />}
-                          {model === "leonardo" && <Palette className="w-5 h-5 text-primary" />}
+                        <div className="flex items-center gap-2">
+                          {model === "openai/dall-e-3" && <ImageIcon className="w-5 h-5 text-primary" />}
+                          {model === "black-forest-labs/flux-dev" && <Zap className="w-5 h-5 text-primary" />}
+                          {model === "black-forest-labs/flux-pro" && <Sparkles className="w-5 h-5 text-primary" />}
+                          {model === "stability-ai/stable-diffusion-xl" && <Settings className="w-5 h-5 text-primary" />}
                         </div>
-                        <Badge variant="outline" className="text-xs">{info.badge}</Badge>
+                        <Badge variant="secondary" className="text-xs">{info.badge}</Badge>
                       </div>
                       <p className="font-semibold text-sm">{info.name}</p>
-                      <p className="text-xs text-muted-foreground">{info.description}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{info.description}</p>
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">{info.pricing}</span>
+                        <span className="text-muted-foreground font-medium">${info.cost}/img</span>
                         <span className="text-muted-foreground">{info.speed}</span>
                       </div>
                     </CardContent>
@@ -460,65 +470,37 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               })}
             </div>
 
-            {/* Style Options */}
-            <div className="space-y-2">
-              <Label>Image Style</Label>
-              <Select value={imageStyle} onValueChange={(v: ImageStyle) => setImageStyle(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="photorealistic">Photorealistic</SelectItem>
-                  <SelectItem value="illustration">Illustration</SelectItem>
-                  <SelectItem value="minimalist">Minimalist</SelectItem>
-                  <SelectItem value="vibrant">Vibrant & Colorful</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Advanced Options */}
             <Accordion type="single" collapsible>
               <AccordionItem value="advanced">
                 <AccordionTrigger className="text-sm">Advanced Options</AccordionTrigger>
                 <AccordionContent className="space-y-3 pt-2">
-                  {selectedModel === "sdxl" && (
-                    <>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Negative Prompt</Label>
-                        <Textarea 
-                          placeholder="What to avoid: blurry, watermark, text..."
-                          value={negativePrompt}
-                          onChange={(e) => setNegativePrompt(e.target.value)}
-                          rows={2}
-                          className="text-sm"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Seed (for reproducibility)</Label>
-                        <Input 
-                          type="number"
-                          placeholder="Leave empty for random"
-                          value={seed}
-                          onChange={(e) => setSeed(e.target.value)}
-                          className="text-sm"
-                        />
-                      </div>
-                    </>
-                  )}
-                  
                   <div className="space-y-2">
-                    <Label className="text-xs">Aspect Ratio</Label>
-                    <Select value={aspectRatio} onValueChange={(v: AspectRatio) => setAspectRatio(v)}>
+                    <Label className="text-xs">Image Size</Label>
+                    <Select value={imageSize} onValueChange={(v: any) => setImageSize(v)}>
                       <SelectTrigger className="text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1:1">Square (1:1) - Instagram Post</SelectItem>
-                        <SelectItem value="4:5">Portrait (4:5) - Instagram Feed</SelectItem>
-                        <SelectItem value="16:9">Landscape (16:9) - LinkedIn</SelectItem>
-                        <SelectItem value="9:16">Story (9:16) - Instagram Stories</SelectItem>
+                        <SelectItem value="1024x1024">Square (1024×1024) - Instagram/LinkedIn</SelectItem>
+                        <SelectItem value="1792x1024">Landscape (1792×1024) - LinkedIn</SelectItem>
+                        <SelectItem value="1024x1792">Portrait (1024×1792) - Instagram Stories</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-xs">Negative Prompt (Optional)</Label>
+                    <Textarea 
+                      placeholder="What to avoid in the image: blurry, watermark, text artifacts..."
+                      value={negativePrompt}
+                      onChange={(e) => setNegativePrompt(e.target.value)}
+                      rows={2}
+                      className="text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Helps improve quality by specifying what should NOT appear
+                    </p>
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -530,7 +512,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               </Button>
               <Button className="flex-1 gap-2" onClick={() => setStep(4)}>
                 <Zap className="w-4 h-4" />
-                Generate with {MODEL_INFO[selectedModel].name}
+                Generate with {IMAGE_MODELS[selectedModel].name}
               </Button>
             </div>
           </div>
@@ -545,16 +527,16 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   <div className="relative">
                     <Sparkles className="w-16 h-16 mx-auto animate-pulse text-primary" />
                     {(contentType === "image" || contentType === "carousel") && (
-                      <Badge className="absolute bottom-0 right-1/3 capitalize">
-                        {selectedModel}
+                      <Badge className="absolute bottom-0 right-1/3 text-xs">
+                        {IMAGE_MODELS[selectedModel].name}
                       </Badge>
                     )}
                   </div>
                   <p className="font-semibold mt-4">Generating your content...</p>
                   <p className="text-sm text-muted-foreground">
                     {contentType === "image" || contentType === "carousel"
-                      ? `Using ${MODEL_INFO[selectedModel].name} • ~${estimateTime(selectedModel)}s`
-                      : "Using Gemini • ~2-3s"}
+                      ? `Using ${IMAGE_MODELS[selectedModel].name} via OpenRouter • ~5-10s`
+                      : "Using Gemini 2.0 Flash (FREE) • ~2-3s"}
                   </p>
                 </div>
                 
@@ -562,27 +544,27 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 <div className="space-y-2">
                   <StatusLine 
                     status={generationStatus.brandAnalysis} 
-                    text="Analyzing brand voice" 
+                    text="✓ Analyzing brand voice & colors" 
                   />
                   <StatusLine 
                     status={generationStatus.contentGen} 
-                    text="Generating copy & hashtags" 
+                    text="✓ Generating copy & hashtags" 
                   />
                   {(contentType === "image" || contentType === "carousel") && (
                     <StatusLine 
                       status={generationStatus.imageGen} 
-                      text="Creating visuals" 
+                      text="🎨 Creating brand-aware visuals" 
                     />
                   )}
                   <StatusLine 
                     status={generationStatus.optimization} 
-                    text="Optimizing for engagement" 
+                    text="⚡ Optimizing for engagement" 
                   />
                 </div>
                 
                 {/* Cost Estimate */}
                 <div className="text-center text-xs text-muted-foreground">
-                  Estimated cost: ${(0.001 + (contentType === "image" || contentType === "carousel" ? estimateCost(selectedModel) : 0)).toFixed(3)}
+                  Estimated cost: ${contentType === "image" || contentType === "carousel" ? IMAGE_MODELS[selectedModel].cost.toFixed(3) : "0.000"} (Text is FREE!)
                 </div>
               </>
             ) : generatedContent ? (
@@ -591,7 +573,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   <CheckCircle className="w-16 h-16 mx-auto" />
                   <p className="font-semibold">Content generated successfully!</p>
                   <p className="text-sm text-muted-foreground">
-                    {contentType === "image" || contentType === "carousel" ? `Model: ${selectedModel} • ` : ""}
+                    {contentType === "image" || contentType === "carousel" ? `${IMAGE_MODELS[selectedModel].name} • ` : "Gemini 2.0 Flash • "}
                     Time: {generationTime.toFixed(1)}s • Cost: ${actualCost.toFixed(3)}
                   </p>
                 </div>

@@ -10,14 +10,22 @@ import { CreatePostModal } from "@/components/marketing/CreatePostModal";
 import { PlatformToggle } from "@/components/marketing/PlatformToggle";
 import { AIInsightCard } from "@/components/marketing/AIInsightCard";
 import { DraftsSection } from "@/components/marketing/DraftsSection";
+import { BrandIdentitySettings } from "@/components/settings/BrandIdentitySettings";
 import { Button } from "@/components/ui/button";
-import { Zap, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Zap, Plus, Palette } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Platform = "all" | "linkedin" | "instagram";
 
 const MarketingHub = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBrandSettingsOpen, setIsBrandSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [platform, setPlatform] = useState<Platform>(() => {
     return (localStorage.getItem("marketingPlatform") as Platform) || "all";
@@ -46,6 +54,15 @@ const MarketingHub = () => {
               </div>
               <div className="flex gap-3 items-center">
                 <PlatformToggle value={platform} onChange={setPlatform} />
+                <Button 
+                  size="lg" 
+                  variant="ghost"
+                  className="gap-2"
+                  onClick={() => setIsBrandSettingsOpen(true)}
+                >
+                  <Palette className="h-5 w-5" />
+                  Brand
+                </Button>
                 <Button 
                   size="lg" 
                   variant="outline"
@@ -101,6 +118,19 @@ const MarketingHub = () => {
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
       />
+
+      {/* Brand Identity Settings Dialog */}
+      <Dialog open={isBrandSettingsOpen} onOpenChange={setIsBrandSettingsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Brand Identity Settings
+            </DialogTitle>
+          </DialogHeader>
+          <BrandIdentitySettings />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

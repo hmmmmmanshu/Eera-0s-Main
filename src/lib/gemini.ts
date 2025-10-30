@@ -51,7 +51,7 @@ async function getWorkingModelInternal() {
 }
 
 // Public getter that lazily resolves and caches the working model
-let resolvedModelPromise: Promise<ReturnType<typeof genAI!.getGenerativeModel>> | null = null;
+let resolvedModelPromise: Promise<any> | null = null;
 export function getGeminiModel() {
   if (!genAI) throw new Error("Gemini API not configured");
   if (!resolvedModelPromise) {
