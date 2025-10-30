@@ -1,57 +1,57 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, FileText, Users, CheckCircle } from "lucide-react";
+import { Sparkles, FileText, Users, CheckCircle, UserPlus } from "lucide-react";
 import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AIJobDescriptionGenerator } from "./AIJobDescriptionGenerator";
+import { AIResumeScreener } from "./AIResumeScreener";
+import { AIOfferLetterGenerator } from "./AIOfferLetterGenerator";
+import { useHRCandidates } from "@/hooks/useHRData";
 
 export function HiringScreening() {
-  const [jdInput, setJdInput] = useState("");
+  const { data: candidates = [], isLoading } = useHRCandidates();
 
-  const candidates = [
+  const mockCandidates = [
     { name: "Alice Johnson", role: "Senior Developer", score: 92, status: "Interview Scheduled" },
     { name: "Bob Smith", role: "Senior Developer", score: 88, status: "Screening Complete" },
     { name: "Carol Davis", role: "Product Designer", score: 95, status: "Offer Extended" },
     { name: "David Lee", role: "Product Designer", score: 78, status: "Under Review" },
   ];
 
+  const displayCandidates = candidates.length > 0 ? candidates : mockCandidates;
+
   return (
     <div className="space-y-6">
-      {/* JD Generation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-accent" />
-            AI Job Description Generator
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">Role Title</label>
-            <Input placeholder="e.g., Senior Frontend Developer" />
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Key Requirements (AI will expand this)</label>
-            <Textarea 
-              placeholder="e.g., 5+ years React experience, TypeScript, team leadership..."
-              value={jdInput}
-              onChange={(e) => setJdInput(e.target.value)}
-              rows={4}
-            />
-          </div>
-          <div className="flex gap-3">
-            <Button className="flex-1">
-              <Sparkles className="h-4 w-4 mr-2" />
-              Generate Complete JD
-            </Button>
-            <Button variant="outline">
-              <FileText className="h-4 w-4 mr-2" />
-              Use Template
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* AI Tools Tabs */}
+      <Tabs defaultValue="jd-generator" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="jd-generator">
+            <FileText className="h-4 w-4 mr-2" />
+            Job Description
+          </TabsTrigger>
+          <TabsTrigger value="resume-screener">
+            <Sparkles className="h-4 w-4 mr-2" />
+            Resume Screener
+          </TabsTrigger>
+          <TabsTrigger value="offer-letter">
+            <UserPlus className="h-4 w-4 mr-2" />
+            Offer Letter
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="jd-generator">
+          <AIJobDescriptionGenerator />
+        </TabsContent>
+
+        <TabsContent value="resume-screener">
+          <AIResumeScreener />
+        </TabsContent>
+
+        <TabsContent value="offer-letter">
+          <AIOfferLetterGenerator />
+        </TabsContent>
+      </Tabs>
 
       {/* Candidate Pipeline */}
       <Card>
@@ -62,26 +62,40 @@ export function HiringScreening() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {candidates.map((candidate, idx) => (
-              <div key={idx} className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-accent/50 transition-all">
-                <div>
-                  <p className="font-medium">{candidate.name}</p>
-                  <p className="text-sm text-muted-foreground">{candidate.role}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-accent">{candidate.score}</p>
-                    <p className="text-xs text-muted-foreground">AI Score</p>
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Loading candidates...
+            </div>
+          ) : displayCandidates.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No candidates yet. Add candidates using the tools above.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {displayCandidates.map((candidate, idx) => (
+                <div key={idx} className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-accent/50 transition-all">
+                  <div>
+                    <p className="font-medium">{candidate.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {typeof candidate.role === 'string' ? candidate.role : 'Role not specified'}
+                    </p>
                   </div>
-                  <Badge variant={candidate.status.includes("Offer") ? "default" : "outline"}>
-                    {candidate.status}
-                  </Badge>
-                  <Button size="sm" variant="outline">View Profile</Button>
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-accent">
+                        {candidate.score || 'N/A'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">AI Score</p>
+                    </div>
+                    <Badge variant={candidate.status?.includes("Offer") || candidate.status === "offer" ? "default" : "outline"}>
+                      {candidate.status || 'Applied'}
+                    </Badge>
+                    <Button size="sm" variant="outline">View Profile</Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -92,7 +106,7 @@ export function HiringScreening() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Applications Received</p>
-                <p className="text-3xl font-bold mt-2">47</p>
+                <p className="text-3xl font-bold mt-2">{displayCandidates.length}</p>
               </div>
               <FileText className="h-8 w-8 text-blue-500" />
             </div>
@@ -104,7 +118,9 @@ export function HiringScreening() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">AI Screening In Progress</p>
-                <p className="text-3xl font-bold mt-2">12</p>
+                <p className="text-3xl font-bold mt-2">
+                  {displayCandidates.filter(c => c.status === 'screening').length}
+                </p>
               </div>
               <Sparkles className="h-8 w-8 text-amber-500 animate-pulse" />
             </div>
@@ -116,7 +132,9 @@ export function HiringScreening() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Qualified Candidates</p>
-                <p className="text-3xl font-bold mt-2">8</p>
+                <p className="text-3xl font-bold mt-2">
+                  {displayCandidates.filter(c => (c.score || 0) >= 70).length}
+                </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
