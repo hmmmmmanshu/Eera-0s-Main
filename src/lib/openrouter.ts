@@ -73,21 +73,21 @@ export const TEXT_MODELS = {
 } as const;
 
 export const IMAGE_MODELS = {
-  "google/gemini-2.0-flash-exp-image:free": {
-    name: "Gemini 2.0 Flash Image",
+  "google/gemini-2.5-flash-image-preview:free": {
+    name: "Gemini 2.5 Flash Image (Free)",
     provider: "Google",
     cost: 0,
     badge: "FREE",
     speed: "fast",
-    description: "Free image generation with Gemini 2.0 Flash",
+    description: "Free image generation with Gemini 2.5 Flash",
   },
   "google/gemini-2.5-flash-image-preview": {
-    name: "Gemini 2.5 Flash Image",
+    name: "Gemini 2.5 Flash Image (Paid)",
     provider: "Google",
     cost: 0.0000625, // $0.0625 per 1K images = ~$0.0000625 per image
-    badge: "LATEST",
+    badge: "PREMIUM",
     speed: "fast",
-    description: "Latest Gemini model with improved image quality",
+    description: "Premium Gemini model with improved image quality",
   },
 } as const;
 
@@ -375,7 +375,7 @@ export async function generateImage(
  */
 export async function generateImageWithFallback(
   options: ImageGenerationOptions,
-  fallbackModels: string[] = ["google/gemini-2.0-flash-exp-image:free"]
+  fallbackModels: string[] = ["google/gemini-2.5-flash-image-preview:free"]
 ): Promise<GeneratedImage> {
   const models = [options.model, ...fallbackModels.filter(m => m !== options.model)];
 

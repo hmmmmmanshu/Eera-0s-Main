@@ -65,7 +65,7 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
 ## 🎨 **Available Models**
 
 ### **FREE Model:**
-- **`google/gemini-2.0-flash-exp-image:free`** 
+- **`google/gemini-2.5-flash-image-preview:free`** ✅ CORRECT MODEL ID
   - Cost: $0.00
   - Speed: Fast (2-4s)
   - Perfect for testing and high-volume
@@ -129,9 +129,9 @@ VITE_OPENROUTER_API_KEY=sk-or-v1-your-key-here
 4. Choose a platform (LinkedIn/Instagram)
 5. Enter headline and key points
 6. Click "Next" to model selection
-7. Select "Gemini 2.0 Flash Image (FREE)"
+7. Select "Gemini 2.5 Flash Image (Free)"
 8. Choose aspect ratio (1:1 for testing)
-9. Click "Generate with Gemini 2.0 Flash Image"
+9. Click "Generate with Gemini 2.5 Flash Image (Free)"
 10. Wait 5-10 seconds
 
 ### **3. Expected Results:**
@@ -149,13 +149,13 @@ VITE_OPENROUTER_API_KEY=sk-or-v1-your-key-here
 **Successful Generation:**
 ```
 [CreatePostModal] Starting image generation with OpenRouter
-[OpenRouter Image] Starting generation: { model: 'google/gemini-2.0-flash-exp-image:free', prompt: '...', aspectRatio: '1:1' }
+[OpenRouter Image] Starting generation: { model: 'google/gemini-2.5-flash-image-preview:free', prompt: '...', aspectRatio: '1:1' }
 [OpenRouter Image] Enhanced prompt: Modern SaaS product dashboard, professional tech aesthetic, #0A66FF and #6B46C1, clean minimalist mood...
 [OpenRouter Image] Response received
 [OpenRouter Image] Received base64 image, size: 123456
 [OpenRouter Image] Converted to blob, size: 89123
 [OpenRouter Image] Generation complete: { url: 'https://...', cost: 0, time: 4523 }
-[CreatePostModal] Image generation complete: { url: '...', model: 'google/gemini-2.0-flash-exp-image:free', cost: 0, time: 4.523 }
+[CreatePostModal] Image generation complete: { url: '...', model: 'google/gemini-2.5-flash-image-preview:free', cost: 0, time: 4.523 }
 ```
 
 ---
@@ -164,8 +164,8 @@ VITE_OPENROUTER_API_KEY=sk-or-v1-your-key-here
 
 | Model | Cost per Image | Use Case |
 |-------|---------------|----------|
-| Gemini 2.0 Flash (FREE) | **$0.000** | Testing, high-volume, prototyping |
-| Gemini 2.5 Flash | **$0.0000625** | Production, better quality |
+| Gemini 2.5 Flash (Free) | **$0.000** | Testing, high-volume, prototyping |
+| Gemini 2.5 Flash (Paid) | **$0.0000625** | Production, better quality |
 | DALL-E 3 (Direct) | $0.040 | Professional layouts, text in images |
 | Flux Pro (Direct) | $0.055 | Photorealistic, premium quality |
 

@@ -68,7 +68,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [objective, setObjective] = useState<"awareness" | "leads" | "engagement" | "recruitment">("engagement");
   
   // Image generation (Step 3.5)
-  const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("google/gemini-2.0-flash-exp-image:free");
+  const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("google/gemini-2.5-flash-image-preview:free");
   const [aspectRatio, setAspectRatio] = useState<"1:1" | "16:9" | "9:16">("1:1");
   const [negativePrompt, setNegativePrompt] = useState("");
   
