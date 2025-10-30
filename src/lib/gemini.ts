@@ -8,7 +8,8 @@ if (!API_KEY) {
 
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
-export const geminiModel = genAI?.getGenerativeModel({ model: "gemini-2.0-flash-live" });
+// Use gemini-1.5-flash (stable and available)
+export const geminiModel = genAI?.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // Helper function to generate job description
 export async function generateJobDescription(

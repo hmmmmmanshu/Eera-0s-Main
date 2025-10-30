@@ -3,27 +3,46 @@ import { Users, Briefcase, DollarSign, TrendingUp, Activity } from "lucide-react
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useHRRoles, useHRCandidates } from "@/hooks/useHRData";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 export function HROverview() {
+  const navigate = useNavigate();
+  const { data: roles = [] } = useHRRoles();
+  const { data: candidates = [] } = useHRCandidates();
+
+  // Calculate real stats
+  const openPositions = roles.filter(r => r.status === 'open').length;
+  const totalCandidates = candidates.length;
+
   const stats = [
-    { label: "Total Employees", value: "24", icon: Users, color: "text-blue-500" },
-    { label: "Open Positions", value: "5", icon: Briefcase, color: "text-amber-500" },
-    { label: "Monthly Payroll", value: "$48,500", icon: DollarSign, color: "text-green-500" },
-    { label: "Avg Performance", value: "4.2/5", icon: TrendingUp, color: "text-purple-500" },
+    { label: "Total Employees", value: "0", icon: Users, color: "text-blue-500" },
+    { label: "Open Positions", value: openPositions.toString(), icon: Briefcase, color: "text-amber-500" },
+    { label: "Total Candidates", value: totalCandidates.toString(), icon: Users, color: "text-green-500" },
+    { label: "Active Roles", value: roles.length.toString(), icon: TrendingUp, color: "text-purple-500" },
   ];
 
-  const hiringPipeline = [
-    { role: "Senior Developer", stage: "Screening", progress: 60, candidates: 8 },
-    { role: "Product Designer", stage: "Interview", progress: 75, candidates: 3 },
-    { role: "Marketing Manager", stage: "Offer", progress: 90, candidates: 1 },
-    { role: "Content Writer", stage: "Sourcing", progress: 30, candidates: 12 },
-  ];
+  // Group candidates by role
+  const hiringPipeline = roles.slice(0, 4).map(role => {
+    const roleCandidates = candidates.filter(c => c.role_id === role.id);
+    const totalCandidates = roleCandidates.length;
+    const qualifiedCandidates = roleCandidates.filter(c => (c.score || 0) >= 70).length;
+    const progress = totalCandidates > 0 ? (qualifiedCandidates / totalCandidates) * 100 : 0;
+    
+    return {
+      role: role.title,
+      stage: role.status,
+      progress: Math.round(progress),
+      candidates: totalCandidates
+    };
+  });
 
   const aiActivity = [
-    { action: "Screened 12 candidates for Senior Developer role", time: "2h ago" },
-    { action: "Generated 2 performance appraisal summaries", time: "4h ago" },
-    { action: "Created onboarding checklist for new hire", time: "6h ago" },
-    { action: "Updated salary benchmarks based on market data", time: "1d ago" },
+    { action: "AI features ready for use", time: "Now" },
+    { action: "Job Description Generator available", time: "Now" },
+    { action: "Resume Screener active", time: "Now" },
+    { action: "Offer Letter Generator ready", time: "Now" },
   ];
 
   return (
@@ -102,21 +121,73 @@ export function HROverview() {
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-4 gap-3">
-            <Button variant="outline" className="justify-start">
+            <Button 
+              variant="outline" 
+              className="justify-start"
+              onClick={() => {
+                navigate('/hr');
+                setTimeout(() => {
+                  const hiringTab = document.querySelector('[value="hiring"]');
+                  if (hiringTab instanceof HTMLElement) {
+                    hiringTab.click();
+                  }
+                }, 100);
+                toast.success("Opening Hiring & Screening");
+              }}
+            >
               <Briefcase className="h-4 w-4 mr-2" />
               Create Job Role
             </Button>
-            <Button variant="outline" className="justify-start">
+            <Button 
+              variant="outline" 
+              className="justify-start"
+              onClick={() => {
+                navigate('/hr');
+                setTimeout(() => {
+                  const teamTab = document.querySelector('[value="team"]');
+                  if (teamTab instanceof HTMLElement) {
+                    teamTab.click();
+                  }
+                }, 100);
+                toast.success("Opening Team & Payroll");
+              }}
+            >
               <Users className="h-4 w-4 mr-2" />
-              Start Onboarding
+              View Team
             </Button>
-            <Button variant="outline" className="justify-start">
+            <Button 
+              variant="outline" 
+              className="justify-start"
+              onClick={() => {
+                navigate('/hr');
+                setTimeout(() => {
+                  const perfTab = document.querySelector('[value="performance"]');
+                  if (perfTab instanceof HTMLElement) {
+                    perfTab.click();
+                  }
+                }, 100);
+                toast.success("Opening Performance");
+              }}
+            >
               <TrendingUp className="h-4 w-4 mr-2" />
               Review Appraisals
             </Button>
-            <Button variant="outline" className="justify-start">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Process Payroll
+            <Button 
+              variant="outline" 
+              className="justify-start"
+              onClick={() => {
+                navigate('/hr');
+                setTimeout(() => {
+                  const aiTab = document.querySelector('[value="ai"]');
+                  if (aiTab instanceof HTMLElement) {
+                    aiTab.click();
+                  }
+                }, 100);
+                toast.success("Opening HR AI Assistant");
+              }}
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              HR AI Assistant
             </Button>
           </div>
         </CardContent>

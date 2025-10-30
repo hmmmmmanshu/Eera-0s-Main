@@ -12,15 +12,6 @@ import { useHRCandidates } from "@/hooks/useHRData";
 export function HiringScreening() {
   const { data: candidates = [], isLoading } = useHRCandidates();
 
-  const mockCandidates = [
-    { name: "Alice Johnson", role: "Senior Developer", score: 92, status: "Interview Scheduled" },
-    { name: "Bob Smith", role: "Senior Developer", score: 88, status: "Screening Complete" },
-    { name: "Carol Davis", role: "Product Designer", score: 95, status: "Offer Extended" },
-    { name: "David Lee", role: "Product Designer", score: 78, status: "Under Review" },
-  ];
-
-  const displayCandidates = candidates.length > 0 ? candidates : mockCandidates;
-
   return (
     <div className="space-y-6">
       {/* AI Tools Tabs */}
@@ -66,13 +57,13 @@ export function HiringScreening() {
             <div className="text-center py-8 text-muted-foreground">
               Loading candidates...
             </div>
-          ) : displayCandidates.length === 0 ? (
+          ) : candidates.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No candidates yet. Add candidates using the tools above.
             </div>
           ) : (
             <div className="space-y-3">
-              {displayCandidates.map((candidate, idx) => (
+              {candidates.map((candidate, idx) => (
                 <div key={idx} className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-accent/50 transition-all">
                   <div>
                     <p className="font-medium">{candidate.name}</p>
@@ -106,7 +97,7 @@ export function HiringScreening() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Applications Received</p>
-                <p className="text-3xl font-bold mt-2">{displayCandidates.length}</p>
+                <p className="text-3xl font-bold mt-2">{candidates.length}</p>
               </div>
               <FileText className="h-8 w-8 text-blue-500" />
             </div>
@@ -119,7 +110,7 @@ export function HiringScreening() {
               <div>
                 <p className="text-sm text-muted-foreground">AI Screening In Progress</p>
                 <p className="text-3xl font-bold mt-2">
-                  {displayCandidates.filter(c => c.status === 'screening').length}
+                  {candidates.filter(c => c.status === 'screening').length}
                 </p>
               </div>
               <Sparkles className="h-8 w-8 text-amber-500 animate-pulse" />
@@ -133,7 +124,7 @@ export function HiringScreening() {
               <div>
                 <p className="text-sm text-muted-foreground">Qualified Candidates</p>
                 <p className="text-3xl font-bold mt-2">
-                  {displayCandidates.filter(c => (c.score || 0) >= 70).length}
+                  {candidates.filter(c => (c.score || 0) >= 70).length}
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-500" />
