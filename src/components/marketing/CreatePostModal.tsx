@@ -83,7 +83,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [objective, setObjective] = useState<"awareness" | "leads" | "engagement" | "recruitment">(savedDraft?.objective || "engagement");
   
   // Image generation (Step 3.5)
-  const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("google/gemini-2.5-flash-image-preview:free");
+  const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("google/gemini-2.5-flash-image-preview");
   const [aspectRatio, setAspectRatio] = useState<"1:1" | "16:9" | "9:16">("1:1");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [consistentStyle, setConsistentStyle] = useState(true);
@@ -350,6 +350,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         if (contentType === "carousel") {
           // Batch generate from slide points
           await generateSlidesFromKeyPoints();
+          console.log("[CreatePostModal] Carousel batch generation complete", { count: slides.length });
         } else {
           console.log("[CreatePostModal] Starting AI image generation");
           const imagePrompt = `${headline}. ${keyPoints || ""}`;
@@ -363,13 +364,10 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           imageUrl = imageResult.url;
           setGeneratedImageUrl(imageUrl);
           setSlides([{ url: imageUrl, prompt: imagePrompt, aspectRatio, seed: consistentStyle ? seed : undefined }]);
+          console.log("[CreatePostModal] Image generation complete", { url: imageUrl });
         }
         setGenerationStatus(prev => ({ ...prev, imageGen: "complete" }));
         
-        console.log("[CreatePostModal] Image generation complete:", {
-          url: imageUrl,
-          time: imageResult.generationTime
-        });
       } else {
         setGenerationStatus(prev => ({ ...prev, imageGen: "skipped" }));
       }
@@ -389,8 +387,14 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       
     } catch (error: unknown) {
       console.error("Generation failed:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      toast.error(`Generation failed: ${errorMessage}`);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      if (message.includes("402")) {
+        toast.error("Image generation failed: OpenRouter credits required. Please add credits and retry.");
+      } else if (message.includes("No endpoints found") || message.includes(":free")) {
+        toast.error("Selected model is unavailable. Switch to 'Gemini 2.5 Image Preview' (non-free) or another model.");
+      } else {
+        toast.error(`Generation failed: ${message}`);
+      }
       setStep(3); // Go back to input
     } finally {
       setIsGenerating(false);
