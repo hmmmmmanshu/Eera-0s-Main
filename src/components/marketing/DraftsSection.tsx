@@ -97,12 +97,16 @@ export const DraftsSection = () => {
                 <CardContent className="p-4">
                   <div className="flex gap-4">
                     {/* Thumbnail */}
-                    {draft.media_urls && draft.media_urls.length > 0 ? (
+                    {draft.media_urls && Array.isArray(draft.media_urls) && draft.media_urls.length > 0 ? (
                       <div className="w-32 h-32 rounded-lg overflow-hidden flex-shrink-0 bg-muted">
                         <img
-                          src={draft.media_urls[0]}
+                          src={draft.media_urls[0] as string}
                           alt="Draft preview"
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.error("[DraftsSection] Image load error:", draft.media_urls[0]);
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
                       </div>
                     ) : (
@@ -170,12 +174,16 @@ export const DraftsSection = () => {
             <div className="space-y-4">
               <Badge className="capitalize">{previewPost.platform}</Badge>
               
-              {previewPost.media_urls && previewPost.media_urls.length > 0 && (
+              {previewPost.media_urls && Array.isArray(previewPost.media_urls) && previewPost.media_urls.length > 0 && (
                 <div className="aspect-video rounded-lg overflow-hidden bg-muted">
                   <img
-                    src={previewPost.media_urls[0]}
+                    src={previewPost.media_urls[0] as string}
                     alt="Post preview"
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error("[DraftsSection Preview] Image load error:", previewPost.media_urls[0]);
+                      e.currentTarget.style.display = 'none';
+                    }}
                   />
                 </div>
               )}

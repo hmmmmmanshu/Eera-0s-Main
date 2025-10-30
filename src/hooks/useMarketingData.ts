@@ -200,26 +200,44 @@ export function useCreatePost() {
     mutationFn: async (
       post: Omit<MarketingPost, "id" | "user_id" | "created_at" | "updated_at">
     ) => {
+      console.log("[useCreatePost] Starting mutation:", post);
+      
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      
+      if (!user) {
+        console.error("[useCreatePost] No authenticated user");
+        throw new Error("Not authenticated");
+      }
+
+      console.log("[useCreatePost] User ID:", user.id);
+
+      const insertData = { ...post, user_id: user.id };
+      console.log("[useCreatePost] Inserting data:", insertData);
 
       const { data, error } = await supabase
         .from("marketing_posts")
-        .insert({ ...post, user_id: user.id })
+        .insert(insertData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("[useCreatePost] Supabase error:", error);
+        throw error;
+      }
+      
+      console.log("[useCreatePost] Post created successfully:", data);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("[useCreatePost] onSuccess callback:", data);
       queryClient.invalidateQueries({ queryKey: ["marketing-posts"] });
       queryClient.invalidateQueries({ queryKey: ["marketing-metrics"] });
       toast.success("Post created successfully!");
     },
     onError: (error) => {
+      console.error("[useCreatePost] onError callback:", error);
       toast.error(`Failed to create post: ${error.message}`);
     },
   });

@@ -219,27 +219,42 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   };
 
   const handleSaveDraft = async () => {
-    if (!generatedContent) return;
+    if (!generatedContent) {
+      toast.error("No content to save");
+      return;
+    }
+
+    console.log("[Save Draft] Starting save:", {
+      platform,
+      contentLength: generatedContent.caption?.length,
+      hasImage: !!generatedImageUrl,
+      imageUrl: generatedImageUrl,
+    });
 
     try {
-      await createPostMutation.mutateAsync({
+      const postData = {
         platform,
         content: generatedContent.caption,
         media_urls: generatedImageUrl ? [generatedImageUrl] : [],
-        status: "draft",
+        status: "draft" as const,
         scheduled_time: null,
         published_time: null,
         views: 0,
         likes: 0,
         comments: 0,
         shares: 0,
-      });
+      };
+
+      console.log("[Save Draft] Post data:", postData);
+
+      const result = await createPostMutation.mutateAsync(postData);
       
+      console.log("[Save Draft] Save successful:", result);
       toast.success("Draft saved successfully!");
       resetAndClose();
     } catch (error) {
-      console.error("Save failed:", error);
-      toast.error("Failed to save draft");
+      console.error("[Save Draft] Save failed:", error);
+      toast.error(`Failed to save draft: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
