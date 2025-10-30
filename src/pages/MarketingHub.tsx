@@ -9,6 +9,7 @@ import { TargetsProgress } from "@/components/marketing/TargetsProgress";
 import { CreatePostModal } from "@/components/marketing/CreatePostModal";
 import { PlatformToggle } from "@/components/marketing/PlatformToggle";
 import { AIInsightCard } from "@/components/marketing/AIInsightCard";
+import { DraftsSection } from "@/components/marketing/DraftsSection";
 import { Button } from "@/components/ui/button";
 import { Zap, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -84,6 +85,9 @@ const MarketingHub = () => {
                   <MetricsCards platform={platform === "all" ? undefined : platform} />
                   <TopPostsCarousel platform={platform === "all" ? undefined : platform} />
                 </div>
+
+                {/* Drafts Section */}
+                <DraftsSection />
 
                 {/* Targets Progress */}
                 <TargetsProgress />

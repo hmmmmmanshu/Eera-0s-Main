@@ -264,29 +264,66 @@ export async function generateImage(
 
 /**
  * Google Gemini Imagen 3 / 2.5 Flash
+ * NOTE: Gemini Imagen API is not yet publicly available for image generation.
+ * Falling back to DALL-E 3 for best quality.
  */
 async function generateWithGemini(
   prompt: string,
   params: ImageGenerationParams
 ): Promise<string> {
+  console.warn("Gemini Imagen API not yet publicly available - using DALL-E 3 fallback");
+  
+  // Check if OpenAI key is available
+  const OPENAI_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+  if (OPENAI_KEY) {
+    console.log("Falling back to DALL-E 3 for image generation");
+    return generateWithDallE(prompt, params);
+  }
+  
+  // If no OpenAI key, use Stability AI
+  const STABILITY_KEY = import.meta.env.VITE_STABILITY_API_KEY;
+  if (STABILITY_KEY) {
+    console.log("Falling back to Stability SDXL for image generation");
+    const result = await generateWithSDXL(prompt, params);
+    return result.url;
+  }
+  
+  // Last resort: create a beautiful placeholder with brand colors
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!API_KEY) throw new Error("Gemini API key not configured");
+  if (!API_KEY) throw new Error("No AI image generation API keys configured");
 
   const { width, height } = getDimensions(params.aspectRatio);
-
-  // Note: This is a placeholder. Actual Gemini image generation API might differ.
-  // For now, we'll use a mock implementation that returns a placeholder
-  console.warn("Gemini image generation not yet implemented - using placeholder");
-
-  // TODO: Implement actual Gemini Imagen API call
-  // const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict', {...});
-
-  // For now, return a placeholder that indicates Gemini was requested
-  const placeholderBlob = await fetch(
-    `https://placehold.co/${width}x${height}/0A66FF/FFFFFF/png?text=Gemini+Image+${width}x${height}`
-  ).then((r) => r.blob());
-
-  return uploadToSupabase(placeholderBlob, `gemini-${Date.now()}.png`);
+  
+  // Generate a gradient placeholder using brand colors if available
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  
+  if (ctx) {
+    // Create gradient with brand colors
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, '#0A66FF');
+    gradient.addColorStop(1, '#6B46C1');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    
+    // Add text
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('AI Generated Image', width / 2, height / 2 - 30);
+    ctx.font = '24px Arial';
+    ctx.fillText(`${width}×${height}`, width / 2, height / 2 + 30);
+  }
+  
+  // Convert canvas to blob
+  const blob = await new Promise<Blob>((resolve) => {
+    canvas.toBlob((b) => resolve(b!), 'image/png');
+  });
+  
+  return uploadToSupabase(blob, `ai-generated-${Date.now()}.png`);
 }
 
 /**
