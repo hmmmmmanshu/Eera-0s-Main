@@ -27,7 +27,7 @@ export async function assembleCognitiveContext(userId: string): Promise<Cognitiv
   // Profile basics
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, startup_name, timezone, tone_personality, language")
+    .select("id, startup_name, timezone, tone_personality")
     .eq("id", userId)
     .single();
 
@@ -93,7 +93,7 @@ export async function assembleCognitiveContext(userId: string): Promise<Cognitiv
       name: profile?.startup_name,
       timezone: profile?.timezone,
       tone: profile?.tone_personality,
-      language: (profile as any)?.language,
+      language: undefined,
     },
     currentWeek: { moodAverage, moods, topTags },
     recentReflections: (reflections || []).map((r: any) => ({

@@ -31,7 +31,7 @@ export function useCognitiveActions(userId?: string | null) {
     if (!userId) throw new Error("No user");
     const { data: inserted, error } = await supabase
       .from("cognitive_reflections")
-      .insert({ user_id: userId, kind: payload.type, content: payload.content })
+      .insert({ user_id: userId, content: payload.content })
       .select("id, content, created_at")
       .single();
     if (error) throw error;
@@ -43,10 +43,12 @@ export function useCognitiveActions(userId?: string | null) {
     const tags = Array.from(new Set([...(topics?.keywords || []), ...(senti?.emotions || [])])).slice(0, 10);
     const sentiment_score = typeof senti?.score === "number" ? senti.score : null;
 
-    await supabase
-      .from("cognitive_reflections")
-      .update({ tags, sentiment_score })
-      .eq("id", inserted.id);
+    try {
+      await supabase
+        .from("cognitive_reflections")
+        .update({ tags, sentiment_score })
+        .eq("id", inserted.id);
+    } catch {}
 
     // AI summary (LLM)
     const ctx = await assembleCognitiveContext(userId);
@@ -70,7 +72,7 @@ export function useCognitiveActions(userId?: string | null) {
       // Ask LLM for compact weekly summary
       const prompt = JSON.stringify({
         moods: ctx.currentWeek,
-        reflections: ctx.recentReflections.map(r => ({ id: r.id, text: r.text, tags: r.tags, ai_summary: r.ai_summary })),
+        reflections: ctx.recentReflections.map(r => ({ id: r.id, text: r.text, ai_summary: r.ai_summary })),
       });
       if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
       const summary = await generateText({
@@ -120,8 +122,18 @@ export function useCognitiveActions(userId?: string | null) {
     const system = personaSystem(persona, ctx.userProfile.tone);
     const prompt = `Using themes=${JSON.stringify(ctx.goalsThemes)}, generate 5 startup ideas as JSON array of {title, category, rationale, nextStep}. Keep each field under 160 chars.`;
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
-    const json = await generateText({ model: "google/gemini-2.0-flash-exp:free", system, prompt: trimText(prompt, 6000), json: true, maxTokens: 700 });
-    try { return JSON.parse(json); } catch { return []; }
+    try {
+      const json = await generateText({ model: "google/gemini-2.0-flash-exp:free", system, prompt: trimText(prompt, 6000), json: true, maxTokens: 700 });
+      return JSON.parse(json);
+    } catch (e: any) {
+      // Fallback to GPT-4o if the free model is rate-limited
+      const msg = e?.message || "";
+      if (msg.includes("429") || msg.includes("rate")) {
+        const json2 = await generateText({ model: "openai/gpt-4o", system, prompt: trimText(prompt, 6000), json: true, maxTokens: 700 });
+        try { return JSON.parse(json2); } catch { return []; }
+      }
+      return [];
+    }
   }, [userId]);
 
   const saveIdea = useCallback(async (idea: { title: string; category?: string; rationale?: string; nextStep?: string }) => {
