@@ -874,72 +874,76 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         )}
 
         {/* Step 5: Preview */}
-        {step === 5 && generatedContent && (
+        {step === 5 && (
           <div className="space-y-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold">
-                      {profile?.startup_name?.[0] || "B"}
+            {generatedContent ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold">
+                        {profile?.startup_name?.[0] || "B"}
+                      </div>
+                      <div>
+                        <p className="font-semibold">{profile?.startup_name || "Your Brand"}</p>
+                        <p className="text-xs text-muted-foreground">Just now • {platform}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold">{profile?.startup_name || "Your Brand"}</p>
-                      <p className="text-xs text-muted-foreground">Just now • {platform}</p>
+                    
+                    <div className="space-y-2">
+                      <p className="whitespace-pre-wrap">{generatedContent.caption}</p>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <p className="whitespace-pre-wrap">{generatedContent.caption}</p>
-                  </div>
-                  
-                  {generatedImageUrl && (
-                    <div className="aspect-video rounded-lg overflow-hidden">
-                      <img 
-                        src={generatedImageUrl} 
-                        alt="Generated content" 
-                        className="w-full h-full object-cover"
-                      />
+                    
+                    {generatedImageUrl && (
+                      <div className="aspect-video rounded-lg overflow-hidden">
+                        <img 
+                          src={generatedImageUrl} 
+                          alt="Generated content" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-wrap gap-2">
+                      {generatedContent.hashtags.map((tag, i) => (
+                        <Badge key={i} variant="secondary">#{tag}</Badge>
+                      ))}
                     </div>
-                  )}
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {generatedContent.hashtags.map((tag, i) => (
-                      <Badge key={i} variant="secondary">#{tag}</Badge>
-                    ))}
-                  </div>
 
-                  {generatedContent.callToAction && (
-                    <div className="p-3 bg-muted/50 rounded-lg text-sm">
-                      <strong>CTA:</strong> {generatedContent.callToAction}
-                    </div>
-                  )}
+                    {generatedContent.callToAction && (
+                      <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                        <strong>CTA:</strong> {generatedContent.callToAction}
+                      </div>
+                    )}
 
-                  {/* AI Reasoning */}
-                  <Accordion type="single" collapsible>
-                    <AccordionItem value="reasoning">
-                      <AccordionTrigger className="text-sm">AI Strategy Reasoning</AccordionTrigger>
-                      <AccordionContent className="text-sm text-muted-foreground">
-                        {generatedContent.aiReasoning}
-                      </AccordionContent>
-                    </AccordionItem>
-                    {generatedContent.alternativeVersions.length > 0 && (
-                      <AccordionItem value="alternatives">
-                        <AccordionTrigger className="text-sm">Alternative Versions</AccordionTrigger>
-                        <AccordionContent className="space-y-3">
-                          {generatedContent.alternativeVersions.map((alt, i) => (
-                            <div key={i} className="p-3 bg-muted/30 rounded text-sm">
-                              <strong>Version {i + 1}:</strong>
-                              <p className="mt-1 whitespace-pre-wrap">{alt}</p>
-                            </div>
-                          ))}
+                    {/* AI Reasoning */}
+                    <Accordion type="single" collapsible>
+                      <AccordionItem value="reasoning">
+                        <AccordionTrigger className="text-sm">AI Strategy Reasoning</AccordionTrigger>
+                        <AccordionContent className="text-sm text-muted-foreground">
+                          {generatedContent.aiReasoning}
                         </AccordionContent>
                       </AccordionItem>
-                    )}
-                  </Accordion>
-                </div>
-              </CardContent>
-            </Card>
+                      {generatedContent.alternativeVersions.length > 0 && (
+                        <AccordionItem value="alternatives">
+                          <AccordionTrigger className="text-sm">Alternative Versions</AccordionTrigger>
+                          <AccordionContent className="space-y-3">
+                            {generatedContent.alternativeVersions.map((alt, i) => (
+                              <div key={i} className="p-3 bg-muted/30 rounded text-sm">
+                                <strong>Version {i + 1}:</strong>
+                                <p className="mt-1 whitespace-pre-wrap">{alt}</p>
+                              </div>
+                            ))}
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+                    </Accordion>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="text-sm text-muted-foreground">No generated content yet. You can go back and generate, or add slides and save as draft.</div>
+            )}
 
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setStep(4)}>
@@ -952,7 +956,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 variant="outline" 
                 className="flex-1"
                 onClick={handleSaveDraft}
-                disabled={createPostMutation.isPending}
+                disabled={createPostMutation.isPending || !generatedContent}
               >
                 {createPostMutation.isPending ? "Saving..." : "Save Draft"}
               </Button>
