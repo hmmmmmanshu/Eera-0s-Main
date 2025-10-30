@@ -765,6 +765,18 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 </Button>
               </>
             ) : null}
+
+            {/* Navigation controls */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setStep((contentType === "image" || contentType === "carousel" || contentType === "video") ? 3.5 : 3)}
+                disabled={isGenerating}
+              >
+                Back
+              </Button>
+            </div>
           </div>
         )}
 
@@ -930,6 +942,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             </Card>
 
             <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setStep(4)}>
+                Back
+              </Button>
               <Button variant="outline" className="flex-1" onClick={() => setStep(3)}>
                 Edit
               </Button>
