@@ -532,7 +532,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           </div>
         )}
 
-        {/* Step 3: Content Input */}
+        {/* Step 3: Content Input / Builder */}
         {step === 3 && (
           <div className="space-y-4">
             <div className="space-y-2">
@@ -544,18 +544,36 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 onChange={(e) => setHeadline(e.target.value)}
               />
             </div>
-            
-            {contentType === "carousel" ? (
-              <div className="space-y-2">
-                <Label htmlFor="slidepoints">Slide Points (one per line)</Label>
-                <Textarea 
-                  id="slidepoints" 
-                  placeholder="Slide 1\nSlide 2\nSlide 3"
-                  rows={6}
-                  value={slidePoints}
-                  onChange={(e) => setSlidePoints(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">We’ll generate one visual per line with brand-aware prompts.</p>
+
+            {contentType === "carousel" || contentType === "video" ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="slidepoints">{contentType === "video" ? "Beats (one per line)" : "Slide Points (one per line)"}</Label>
+                  <Textarea 
+                    id="slidepoints" 
+                    placeholder={contentType === "video" ? "Beat 1\nBeat 2\nBeat 3" : "Slide 1\nSlide 2\nSlide 3"}
+                    rows={6}
+                    value={slidePoints}
+                    onChange={(e) => setSlidePoints(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">No AI yet. We’ll create one visual per line after you pick a model.</p>
+                </div>
+
+                {/* Placeholder tray from points */}
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">{contentType === "video" ? "Storyboard Preview" : "Slides Preview"}</p>
+                  {splitKeyPointsIntoPrompts().length === 0 ? (
+                    <div className="text-xs text-muted-foreground">Add points above to preview placeholders.</div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {splitKeyPointsIntoPrompts().map((p, i) => (
+                        <div key={i} className="aspect-square rounded-md border bg-muted/40 p-2 text-[11px] flex items-center justify-center text-center">
+                          {i + 1}. {p}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="space-y-2">
@@ -610,10 +628,10 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               <Button 
                 className="flex-1 gap-2" 
                 onClick={() => {
-                  if (contentType === "image" || contentType === "carousel") {
+                  if (contentType === "image" || contentType === "carousel" || contentType === "video") {
                     setStep(3.5); // Go to model selection
                   } else {
-                    setStep(4); // Skip to generation
+                    setStep(4); // Text goes directly to generation
                   }
                 }}
               >
