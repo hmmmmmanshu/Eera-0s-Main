@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const PREFERRED_MODEL = import.meta.env.VITE_GEMINI_MODEL?.trim();
 
 if (!API_KEY) {
   console.warn("Gemini API key not found. AI features will be disabled.");
@@ -8,8 +9,56 @@ if (!API_KEY) {
 
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
-// Use gemini-1.5-flash (stable and available)
-export const geminiModel = genAI?.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Ordered list of text-generation models known to work with Google AI Studio generateContent.
+// We'll try env override first, then fallbacks in order.
+const FALLBACK_MODELS = [
+  // User override (if any) will be tried first via getWorkingModel()
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+];
+
+let cachedModelName: string | null = null;
+
+async function tryModel(modelName: string) {
+  if (!genAI) throw new Error("Gemini API not configured");
+  const model = genAI.getGenerativeModel({ model: modelName });
+  // Minimal, cheap probe to confirm model supports generateContent for this key
+  try {
+    const result = await model.generateContent("Reply with 'ok'.");
+    const text = (await result.response).text().toLowerCase();
+    if (text) return model; // success
+  } catch (err: unknown) {
+    // Swallow and return null to continue fallbacks
+    return null;
+  }
+  return null;
+}
+
+async function getWorkingModelInternal() {
+  const candidates = [PREFERRED_MODEL, ...FALLBACK_MODELS].filter(Boolean) as string[];
+  for (const name of candidates) {
+    const mdl = await tryModel(name);
+    if (mdl) {
+      cachedModelName = name;
+      return mdl;
+    }
+  }
+  throw new Error(
+    "No compatible Gemini model found for this API key. Set VITE_GEMINI_MODEL or verify model access in AI Studio."
+  );
+}
+
+// Public getter that lazily resolves and caches the working model
+let resolvedModelPromise: Promise<ReturnType<typeof genAI!.getGenerativeModel>> | null = null;
+export function getGeminiModel() {
+  if (!genAI) throw new Error("Gemini API not configured");
+  if (!resolvedModelPromise) {
+    resolvedModelPromise = getWorkingModelInternal();
+  }
+  return resolvedModelPromise;
+}
 
 // Helper function to generate job description
 export async function generateJobDescription(
@@ -17,9 +66,7 @@ export async function generateJobDescription(
   department?: string,
   additionalContext?: string
 ) {
-  if (!geminiModel) {
-    throw new Error("Gemini API not configured");
-  }
+  const model = await getGeminiModel();
 
   const prompt = `Generate a professional job description for the following role:
 
@@ -41,16 +88,14 @@ Format the response as JSON with this structure:
   "niceToHave": ["...", "..."]
 }`;
 
-  const result = await geminiModel.generateContent(prompt);
+  const result = await model.generateContent(prompt);
   const response = await result.response;
   const text = response.text();
-  
-  // Extract JSON from response
+
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     return JSON.parse(jsonMatch[0]);
   }
-  
   throw new Error("Failed to parse AI response");
 }
 
@@ -59,9 +104,7 @@ export async function scoreResume(
   resumeText: string,
   jobRequirements: string[]
 ) {
-  if (!geminiModel) {
-    throw new Error("Gemini API not configured");
-  }
+  const model = await getGeminiModel();
 
   const prompt = `Analyze this resume against the job requirements and provide a score from 0-100.
 
@@ -79,15 +122,14 @@ Provide a JSON response with:
   "summary": "Brief 2-3 sentence assessment"
 }`;
 
-  const result = await geminiModel.generateContent(prompt);
+  const result = await model.generateContent(prompt);
   const response = await result.response;
   const text = response.text();
-  
+
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     return JSON.parse(jsonMatch[0]);
   }
-  
   throw new Error("Failed to parse AI response");
 }
 
@@ -99,9 +141,7 @@ export async function generateOfferLetter(
   startDate: string,
   companyName: string
 ) {
-  if (!geminiModel) {
-    throw new Error("Gemini API not configured");
-  }
+  const model = await getGeminiModel();
 
   const prompt = `Generate a professional offer letter with the following details:
 
@@ -120,7 +160,7 @@ Make it professional, warm, and include standard sections like:
 
 Keep it concise but complete.`;
 
-  const result = await geminiModel.generateContent(prompt);
+  const result = await model.generateContent(prompt);
   const response = await result.response;
   return response.text();
 }
