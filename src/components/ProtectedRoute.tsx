@@ -8,19 +8,24 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
-    checkOnboardingStatus();
-  }, [user, location.pathname]); // Re-check when location changes
+    // Only check when the authenticated user changes.
+    // Avoid flipping to a blocking loading state on every route change.
+    checkOnboardingStatus(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
-  const checkOnboardingStatus = async () => {
+  const checkOnboardingStatus = async (showBlockingLoader: boolean) => {
     if (!user) {
       setCheckingOnboarding(false);
       return;
     }
 
-    setCheckingOnboarding(true);
+    if (showBlockingLoader || needsOnboarding === null) {
+      setCheckingOnboarding(true);
+    }
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -48,7 +53,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  if (loading || checkingOnboarding) {
+  if (loading || (checkingOnboarding && needsOnboarding === null)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

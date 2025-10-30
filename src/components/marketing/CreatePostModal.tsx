@@ -542,8 +542,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   <p className="font-semibold mt-4">Generating your content...</p>
                   <p className="text-sm text-muted-foreground">
                     {contentType === "image" || contentType === "carousel"
-                      ? `Using ${IMAGE_MODELS[selectedModel].name} via OpenRouter • ~5-10s`
-                      : "Using Gemini 2.0 Flash (FREE) • ~2-3s"}
+                      ? `Using ${IMAGE_MODELS[selectedModel].name} • ~5-10s`
+                      : "AI Model • ~2-3s"}
                   </p>
                 </div>
                 
