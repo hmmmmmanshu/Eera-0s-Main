@@ -263,67 +263,138 @@ export async function generateImage(
 // ========================================
 
 /**
- * Google Gemini Imagen 3 / 2.5 Flash
- * NOTE: Gemini Imagen API is not yet publicly available for image generation.
- * Falling back to DALL-E 3 for best quality.
+ * Google Gemini 2.5 Flash with Imagen 3.0
+ * Native image generation using imagen-3.0-generate-001 model
+ * Reference: https://aistudio.google.com/models/gemini-2-5-flash-image
  */
 async function generateWithGemini(
   prompt: string,
   params: ImageGenerationParams
 ): Promise<string> {
-  console.warn("Gemini Imagen API not yet publicly available - using DALL-E 3 fallback");
-  
-  // Check if OpenAI key is available
-  const OPENAI_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-  if (OPENAI_KEY) {
-    console.log("Falling back to DALL-E 3 for image generation");
-    return generateWithDallE(prompt, params);
-  }
-  
-  // If no OpenAI key, use Stability AI
-  const STABILITY_KEY = import.meta.env.VITE_STABILITY_API_KEY;
-  if (STABILITY_KEY) {
-    console.log("Falling back to Stability SDXL for image generation");
-    const result = await generateWithSDXL(prompt, params);
-    return result.url;
-  }
-  
-  // Last resort: create a beautiful placeholder with brand colors
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!API_KEY) throw new Error("No AI image generation API keys configured");
+  if (!API_KEY) {
+    throw new Error("VITE_GEMINI_API_KEY is required for image generation");
+  }
+
+  console.log("[Gemini Image] Starting generation with imagen-3.0-generate-001");
+  console.log("[Gemini Image] Prompt:", prompt);
 
   const { width, height } = getDimensions(params.aspectRatio);
   
-  // Generate a gradient placeholder using brand colors if available
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  
-  if (ctx) {
-    // Create gradient with brand colors
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#0A66FF');
-    gradient.addColorStop(1, '#6B46C1');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+  try {
+    // Use Gemini 2.5 Flash with Imagen 3.0 for native image generation
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateContent?key=${API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseModalities: ["image"],
+            // Gemini aspect ratio options: "1:1", "16:9", "9:16", "4:3", "3:4"
+            ...(params.aspectRatio && { 
+              aspectRatio: params.aspectRatio === "4:5" ? "4:3" : params.aspectRatio 
+            }),
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Gemini Image] API Error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+      });
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("[Gemini Image] API Response:", data);
+
+    // Extract image data from response
+    // Gemini returns base64-encoded image in the response
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
+      console.error("[Gemini Image] No image data in response:", data);
+      throw new Error("No image data in Gemini response");
+    }
+
+    const imageData = data.candidates[0].content.parts[0].inlineData;
+    const base64Image = imageData.data;
+    const mimeType = imageData.mimeType || "image/png";
+
+    console.log("[Gemini Image] Received image:", {
+      mimeType,
+      size: base64Image.length,
+    });
+
+    // Convert base64 to blob
+    const binaryString = atob(base64Image);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: mimeType });
+
+    console.log("[Gemini Image] Blob created:", {
+      size: blob.size,
+      type: blob.type,
+    });
+
+    // Upload to Supabase Storage
+    const filename = `gemini-${Date.now()}.png`;
+    const publicUrl = await uploadToSupabase(blob, filename);
+
+    console.log("[Gemini Image] Upload successful:", publicUrl);
+    return publicUrl;
+  } catch (error) {
+    console.error("[Gemini Image] Generation failed:", error);
     
-    // Add text
-    ctx.fillStyle = 'white';
-    ctx.font = 'bold 48px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('AI Generated Image', width / 2, height / 2 - 30);
-    ctx.font = '24px Arial';
-    ctx.fillText(`${width}×${height}`, width / 2, height / 2 + 30);
+    // If Gemini fails, create a branded placeholder as fallback
+    console.log("[Gemini Image] Creating fallback placeholder");
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    if (ctx) {
+      // Create gradient with brand colors
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, '#0A66FF');
+      gradient.addColorStop(1, '#6B46C1');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      
+      // Add text
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 48px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('AI Generated Image', width / 2, height / 2 - 30);
+      ctx.font = '24px Arial';
+      ctx.fillText(`${width}×${height}`, width / 2, height / 2 + 30);
+    }
+    
+    // Convert canvas to blob
+    const blob = await new Promise<Blob>((resolve) => {
+      canvas.toBlob((b) => resolve(b!), 'image/png');
+    });
+    
+    return uploadToSupabase(blob, `placeholder-${Date.now()}.png`);
   }
-  
-  // Convert canvas to blob
-  const blob = await new Promise<Blob>((resolve) => {
-    canvas.toBlob((b) => resolve(b!), 'image/png');
-  });
-  
-  return uploadToSupabase(blob, `ai-generated-${Date.now()}.png`);
 }
 
 /**
