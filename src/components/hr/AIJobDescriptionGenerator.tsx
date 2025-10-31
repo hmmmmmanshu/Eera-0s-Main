@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,8 @@ import { Loader2, Sparkles, Copy, Check } from "lucide-react";
 import { generateJobDescription } from "@/lib/gemini";
 import { toast } from "sonner";
 import { useCreateRole } from "@/hooks/useHRData";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface JobDescriptionResult {
   summary: string;
@@ -17,14 +19,42 @@ interface JobDescriptionResult {
 }
 
 export function AIJobDescriptionGenerator() {
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [department, setDepartment] = useState("");
   const [additionalContext, setAdditionalContext] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<JobDescriptionResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [organizationContext, setOrganizationContext] = useState<any>(null);
   
   const createRole = useCreateRole();
+
+  // Fetch organization context from user profile
+  useEffect(() => {
+    if (user?.id) {
+      supabase
+        .from("profiles")
+        .select("startup_name, industry, about, key_offerings, company_stage, tagline, target_audience, competitive_edge, brand_values")
+        .eq("id", user.id)
+        .single()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setOrganizationContext({
+              companyName: data.startup_name,
+              industry: data.industry,
+              about: data.about,
+              keyOfferings: data.key_offerings,
+              companyStage: data.company_stage,
+              tagline: data.tagline,
+              targetAudience: data.target_audience,
+              competitiveEdge: data.competitive_edge,
+              brandValues: Array.isArray(data.brand_values) ? data.brand_values : null,
+            });
+          }
+        });
+    }
+  }, [user?.id]);
 
   const handleGenerate = async () => {
     if (!title.trim()) {
@@ -34,7 +64,12 @@ export function AIJobDescriptionGenerator() {
 
     setIsGenerating(true);
     try {
-      const jd = await generateJobDescription(title, department, additionalContext);
+      const jd = await generateJobDescription(
+        title,
+        department,
+        additionalContext,
+        organizationContext
+      );
       setResult(jd);
       toast.success("Job description generated successfully!");
     } catch (error) {

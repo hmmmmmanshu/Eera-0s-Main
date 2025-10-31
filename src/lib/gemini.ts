@@ -64,20 +64,73 @@ export function getGeminiModel() {
 export async function generateJobDescription(
   title: string,
   department?: string,
-  additionalContext?: string
+  additionalContext?: string,
+  organizationContext?: {
+    companyName?: string;
+    industry?: string;
+    about?: string;
+    keyOfferings?: string;
+    companyStage?: string;
+    tagline?: string;
+    targetAudience?: string;
+    competitiveEdge?: string;
+    brandValues?: string[];
+  }
 ) {
   const model = await getGeminiModel();
 
-  const prompt = `Generate a professional job description for the following role:
+  // Build organization context section
+  let orgContextSection = "";
+  if (organizationContext) {
+    const orgParts: string[] = [];
+    if (organizationContext.companyName) {
+      orgParts.push(`Company Name: ${organizationContext.companyName}`);
+    }
+    if (organizationContext.tagline) {
+      orgParts.push(`Tagline: ${organizationContext.tagline}`);
+    }
+    if (organizationContext.about) {
+      orgParts.push(`About: ${organizationContext.about}`);
+    }
+    if (organizationContext.industry) {
+      orgParts.push(`Industry: ${organizationContext.industry}`);
+    }
+    if (organizationContext.companyStage) {
+      orgParts.push(`Company Stage: ${organizationContext.companyStage}`);
+    }
+    if (organizationContext.keyOfferings) {
+      orgParts.push(`Key Offerings: ${organizationContext.keyOfferings}`);
+    }
+    if (organizationContext.targetAudience) {
+      orgParts.push(`Target Audience: ${organizationContext.targetAudience}`);
+    }
+    if (organizationContext.competitiveEdge) {
+      orgParts.push(`Competitive Edge: ${organizationContext.competitiveEdge}`);
+    }
+    if (organizationContext.brandValues && organizationContext.brandValues.length > 0) {
+      orgParts.push(`Brand Values: ${organizationContext.brandValues.join(", ")}`);
+    }
+
+    if (orgParts.length > 0) {
+      orgContextSection = `
+
+ORGANIZATION CONTEXT:
+${orgParts.join("\n")}
+
+IMPORTANT: Use this organization context to tailor the job description. Make it specific to ${organizationContext.companyName || "this company"}, reflect their ${organizationContext.industry || "industry"}, and align with their ${organizationContext.companyStage || "stage"} stage. The job description should feel authentic to this organization's culture and values.`;
+    }
+  }
+
+  const prompt = `Generate a professional job description for the following role:${orgContextSection}
 
 Role Title: ${title}
 ${department ? `Department: ${department}` : ""}
 ${additionalContext ? `Additional Context: ${additionalContext}` : ""}
 
 Please provide:
-1. A compelling job summary (2-3 sentences)
-2. 5-7 key responsibilities
-3. 5-7 required qualifications/skills
+1. A compelling job summary (2-3 sentences) that references the organization context and makes the role appealing within this specific company
+2. 5-7 key responsibilities tailored to this organization and role
+3. 5-7 required qualifications/skills relevant to this industry and company stage
 4. Nice-to-have skills (3-4 items)
 
 Format the response as JSON with this structure:
@@ -139,11 +192,48 @@ export async function generateOfferLetter(
   role: string,
   salary: string,
   startDate: string,
-  companyName: string
+  companyName: string,
+  organizationContext?: {
+    tagline?: string;
+    about?: string;
+    industry?: string;
+    companyStage?: string;
+    brandValues?: string[];
+  }
 ) {
   const model = await getGeminiModel();
 
-  const prompt = `Generate a professional offer letter with the following details:
+  // Build organization context section
+  let orgContextSection = "";
+  if (organizationContext) {
+    const orgParts: string[] = [];
+    if (organizationContext.tagline) {
+      orgParts.push(`Tagline: ${organizationContext.tagline}`);
+    }
+    if (organizationContext.about) {
+      orgParts.push(`About: ${organizationContext.about}`);
+    }
+    if (organizationContext.industry) {
+      orgParts.push(`Industry: ${organizationContext.industry}`);
+    }
+    if (organizationContext.companyStage) {
+      orgParts.push(`Company Stage: ${organizationContext.companyStage}`);
+    }
+    if (organizationContext.brandValues && organizationContext.brandValues.length > 0) {
+      orgParts.push(`Brand Values: ${organizationContext.brandValues.join(", ")}`);
+    }
+
+    if (orgParts.length > 0) {
+      orgContextSection = `
+
+ORGANIZATION CONTEXT:
+${orgParts.join("\n")}
+
+IMPORTANT: Use this organization context to make the offer letter feel authentic to ${companyName}'s culture and values. Reflect their ${organizationContext.industry || "industry"} and ${organizationContext.companyStage || "stage"} stage.`;
+    }
+  }
+
+  const prompt = `Generate a professional offer letter with the following details:${orgContextSection}
 
 Candidate Name: ${candidateName}
 Role: ${role}
@@ -158,7 +248,7 @@ Make it professional, warm, and include standard sections like:
 - Start date and next steps
 - Closing
 
-Keep it concise but complete.`;
+Keep it concise but complete, and reflect the organization's culture and values.`;
 
   const result = await model.generateContent(prompt);
   const response = await result.response;

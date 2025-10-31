@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,8 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, Sparkles, Copy, Check, Download } from "lucide-react";
 import { generateOfferLetter } from "@/lib/gemini";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 export function AIOfferLetterGenerator() {
+  const { user } = useAuth();
   const [candidateName, setCandidateName] = useState("");
   const [role, setRole] = useState("");
   const [salary, setSalary] = useState("");
@@ -16,6 +19,31 @@ export function AIOfferLetterGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [offerLetter, setOfferLetter] = useState("");
   const [copied, setCopied] = useState(false);
+  const [organizationContext, setOrganizationContext] = useState<any>(null);
+
+  // Fetch organization context from user profile and auto-fill company name
+  useEffect(() => {
+    if (user?.id) {
+      supabase
+        .from("profiles")
+        .select("startup_name, industry, about, company_stage, tagline, brand_values")
+        .eq("id", user.id)
+        .single()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            // Auto-fill company name if empty
+            setCompanyName((prev) => prev || data.startup_name || "");
+            setOrganizationContext({
+              tagline: data.tagline,
+              about: data.about,
+              industry: data.industry,
+              companyStage: data.company_stage,
+              brandValues: Array.isArray(data.brand_values) ? data.brand_values : null,
+            });
+          }
+        });
+    }
+  }, [user?.id]);
 
   const handleGenerate = async () => {
     if (!candidateName.trim() || !role.trim() || !salary.trim() || !startDate || !companyName.trim()) {
@@ -30,7 +58,8 @@ export function AIOfferLetterGenerator() {
         role,
         salary,
         startDate,
-        companyName
+        companyName,
+        organizationContext
       );
       setOfferLetter(letter);
       toast.success("Offer letter generated successfully!");
