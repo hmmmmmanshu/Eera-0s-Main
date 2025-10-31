@@ -1,12 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, FileText, Users, CheckCircle, UserPlus } from "lucide-react";
+import { Sparkles, FileText, Users, CheckCircle, UserPlus, Briefcase } from "lucide-react";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AIJobDescriptionGenerator } from "./AIJobDescriptionGenerator";
 import { AIResumeScreener } from "./AIResumeScreener";
 import { AIOfferLetterGenerator } from "./AIOfferLetterGenerator";
+import { PositionsList } from "./PositionsList";
 import { useHRCandidates } from "@/hooks/useHRData";
 
 export function HiringScreening() {
@@ -14,6 +15,9 @@ export function HiringScreening() {
 
   return (
     <div className="space-y-6">
+      {/* Saved Positions */}
+      <PositionsList />
+
       {/* AI Tools Tabs */}
       <Tabs defaultValue="jd-generator" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
