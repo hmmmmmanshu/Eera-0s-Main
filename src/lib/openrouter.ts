@@ -14,8 +14,10 @@ import { BrandContext } from "./brandContext";
 export interface TextGenerationOptions {
   model: string;
   prompt: string;
+  system?: string;
   temperature?: number;
   maxTokens?: number;
+  json?: boolean;
   brandContext?: BrandContext;
 }
 
@@ -200,22 +202,47 @@ export async function preflightTextRoute(models: string[] = [LIGHT_TEXT_PRIMARY,
 export async function generateText(
   options: TextGenerationOptions
 ): Promise<GeneratedText> {
-  const { model, prompt, temperature = 0.7, maxTokens = 1000, brandContext } = options;
+  const { model, prompt, system, temperature = 0.7, maxTokens = 1000, json, brandContext } = options;
 
-  console.log("[OpenRouter Text] Starting generation:", { model, prompt });
+  console.log("[OpenRouter Text] Starting generation:", { model, prompt, system, json });
 
   const startTime = Date.now();
   const apiKey = getOpenRouterKey();
 
-  // Enhance prompt with brand context
-  const systemPrompt = brandContext
-    ? `You are a professional marketing content creator for ${brandContext.business?.industry || "a business"}. 
+  // Determine system prompt: use provided system, or derive from brand context, or default
+  let systemPrompt = system;
+  if (!systemPrompt && brandContext) {
+    systemPrompt = `You are a professional marketing content creator for ${brandContext.business?.industry || "a business"}. 
        Brand voice: ${brandContext.voice?.tone?.join(", ") || "professional"}.
        Writing style: ${brandContext.voice?.style || "clear and engaging"}.
-       Brand values: ${brandContext.voice?.values?.join(", ") || "quality and innovation"}.`
-    : "You are a professional marketing content creator.";
+       Brand values: ${brandContext.voice?.values?.join(", ") || "quality and innovation"}.`;
+  }
+  if (!systemPrompt) {
+    systemPrompt = "You are a helpful AI assistant.";
+  }
 
   try {
+    const body: any = {
+      model,
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature,
+      max_tokens: maxTokens,
+    };
+
+    // Add response_format for JSON mode if requested
+    if (json) {
+      body.response_format = { type: "json_object" };
+    }
+
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -226,21 +253,7 @@ export async function generateText(
           "X-Title": "EERA OS Marketing Hub",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt,
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature,
-          max_tokens: maxTokens,
-        }),
+        body: JSON.stringify(body),
       }
     );
 

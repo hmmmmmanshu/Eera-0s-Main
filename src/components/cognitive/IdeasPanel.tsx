@@ -4,22 +4,42 @@ import { Badge } from "@/components/ui/badge";
 import { Lightbulb, Sparkles, TrendingUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCognitiveActions } from "@/hooks/useCognitive";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export function IdeasPanel() {
   const { user } = useAuth();
   const { generateIdeas, saveIdea, preflightLLM } = useCognitiveActions(user?.id);
   const [ideas, setIdeas] = useState<any[]>([]);
+  const [savedIdeas, setSavedIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [llmOk, setLlmOk] = useState<boolean | null>(null);
 
+  // Load saved ideas from database
+  useEffect(() => {
+    (async () => {
+      if (!user?.id) return;
+      try {
+        const { data } = await supabase
+          .from("cognitive_ideas")
+          .select("id, title, category, rationale, next_step, status, priority")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        setSavedIdeas(data || []);
+      } catch (error) {
+        console.error("Error loading saved ideas:", error);
+      }
+    })();
+  }, [user?.id]);
+
   // preflight once
-  useState(() => {
+  useEffect(() => {
     (async () => {
       try { const pf = await preflightLLM(); setLlmOk(!!pf.model); } catch { setLlmOk(false); }
     })();
-  });
+  }, [preflightLLM]);
 
   return (
     <Card className="border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5">
@@ -30,6 +50,28 @@ export function IdeasPanel() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* Show saved ideas */}
+        {savedIdeas.length > 0 && (
+          <div className="space-y-2 border-t pt-3">
+            <p className="text-xs font-semibold text-muted-foreground mb-2">Saved Ideas ({savedIdeas.length})</p>
+            {savedIdeas.map((idea) => (
+              <div key={idea.id} className="p-2 rounded border text-xs bg-muted/30">
+                <div className="font-medium mb-1">{idea.title}</div>
+                {idea.category && (
+                  <Badge variant="outline" className="text-xs mt-1">{idea.category}</Badge>
+                )}
+                {idea.rationale && (
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{idea.rationale}</p>
+                )}
+                {idea.status && (
+                  <Badge variant="secondary" className="text-xs mt-1 ml-1">{idea.status}</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Show generated ideas */}
         {ideas.map((idea, idx) => (
           <div key={idx} className="p-3 rounded-lg border border-border hover:border-cyan-500/50 transition-all">
             <div className="flex items-start justify-between mb-2">
@@ -48,6 +90,14 @@ export function IdeasPanel() {
                 try {
                   const id = await saveIdea(idea);
                   toast.success("Saved to Ideas");
+                  // Refresh saved ideas
+                  const { data } = await supabase
+                    .from("cognitive_ideas")
+                    .select("id, title, category, rationale, next_step, status, priority")
+                    .eq("user_id", user?.id)
+                    .order("created_at", { ascending: false })
+                    .limit(10);
+                  setSavedIdeas(data || []);
                 } catch (e: any) {
                   toast.error(e?.message || "Failed to save idea");
                 }

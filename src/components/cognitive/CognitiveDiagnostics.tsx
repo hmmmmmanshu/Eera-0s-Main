@@ -8,10 +8,8 @@ import { useState } from "react";
 
 export function CognitiveDiagnostics() {
   const { user } = useAuth();
-  const { preflightLLM, skillsStatus, weeklyOverview } = useCognitiveActions(user?.id);
+  const { preflightLLM, weeklyOverview } = useCognitiveActions(user?.id);
   const [llmModel, setLlmModel] = useState<string | null>(null);
-  const [dockerOn, setDockerOn] = useState<boolean | null>(null);
-  const [skills, setSkills] = useState<Array<{ id: string; healthy: boolean }>>([]);
   const [weekOk, setWeekOk] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -26,25 +24,16 @@ export function CognitiveDiagnostics() {
       <CardContent className="space-y-3 text-xs">
         <div className="flex items-center gap-2">
           <Badge variant={llmModel ? "default" : "outline"}>LLM: {llmModel || "unknown"}</Badge>
-          <Badge variant={dockerOn ? "default" : "outline"}>Docker: {dockerOn === null ? "…" : dockerOn ? "On" : "Off"}</Badge>
           <Badge variant={weekOk ? "default" : "outline"}>Weekly Snapshot: {weekOk === null ? "…" : weekOk ? "OK" : "—"}</Badge>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Button size="sm" variant="outline" disabled={busy} onClick={async () => {
             setBusy(true);
             try {
               const pf = await preflightLLM();
-              setLlmModel(pf.model);
+              setLlmModel(pf.model || null);
             } finally { setBusy(false); }
           }}>Preflight LLM</Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={async () => {
-            setBusy(true);
-            try {
-              const st = await skillsStatus();
-              setDockerOn(!!st?.dockerAvailable);
-              setSkills(st?.skills || []);
-            } finally { setBusy(false); }
-          }}>Check Skills</Button>
           <Button size="sm" variant="outline" disabled={busy} onClick={async () => {
             setBusy(true);
             try {
@@ -54,16 +43,6 @@ export function CognitiveDiagnostics() {
             } finally { setBusy(false); }
           }}>Verify Weekly</Button>
         </div>
-        {skills.length > 0 && (
-          <div className="grid grid-cols-2 gap-1">
-            {skills.map((s) => (
-              <div key={s.id} className="flex items-center gap-2">
-                <ActivitySquare className={`h-3 w-3 ${s.healthy ? "text-green-500" : "text-amber-600"}`} />
-                <span>{s.id}: {s.healthy ? "healthy" : "down"}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </CardContent>
     </Card>
   );

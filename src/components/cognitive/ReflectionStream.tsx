@@ -11,19 +11,8 @@ import { toast } from "sonner";
 export function ReflectionStream() {
   const [newEntry, setNewEntry] = useState("");
   const { user } = useAuth();
-  const { addReflection, skillsStatus } = useCognitiveActions(user?.id);
+  const { addReflection } = useCognitiveActions(user?.id);
   const [lastRun, setLastRun] = useState<{ ok: boolean; details: string } | null>(null);
-  const [skillsBanner, setSkillsBanner] = useState<string | null>(null);
-
-  // probe skills once on mount
-  useState(() => {
-    (async () => {
-      try {
-        const s = await skillsStatus();
-        if (!s?.dockerAvailable) setSkillsBanner("Local skills are offline. We'll still save your reflection and generate summaries when available.");
-      } catch {}
-    })();
-  });
 
   const entries = [
     {
@@ -67,9 +56,6 @@ export function ReflectionStream() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {skillsBanner && (
-          <div className="text-xs text-amber-600">{skillsBanner}</div>
-        )}
         {/* New Entry Input */}
         <div className="space-y-3">
           <Textarea

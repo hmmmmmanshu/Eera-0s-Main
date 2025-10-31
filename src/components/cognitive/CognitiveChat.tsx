@@ -19,18 +19,8 @@ export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
   const [history, setHistory] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const { user } = useAuth();
-  const { cognitiveChat, preflightLLM, skillsStatus } = useCognitiveActions(user?.id);
-  const [dockerOn, setDockerOn] = useState<boolean | null>(null);
+  const { cognitiveChat, preflightLLM } = useCognitiveActions(user?.id);
   const [orStatus, setOrStatus] = useState<"ok" | "nocredits" | "unavailable" | "checking">("checking");
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const status = await skillsStatus();
-        setDockerOn(status?.dockerAvailable ?? false);
-      } catch { setDockerOn(false); }
-    })();
-  }, [skillsStatus]);
 
   useEffect(() => {
     (async () => {
@@ -63,9 +53,6 @@ export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="outline">Active</Badge>
-            <Badge variant={dockerOn ? "default" : "outline"} className="text-xs">
-              Local skills: {dockerOn === null ? "…" : dockerOn ? "On" : "Off"}
-            </Badge>
             <Badge variant={orStatus === "ok" ? "default" : "outline"} className="text-xs">
               OpenRouter: {orStatus === "checking" ? "…" : orStatus === "ok" ? "OK" : orStatus === "nocredits" ? "No credits" : "Unavailable"}
           </Badge>

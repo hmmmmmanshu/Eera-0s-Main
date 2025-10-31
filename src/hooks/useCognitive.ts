@@ -2,9 +2,8 @@ import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { assembleCognitiveContext } from "@/lib/cognitive/context";
 import { getOrCreateWeeklySnapshot, saveSessionMessage, type Persona } from "@/lib/cognitive/memory";
-import { runSkill, getSkillsStatus } from "@/lib/docker/skills";
 import { generateText, preflightTextRoute, LIGHT_TEXT_PRIMARY, LIGHT_TEXT_FALLBACK } from "@/lib/openrouter";
-import { logLLM, logSkill } from "@/lib/cognitive/telemetry";
+import { logLLM } from "@/lib/cognitive/telemetry";
 
 const TEXT_MODEL_PRIMARY = LIGHT_TEXT_PRIMARY;
 const TEXT_MODEL_FALLBACK = LIGHT_TEXT_FALLBACK;
@@ -33,6 +32,58 @@ export function useCognitiveActions(userId?: string | null) {
   function trimText(input: string, maxChars = 4000): string {
     if (input.length <= maxChars) return input;
     return input.slice(0, maxChars) + "\n[...truncated...]";
+  }
+
+  // AI-powered sentiment analysis using Gemini
+  async function analyzeSentiment(text: string): Promise<{ score: number; emotions: string[] }> {
+    try {
+      const prompt = `Analyze sentiment of this text. Output JSON with this exact structure: {"score": 1-10 (1=very negative, 10=very positive), "emotions": ["emotion1", "emotion2", "emotion3"]}
+
+TEXT: ${text}`;
+      
+      const result = await generateText({
+        model: TEXT_MODEL_PRIMARY,
+        system: "You are a sentiment analyzer. Output strict JSON only. Use this format: {\"score\": number, \"emotions\": [\"string\", \"string\"]}",
+        prompt: trimText(prompt, 3000),
+        json: true,
+        maxTokens: 150,
+      });
+      
+      const parsed = typeof result.content === "string" ? JSON.parse(result.content) : result.content;
+      return {
+        score: typeof parsed.score === "number" ? Math.max(1, Math.min(10, parsed.score)) : 5,
+        emotions: Array.isArray(parsed.emotions) ? parsed.emotions.slice(0, 3) : ["neutral"],
+      };
+    } catch (error) {
+      console.error("Sentiment analysis error:", error);
+      // Fallback: neutral sentiment
+      return { score: 5, emotions: ["neutral"] };
+    }
+  }
+
+  // AI-powered topic extraction using Gemini
+  async function extractTopics(text: string): Promise<{ keywords: string[] }> {
+    try {
+      const prompt = `Extract 3-5 key topics/themes from this text. Output JSON with this exact structure: {"keywords": ["topic1", "topic2", "topic3"]}
+
+TEXT: ${text}`;
+      
+      const result = await generateText({
+        model: TEXT_MODEL_PRIMARY,
+        system: "You are a topic extractor. Output strict JSON only. Use this format: {\"keywords\": [\"string\", \"string\"]}",
+        prompt: trimText(prompt, 3000),
+        json: true,
+        maxTokens: 150,
+      });
+      
+      const parsed = typeof result.content === "string" ? JSON.parse(result.content) : result.content;
+      return {
+        keywords: Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 5) : [],
+      };
+    } catch (error) {
+      console.error("Topic extraction error:", error);
+      return { keywords: [] };
+    }
   }
 
   // --- New: Chat sessions & plan extraction ---
@@ -174,13 +225,14 @@ export function useCognitiveActions(userId?: string | null) {
       .single();
     if (error) throw error;
 
-    // Run local skills (best-effort)
+    // AI-powered sentiment and topic extraction
     const startSenti = Date.now();
-    const senti = await runSkill("sentiment", { text: payload.content });
-    await logSkill(userId, "sentiment", senti ? "success" : "skip", { durationMs: Date.now() - startSenti });
+    const senti = await analyzeSentiment(payload.content);
+    await logLLM(userId, "reflection.sentiment", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - startSenti });
+
     const startTopics = Date.now();
-    const topics = await runSkill("topics", { text: payload.content });
-    await logSkill(userId, "topics", topics ? "success" : "skip", { durationMs: Date.now() - startTopics });
+    const topics = await extractTopics(payload.content);
+    await logLLM(userId, "reflection.topics", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - startTopics });
 
     const tags = Array.from(new Set([...(topics?.keywords || []), ...(senti?.emotions || [])])).slice(0, 10);
     const sentiment_score = typeof senti?.score === "number" ? senti.score : null;
@@ -443,11 +495,7 @@ export function useCognitiveActions(userId?: string | null) {
     return preflightTextRoute([TEXT_MODEL_PRIMARY, TEXT_MODEL_FALLBACK]);
   }, []);
 
-  const skillsStatus = useCallback(async () => {
-    return getSkillsStatus();
-  }, []);
-
-  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, skillsStatus, sendChatWithPlanExtract, pinPlanToSession };
+  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, pinPlanToSession };
 }
 
 function personaSystem(persona: Persona, tone?: string) {
