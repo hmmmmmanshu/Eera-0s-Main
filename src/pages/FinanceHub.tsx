@@ -235,8 +235,6 @@ const FinanceHub = () => {
                   <TabsContent value="pitch-analysis" className="mt-6">
                     <PitchDeckAnalyzer />
                   </TabsContent>
-              </motion.div>
-            </AnimatePresence>
             </Tabs>
           </div>
         </main>
