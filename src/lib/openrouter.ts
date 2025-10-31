@@ -86,6 +86,10 @@ export const IMAGE_MODELS = {
   },
 } as const;
 
+// Lightweight defaults for Cognitive Hub
+export const LIGHT_TEXT_PRIMARY = "qwen/qwen-2.5-7b-instruct";
+export const LIGHT_TEXT_FALLBACK = "meta-llama/llama-3.1-8b-instruct";
+
 // ========================================
 // HELPER FUNCTIONS
 // ========================================
@@ -162,6 +166,16 @@ export async function preflightModel(model: string): Promise<{ ok: boolean; code
   } catch (e: any) {
     return { ok: false, message: e?.message };
   }
+}
+
+export async function preflightTextRoute(models: string[] = [LIGHT_TEXT_PRIMARY, LIGHT_TEXT_FALLBACK]): Promise<{ model: string | null; code?: number; message?: string }> {
+  for (const m of models) {
+    const r = await preflightModel(m);
+    if (r.ok) return { model: m };
+    // If credits (402) or provider 429, try next
+    if (r.code && (r.code === 402 || r.code === 429)) continue;
+  }
+  return { model: null, message: "No available text model (rate-limited or credits required)" };
 }
 
 

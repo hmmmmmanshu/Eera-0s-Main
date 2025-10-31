@@ -7,9 +7,7 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCognitiveActions } from "@/hooks/useCognitive";
 import { toast } from "sonner";
-import { isDockerAvailable } from "@/lib/docker/skills";
 import { useEffect } from "react";
-import { preflightModel } from "@/lib/openrouter";
 
 interface CognitiveChatProps {
   mode: "friend" | "guide" | "mentor" | "ea";
@@ -21,26 +19,28 @@ export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
   const [history, setHistory] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const { user } = useAuth();
-  const { cognitiveChat } = useCognitiveActions(user?.id);
+  const { cognitiveChat, preflightLLM, skillsStatus } = useCognitiveActions(user?.id);
   const [dockerOn, setDockerOn] = useState<boolean | null>(null);
   const [orStatus, setOrStatus] = useState<"ok" | "nocredits" | "unavailable" | "checking">("checking");
 
   useEffect(() => {
     (async () => {
-      try { setDockerOn(await isDockerAvailable()); } catch { setDockerOn(false); }
+      try {
+        const status = await skillsStatus();
+        setDockerOn(status?.dockerAvailable ?? false);
+      } catch { setDockerOn(false); }
     })();
-  }, []);
+  }, [skillsStatus]);
 
   useEffect(() => {
     (async () => {
       try {
-        const pf = await preflightModel("google/gemini-2.0-flash-exp:free");
-        if (pf.ok) setOrStatus("ok");
-        else if (pf.code === 402) setOrStatus("nocredits");
+        const pf = await preflightLLM();
+        if (pf.model) setOrStatus("ok");
         else setOrStatus("unavailable");
       } catch { setOrStatus("unavailable"); }
     })();
-  }, []);
+  }, [preflightLLM]);
 
   const modes = [
     { id: "friend" as const, label: "Friend", icon: Heart, color: "text-pink-500" },
@@ -127,7 +127,7 @@ export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
               }
             }}
           />
-          <Button size="icon" disabled={busy} onClick={async () => {
+          <Button size="icon" disabled={busy || orStatus !== "ok"} onClick={async () => {
             if (!input.trim()) return;
             try {
               setBusy(true);

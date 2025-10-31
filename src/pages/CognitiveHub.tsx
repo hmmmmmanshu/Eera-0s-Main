@@ -7,6 +7,7 @@ import { CalendarPanel } from "@/components/cognitive/CalendarPanel";
 import { IdeasPanel } from "@/components/cognitive/IdeasPanel";
 import { CognitiveChat } from "@/components/cognitive/CognitiveChat";
 import { WeeklyOverview } from "@/components/cognitive/WeeklyOverview";
+import { CognitiveDiagnostics } from "@/components/cognitive/CognitiveDiagnostics";
 
 const CognitiveHub = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -34,6 +35,7 @@ const CognitiveHub = () => {
                 <MoodTracker />
                 <WeeklyOverview />
                 <ReflectionStream />
+                <CognitiveDiagnostics />
               </div>
 
               {/* Right Column - Panels */}

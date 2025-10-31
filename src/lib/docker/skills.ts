@@ -32,6 +32,11 @@ export const SKILLS: Record<string, Skill> = {
   },
 };
 
+export interface SkillStatus {
+  dockerAvailable: boolean;
+  skills: Array<{ id: string; healthy: boolean }>;
+}
+
 export async function isDockerAvailable(): Promise<boolean> {
   try {
     // Docker Desktop can expose 2375 if enabled; otherwise this will fail quickly.
@@ -85,6 +90,22 @@ export async function runSkill<TReq extends object, TRes = any>(skillId: keyof t
     console.warn(`[docker skills] call failed for ${skill.id}`, e);
     return null;
   }
+}
+
+export async function getSkillsStatus(): Promise<SkillStatus> {
+  const dockerAvailable = await isDockerAvailable();
+  const entries = Object.values(SKILLS);
+  const results: Array<{ id: string; healthy: boolean }> = [];
+  for (const s of entries) {
+    let healthy = false;
+    try {
+      const healthUrl = `http://127.0.0.1:${s.port}${s.healthPath || "/healthz"}`;
+      const h = await fetch(healthUrl);
+      healthy = h.ok;
+    } catch { healthy = false; }
+    results.push({ id: s.id, healthy });
+  }
+  return { dockerAvailable, skills: results };
 }
 
 

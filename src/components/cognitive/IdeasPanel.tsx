@@ -9,9 +9,17 @@ import { toast } from "sonner";
 
 export function IdeasPanel() {
   const { user } = useAuth();
-  const { generateIdeas, saveIdea } = useCognitiveActions(user?.id);
+  const { generateIdeas, saveIdea, preflightLLM } = useCognitiveActions(user?.id);
   const [ideas, setIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [llmOk, setLlmOk] = useState<boolean | null>(null);
+
+  // preflight once
+  useState(() => {
+    (async () => {
+      try { const pf = await preflightLLM(); setLlmOk(!!pf.model); } catch { setLlmOk(false); }
+    })();
+  });
 
   return (
     <Card className="border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5">
@@ -50,7 +58,7 @@ export function IdeasPanel() {
           </div>
         ))}
 
-        <Button variant="outline" className="w-full mt-3" disabled={loading} onClick={async () => {
+        <Button variant="outline" className="w-full mt-3" disabled={loading || llmOk === false} onClick={async () => {
           try {
             setLoading(true);
             const res = await generateIdeas("guide");
@@ -62,7 +70,7 @@ export function IdeasPanel() {
           }
         }}>
           <TrendingUp className="h-4 w-4 mr-2" />
-          {loading ? "Generating…" : "Generate 5 Ideas"}
+          {llmOk === false ? "Model unavailable" : (loading ? "Generating…" : "Generate 5 Ideas")}
         </Button>
       </CardContent>
     </Card>

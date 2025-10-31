@@ -13,7 +13,7 @@ export interface CognitiveContext {
     moods: Array<{ date: string; score: number; tags?: string[] }>; // last 7 days
     topTags: string[];
   };
-  recentReflections: Array<{ id: string; created_at: string; text: string; ai_summary?: string | null; tags?: string[] }>;
+  recentReflections: Array<{ id: string; created_at: string; text: string; ai_summary?: string | null }>;
   activeIdeas: Array<{ id: string; title: string; category?: string; priority?: number }>;
   upcomingEvents: Array<{ id: string; title: string; start_time: string; end_time?: string | null }>;
   goalsThemes: string[];
@@ -56,7 +56,7 @@ export async function assembleCognitiveContext(userId: string): Promise<Cognitiv
   // Recent reflections
   const { data: reflections } = await supabase
     .from("cognitive_reflections")
-    .select("id, created_at, content, ai_summary, tags")
+    .select("id, created_at, content, ai_summary")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(10);
@@ -101,7 +101,6 @@ export async function assembleCognitiveContext(userId: string): Promise<Cognitiv
       created_at: r.created_at,
       text: r.content,
       ai_summary: r.ai_summary,
-      tags: r.tags || [],
     })),
     activeIdeas: topIdeas,
     upcomingEvents: (events || []).map((e: any) => ({ id: e.id, title: e.title, start_time: e.start_time, end_time: e.end_time })),

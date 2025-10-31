@@ -2,8 +2,12 @@ import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { assembleCognitiveContext } from "@/lib/cognitive/context";
 import { getOrCreateWeeklySnapshot, saveSessionMessage, type Persona } from "@/lib/cognitive/memory";
-import { runSkill } from "@/lib/docker/skills";
-import { generateText } from "@/lib/openrouter";
+import { runSkill, getSkillsStatus } from "@/lib/docker/skills";
+import { generateText, preflightTextRoute, LIGHT_TEXT_PRIMARY, LIGHT_TEXT_FALLBACK } from "@/lib/openrouter";
+import { logLLM, logSkill } from "@/lib/cognitive/telemetry";
+
+const TEXT_MODEL_PRIMARY = LIGHT_TEXT_PRIMARY;
+const TEXT_MODEL_FALLBACK = LIGHT_TEXT_FALLBACK;
 
 export function useCognitiveActions(userId?: string | null) {
   // Simple call budget: max 5 LLM calls per 60s per session
@@ -37,32 +41,54 @@ export function useCognitiveActions(userId?: string | null) {
     if (error) throw error;
 
     // Run local skills (best-effort)
+    const startSenti = Date.now();
     const senti = await runSkill("sentiment", { text: payload.content });
+    await logSkill(userId, "sentiment", senti ? "success" : "skip", { durationMs: Date.now() - startSenti });
+    const startTopics = Date.now();
     const topics = await runSkill("topics", { text: payload.content });
+    await logSkill(userId, "topics", topics ? "success" : "skip", { durationMs: Date.now() - startTopics });
 
     const tags = Array.from(new Set([...(topics?.keywords || []), ...(senti?.emotions || [])])).slice(0, 10);
     const sentiment_score = typeof senti?.score === "number" ? senti.score : null;
 
-    try {
-      await supabase
-        .from("cognitive_reflections")
-        .update({ tags, sentiment_score })
-        .eq("id", inserted.id);
-    } catch {}
+    // Persisting derived tags/sentiment is disabled until columns exist in schema
+    // (kept local for return value / UI only)
 
     // AI summary (LLM)
     const ctx = await assembleCognitiveContext(userId);
     const sys = `Summarize the reflection in 3-5 bullets. Be concise. Tone=${ctx.userProfile.tone || "neutral"}.`;
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
-    const summary = await generateText({
-      model: "google/gemini-2.0-flash-exp:free",
-      system: sys,
-      prompt: trimText(payload.content, 2000),
-      maxTokens: 320,
-    });
-    await supabase.from("cognitive_reflections").update({ ai_summary: summary }).eq("id", inserted.id);
+    let ai_summary: string | null = null;
+    try {
+      const t0 = Date.now();
+      const summary = await generateText({
+        model: TEXT_MODEL_PRIMARY,
+        system: sys,
+        prompt: trimText(payload.content, 2000),
+        maxTokens: 300,
+      });
+      await logLLM(userId, "reflection.summary", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
+      ai_summary = summary;
+    } catch (e: any) {
+      try {
+        const t1 = Date.now();
+        const summary2 = await generateText({
+          model: TEXT_MODEL_FALLBACK,
+          system: sys,
+          prompt: trimText(payload.content, 2000),
+          maxTokens: 300,
+        });
+        await logLLM(userId, "reflection.summary", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
+        ai_summary = summary2;
+      } catch (e2: any) {
+        await logLLM(userId, "reflection.summary", TEXT_MODEL_FALLBACK, "failure", { error: e2?.message });
+      }
+    }
+    if (ai_summary) {
+      await supabase.from("cognitive_reflections").update({ ai_summary }).eq("id", inserted.id);
+    }
 
-    return { id: inserted.id, tags, sentiment_score, ai_summary: summary };
+    return { id: inserted.id, tags, sentiment_score, ai_summary };
   }, [userId]);
 
   const weeklyOverview = useCallback(async () => {
@@ -75,14 +101,38 @@ export function useCognitiveActions(userId?: string | null) {
         reflections: ctx.recentReflections.map(r => ({ id: r.id, text: r.text, ai_summary: r.ai_summary })),
       });
       if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
-      const summary = await generateText({
-        model: "google/gemini-2.0-flash-exp:free",
-        system: "You output strict JSON with fields: moodAverage, topMoods, themes, insights[3], actions[3].",
-        prompt: trimText(prompt, 6000),
-        json: true,
-        maxTokens: 600,
-      });
-      try { return JSON.parse(summary); } catch { return { raw: summary }; }
+      let jsonText: string | null = null;
+      try {
+        const t0 = Date.now();
+        jsonText = await generateText({
+          model: TEXT_MODEL_PRIMARY,
+          system: "You output strict JSON with fields: moodAverage, topMoods, themes, insights[3], actions[3].",
+          prompt: trimText(prompt, 6000),
+          json: true,
+          maxTokens: 500,
+        });
+        await logLLM(userId, "weekly.snapshot", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
+      } catch {
+        try {
+          const t1 = Date.now();
+          jsonText = await generateText({
+            model: TEXT_MODEL_FALLBACK,
+            system: "You output strict JSON with fields: moodAverage, topMoods, themes, insights[3], actions[3].",
+            prompt: trimText(prompt, 6000),
+            json: true,
+            maxTokens: 500,
+          });
+          await logLLM(userId, "weekly.snapshot", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
+        } catch {}
+      }
+      if (jsonText) {
+        try { return JSON.parse(jsonText); } catch { /* fallthrough */ }
+      }
+      // Last-resort: derive minimal snapshot locally without LLM
+      const moodAverage = ctx.currentWeek.moodAverage;
+      const topMoods = ctx.currentWeek.moods.slice(-5).map(m => m.score);
+      const themes = ctx.goalsThemes;
+      return { moodAverage, topMoods, themes, insights: [], actions: [] };
     });
     return snapshot;
   }, [userId]);
@@ -98,12 +148,32 @@ export function useCognitiveActions(userId?: string | null) {
       snapshot_hint: "Use the latest weekly snapshot if available.",
     });
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
-    const reply = await generateText({
-      model: "google/gemini-2.0-flash-exp:free",
-      system,
-      prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 6000),
-      maxTokens: 480,
-    });
+    let reply: string | null = null;
+    try {
+      const t0 = Date.now();
+      reply = await generateText({
+        model: TEXT_MODEL_PRIMARY,
+        system,
+        prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 6000),
+        maxTokens: 420,
+      });
+      await logLLM(userId, "chat.reply", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
+    } catch {
+      try {
+        const t1 = Date.now();
+        reply = await generateText({
+          model: TEXT_MODEL_FALLBACK,
+          system,
+          prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 6000),
+          maxTokens: 420,
+        });
+        await logLLM(userId, "chat.reply", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
+      } catch {}
+    }
+    if (!reply) {
+      // Local minimal fallback to avoid silent failure
+      reply = "I couldn't reach the assistant right now. Based on your recent context, here are next steps: 1) capture a reflection, 2) pick one focus theme this week, 3) schedule a 30-min block.";
+    }
     // Simple citation line using tags/date window
     const weekDates = ctx.currentWeek.moods.map(m => m.date);
     const from = weekDates[0] ? new Date(weekDates[0]).toDateString().split(" ").slice(0,3).join(" ") : "recent days";
@@ -123,13 +193,16 @@ export function useCognitiveActions(userId?: string | null) {
     const prompt = `Using themes=${JSON.stringify(ctx.goalsThemes)}, generate 5 startup ideas as JSON array of {title, category, rationale, nextStep}. Keep each field under 160 chars.`;
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
     try {
-      const json = await generateText({ model: "google/gemini-2.0-flash-exp:free", system, prompt: trimText(prompt, 6000), json: true, maxTokens: 700 });
+      const t0 = Date.now();
+      const json = await generateText({ model: TEXT_MODEL_PRIMARY, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 });
+      await logLLM(userId, "ideas.generate", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
       return JSON.parse(json);
     } catch (e: any) {
-      // Fallback to GPT-4o if the free model is rate-limited
       const msg = e?.message || "";
-      if (msg.includes("429") || msg.includes("rate")) {
-        const json2 = await generateText({ model: "openai/gpt-4o", system, prompt: trimText(prompt, 6000), json: true, maxTokens: 700 });
+      if (msg.includes("429") || msg.includes("rate") || msg.includes("402")) {
+        const t1 = Date.now();
+        const json2 = await generateText({ model: TEXT_MODEL_FALLBACK, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 });
+        await logLLM(userId, "ideas.generate", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
         try { return JSON.parse(json2); } catch { return []; }
       }
       return [];
@@ -182,7 +255,7 @@ export function useCognitiveActions(userId?: string | null) {
   const fetchReflectionById = useCallback(async (id: string) => {
     const { data, error } = await supabase
       .from("cognitive_reflections")
-      .select("id, created_at, content, ai_summary, tags, sentiment_score")
+      .select("id, created_at, content, ai_summary")
       .eq("id", id)
       .single();
     if (error) throw error; return data;
@@ -203,18 +276,35 @@ export function useCognitiveActions(userId?: string | null) {
     if (!userId) throw new Error("No user");
     const { data } = await supabase
       .from("cognitive_reflections")
-      .select("id, created_at, content, tags")
+      .select("id, created_at, content")
       .eq("user_id", userId)
       .gte("created_at", fromISO)
       .lte("created_at", toISO)
       .order("created_at", { ascending: true });
     const prompt = JSON.stringify({ range: { fromISO, toISO }, reflections: data });
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
-    const res = await generateText({ model: "google/gemini-2.0-flash-exp:free", system: "Summarize reflections into themes and 3 actions. Output JSON.", prompt: trimText(prompt, 6000), json: true, maxTokens: 700 });
+    let res: any;
+    try {
+      const t0 = Date.now();
+      res = await generateText({ model: TEXT_MODEL_PRIMARY, system: "Summarize reflections into themes and 3 actions. Output JSON.", prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 });
+      await logLLM(userId, "range.summary", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
+    } catch {
+      const t1 = Date.now();
+      res = await generateText({ model: TEXT_MODEL_FALLBACK, system: "Summarize reflections into themes and 3 actions. Output JSON.", prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 });
+      await logLLM(userId, "range.summary", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
+    }
     try { return JSON.parse(res); } catch { return { raw: res }; }
   }, [userId]);
 
-  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange };
+  const preflightLLM = useCallback(async () => {
+    return preflightTextRoute([TEXT_MODEL_PRIMARY, TEXT_MODEL_FALLBACK]);
+  }, []);
+
+  const skillsStatus = useCallback(async () => {
+    return getSkillsStatus();
+  }, []);
+
+  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, skillsStatus };
 }
 
 function personaSystem(persona: Persona, tone?: string) {
