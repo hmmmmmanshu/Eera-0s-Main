@@ -117,6 +117,50 @@ export function InvoiceGenerator() {
     }
   };
 
+  const handlePrintInvoice = () => {
+    // Create a new window for printing
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 20mm;
+            }
+            body {
+              font-family: system-ui, -apple-system, sans-serif;
+              color: black;
+              background: white;
+              margin: 0;
+              padding: 20px;
+            }
+            * {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+              color-adjust: exact;
+            }
+          </style>
+        </head>
+        <body>
+          ${previewInvoice.formattedInvoice.replace(/\n/g, "<br />")}
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   const handleSaveInvoice = async (status: "draft" | "sent" = "draft") => {
     if (!previewInvoice) {
       // Save without AI generation
@@ -348,7 +392,8 @@ export function InvoiceGenerator() {
         <CardContent>
           {previewInvoice ? (
             <div className="space-y-4">
-              <div className="prose prose-sm max-w-none">
+              {/* Screen preview */}
+              <div className="prose prose-sm max-w-none border rounded-lg p-6 bg-white">
                 <div
                   dangerouslySetInnerHTML={{
                     __html: previewInvoice.formattedInvoice.replace(/\n/g, "<br />"),
@@ -356,9 +401,9 @@ export function InvoiceGenerator() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => window.print()}>
+                <Button onClick={handlePrintInvoice}>
                   <Download className="h-4 w-4 mr-2" />
-                  Download PDF
+                  Print / Save PDF
                 </Button>
                 <Button variant="outline" onClick={() => handleSaveInvoice("sent")}>
                   Mark as Sent

@@ -245,7 +245,7 @@ export async function syncEmployeeCount(userId: string): Promise<number> {
 
     const employeeCount = employees?.length || 0;
 
-    // Update company_info
+    // Check if company_info exists
     const { data: companyInfo } = await supabase
       .from("company_info")
       .select("id")
@@ -253,12 +253,25 @@ export async function syncEmployeeCount(userId: string): Promise<number> {
       .maybeSingle();
 
     if (companyInfo) {
+      // Update existing company_info
       const { error: updateError } = await supabase
         .from("company_info")
         .update({ number_of_employees: employeeCount })
         .eq("id", companyInfo.id);
 
       if (updateError) throw updateError;
+    } else {
+      // Create company_info if it doesn't exist (with minimal required data)
+      const { error: insertError } = await supabase
+        .from("company_info")
+        .insert({
+          user_id: userId,
+          number_of_employees: employeeCount,
+          company_name: "Your Company",
+          company_type: "private_limited",
+        });
+
+      if (insertError) throw insertError;
     }
 
     return employeeCount;

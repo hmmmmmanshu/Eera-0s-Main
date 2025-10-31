@@ -27,11 +27,24 @@ export function CashFlowChart() {
     net: Number(cf.net_cash_flow) / 1000,
   }));
 
-  // If no data, use placeholder
+  // If no data, show empty state instead of placeholder
   if (data.length === 0 && !isLoading) {
-    // Show placeholder data structure
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    data = months.map((month) => ({ month, inflow: 0, outflow: 0, net: 0 }));
+    return (
+      <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-accent" />
+            Cash Flow Forecast
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-12 text-muted-foreground">
+            <p>No cash flow data available</p>
+            <p className="text-xs mt-2">Cash flow data will appear here once transactions are recorded</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const avgInflow = data.length > 0 ? data.reduce((sum, d) => sum + d.inflow, 0) / data.length : 0;
@@ -64,7 +77,7 @@ export function CashFlowChart() {
                 />
                 {entry.name}
               </span>
-              <span className="font-bold">${entry.value}K</span>
+                <span className="font-bold">₹{entry.value}K</span>
             </div>
           ))}
         </div>
@@ -126,7 +139,7 @@ export function CashFlowChart() {
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(value) => `$${value}K`}
+                  tickFormatter={(value) => `₹${value}K`}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 
@@ -168,18 +181,17 @@ export function CashFlowChart() {
           <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Avg. Inflow</p>
-              <p className="text-2xl font-bold text-emerald-500">${avgInflow.toFixed(0)}K</p>
-              <p className="text-xs text-emerald-500/70">+12% growth</p>
+              <p className="text-2xl font-bold text-emerald-500">₹{(avgInflow * 1000).toFixed(0)}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Avg. Outflow</p>
-              <p className="text-2xl font-bold text-rose-500">${avgOutflow.toFixed(0)}K</p>
-              <p className="text-xs text-rose-500/70">+3% increase</p>
+              <p className="text-2xl font-bold text-rose-500">₹{(avgOutflow * 1000).toFixed(0)}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Net Positive</p>
-              <p className="text-2xl font-bold text-accent">${avgNet.toFixed(0)}K</p>
-              <p className="text-xs text-accent/70">+24% margin</p>
+              <p className="text-xs text-muted-foreground">Net Cash Flow</p>
+              <p className={`text-2xl font-bold ${avgNet >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                ₹{(avgNet * 1000).toFixed(0)}
+              </p>
             </div>
           </div>
         </div>

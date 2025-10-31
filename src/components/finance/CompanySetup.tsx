@@ -14,10 +14,12 @@ import { useCompanyInfo, useUpdateCompanyInfo, type CompanyType } from "@/hooks/
 import { Loader2, Building2, Users, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { syncEmployeeCount, regenerateTasksAfterEmployeeSync } from "@/lib/virtualCFO";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function CompanySetup() {
   const { data: companyInfo, isLoading } = useCompanyInfo();
   const updateMutation = useUpdateCompanyInfo();
+  const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -74,6 +76,10 @@ export function CompanySetup() {
       if (!user) throw new Error("Not authenticated");
 
       const count = await syncEmployeeCount(user.id);
+      
+      // Invalidate and refetch company info to show updated employee count
+      queryClient.invalidateQueries({ queryKey: ["company-info"] });
+      
       toast.success(`Synced ${count} employees from HR Hub`);
 
       // Regenerate compliance tasks if thresholds crossed
