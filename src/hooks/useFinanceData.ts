@@ -822,6 +822,85 @@ export function useExpenses(category?: string, dateRange?: { start: string; end:
   return query;
 }
 
+export function useCreateExpense() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (expense: Omit<Expense, "id" | "user_id" | "created_at" | "updated_at">) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("finance_expenses")
+        .insert({
+          ...expense,
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Expense;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      toast.success("Expense added!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to add expense: ${error.message}`);
+    },
+  });
+}
+
+export function useUpdateExpense() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Expense> }) => {
+      const { data, error } = await supabase
+        .from("finance_expenses")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Expense;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      toast.success("Expense updated!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update expense: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteExpense() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("finance_expenses")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      toast.success("Expense deleted!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete expense: ${error.message}`);
+    },
+  });
+}
+
 // ========================================
 // PITCH DECK ANALYSIS HOOKS
 // ========================================
