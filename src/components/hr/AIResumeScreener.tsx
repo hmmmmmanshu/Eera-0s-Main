@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Sparkles, CheckCircle2, AlertCircle, UserPlus } from "lucide-react";
 import { scoreResume } from "@/lib/gemini";
+import { useCreateCandidate, useHRRoles } from "@/hooks/useHRData";
 import { toast } from "sonner";
 
 interface ResumeScore {
@@ -31,6 +35,14 @@ export function AIResumeScreener({
   );
   const [isScoring, setIsScoring] = useState(false);
   const [result, setResult] = useState<ResumeScore | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [candidateName, setCandidateName] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
+  const [candidatePhone, setCandidatePhone] = useState("");
+  const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+  
+  const { data: roles = [] } = useHRRoles();
+  const createCandidate = useCreateCandidate();
 
   const handleScore = async () => {
     if (!resumeText.trim()) {
@@ -58,11 +70,51 @@ export function AIResumeScreener({
       }
       
       toast.success("Resume scored successfully!");
+      setShowSaveDialog(true);
     } catch (error) {
       console.error("Error scoring resume:", error);
       toast.error("Failed to score resume. Please try again.");
     } finally {
       setIsScoring(false);
+    }
+  };
+
+  const handleSaveCandidate = async () => {
+    if (!candidateName.trim() || !candidateEmail.trim()) {
+      toast.error("Name and email are required");
+      return;
+    }
+
+    if (!result) {
+      toast.error("No score result available");
+      return;
+    }
+
+    try {
+      await createCandidate.mutateAsync({
+        name: candidateName.trim(),
+        email: candidateEmail.trim(),
+        phone: candidatePhone.trim() || null,
+        role_id: selectedRoleId || null,
+        resume_url: null,
+        score: result.score,
+        status: "screening",
+        interview_notes: null,
+        screening_results: {
+          strengths: result.strengths,
+          gaps: result.gaps,
+          summary: result.summary,
+        },
+      });
+
+      setShowSaveDialog(false);
+      setCandidateName("");
+      setCandidateEmail("");
+      setCandidatePhone("");
+      setSelectedRoleId("");
+      toast.success("Candidate saved successfully!");
+    } catch (error) {
+      console.error("Error saving candidate:", error);
     }
   };
 
@@ -198,6 +250,97 @@ export function AIResumeScreener({
                   ))}
                 </ul>
               </div>
+            )}
+
+            {/* Save Candidate Dialog */}
+            {result && (
+              <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+                <DialogContent className="sm:max-w-[500px]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <UserPlus className="h-5 w-5 text-accent" />
+                      Save Candidate
+                    </DialogTitle>
+                    <DialogDescription>
+                      Save this candidate to your pipeline with the AI screening results.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="candidate-name">Name *</Label>
+                      <Input
+                        id="candidate-name"
+                        placeholder="John Doe"
+                        value={candidateName}
+                        onChange={(e) => setCandidateName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="candidate-email">Email *</Label>
+                      <Input
+                        id="candidate-email"
+                        type="email"
+                        placeholder="john.doe@example.com"
+                        value={candidateEmail}
+                        onChange={(e) => setCandidateEmail(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="candidate-phone">Phone</Label>
+                      <Input
+                        id="candidate-phone"
+                        type="tel"
+                        placeholder="+1 (555) 123-4567"
+                        value={candidatePhone}
+                        onChange={(e) => setCandidatePhone(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="candidate-role">Role</Label>
+                      <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+                        <SelectTrigger id="candidate-role">
+                          <SelectValue placeholder="Select a role (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {roles.map((role) => (
+                            <SelectItem key={role.id} value={role.id}>
+                              {role.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="rounded-lg border p-3 bg-muted/50">
+                      <p className="text-sm font-medium mb-1">AI Score: {result.score}/100</p>
+                      <p className="text-xs text-muted-foreground">
+                        Screening results will be saved with the candidate profile.
+                      </p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSaveCandidate}
+                      disabled={!candidateName.trim() || !candidateEmail.trim() || createCandidate.isPending}
+                    >
+                      {createCandidate.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Save Candidate
+                        </>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
           </CardContent>
         </Card>
