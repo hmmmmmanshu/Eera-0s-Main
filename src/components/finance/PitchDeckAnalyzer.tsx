@@ -46,21 +46,50 @@ export function PitchDeckAnalyzer() {
   const extractTextFromFile = async (file: File): Promise<string> => {
     if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
       // Extract text from PDF using dynamic import
-      // pdf-parse exports differently in CJS vs ESM, handle both cases
-      const pdfParseModule = await import("pdf-parse");
-      // Handle both default export and named export cases
-      const pdfParse = pdfParseModule.default || pdfParseModule.pdfParse || pdfParseModule;
-      const arrayBuffer = await file.arrayBuffer();
-      const data = await pdfParse(Buffer.from(arrayBuffer));
-      return data.text;
+      try {
+        const pdfParseModule = await import("pdf-parse");
+        // pdf-parse can export as default, named export, or as a function itself
+        let pdfParse: any;
+        if (typeof pdfParseModule === "function") {
+          pdfParse = pdfParseModule;
+        } else if (pdfParseModule.default && typeof pdfParseModule.default === "function") {
+          pdfParse = pdfParseModule.default;
+        } else if (pdfParseModule.pdfParse && typeof pdfParseModule.pdfParse === "function") {
+          pdfParse = pdfParseModule.pdfParse;
+        } else {
+          // Try to find any function export
+          const keys = Object.keys(pdfParseModule);
+          const funcKey = keys.find((k) => typeof (pdfParseModule as any)[k] === "function");
+          if (funcKey) {
+            pdfParse = (pdfParseModule as any)[funcKey];
+          } else {
+            throw new Error("Could not find pdf-parse function");
+          }
+        }
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const data = await pdfParse(buffer);
+        return data.text || "";
+      } catch (error: any) {
+        console.error("PDF parsing error:", error);
+        toast.error(`Failed to parse PDF: ${error.message}`);
+        throw error;
+      }
     } else if (
       file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
       file.name.endsWith(".pptx")
     ) {
-      // Extract text from PowerPoint (.pptx)
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      return result.value;
+      // Extract text from PowerPoint (.pptx) using mammoth
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value || "";
+      } catch (error: any) {
+        console.error("PPTX parsing error:", error);
+        toast.error(`Failed to parse PowerPoint file: ${error.message}`);
+        throw error;
+      }
     } else if (
       file.type === "application/vnd.ms-powerpoint" ||
       file.name.endsWith(".ppt")

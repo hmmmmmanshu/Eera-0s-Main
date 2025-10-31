@@ -33,23 +33,54 @@ export function PayrollDashboard() {
   const { data: payrollData = [], isLoading } = usePayrollData(currentMonth);
   const { data: summary } = usePayrollSummary(currentMonth);
   
-  // Fetch employees
-  const { data: employees = [] } = useQuery({
-    queryKey: ["hr-employees"],
+  // Fetch employees - fallback to hired candidates if no employees exist
+  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+    queryKey: ["hr-employees-for-payroll"],
     queryFn: async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
       
-      const { data, error } = await supabase
+      // First try hr_employees
+      const { data: employeesData, error: employeesError } = await supabase
         .from("hr_employees")
         .select("*")
         .eq("user_id", user.id)
         .eq("status", "active");
       
-      if (error) throw error;
-      return data || [];
+      if (employeesError && employeesError.code !== "PGRST116") throw employeesError;
+      
+      if (employeesData && employeesData.length > 0) {
+        return employeesData.map((emp) => ({
+          id: emp.id,
+          name: emp.name,
+          email: emp.email,
+          designation: emp.designation,
+          department: emp.department,
+          salary: emp.salary,
+          status: emp.status,
+        }));
+      }
+      
+      // Fallback to hired candidates
+      const { data: candidatesData, error: candidatesError } = await supabase
+        .from("hr_candidates")
+        .select("id, name, email, salary, role_id")
+        .eq("user_id", user.id)
+        .eq("status", "hired");
+      
+      if (candidatesError) throw candidatesError;
+      
+      return candidatesData?.map((c) => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        designation: "Employee",
+        department: null,
+        salary: c.salary ? parseFloat(c.salary.toString()) : 0,
+        status: "active",
+      })) || [];
     },
   });
   
@@ -100,9 +131,9 @@ export function PayrollDashboard() {
     };
   });
 
-  if (isLoading) {
+  if (isLoading || employeesLoading) {
     return (
-      <Card>
+      <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
         <CardContent className="p-6">
           <div className="flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -112,17 +143,22 @@ export function PayrollDashboard() {
     );
   }
 
+  // Calculate total from employees if no payroll summary
+  const totalMonthlyPayroll = summary?.total_monthly_payroll || 
+    employees.reduce((sum, emp) => sum + (Number(emp.salary) || 0), 0);
+  const employeeCount = summary?.employee_count || employees.length;
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Total Monthly Payroll</p>
                 <p className="text-2xl font-bold">
-                  ₹{summary?.total_monthly_payroll.toLocaleString() || 0}
+                  ₹{totalMonthlyPayroll.toLocaleString()}
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-accent opacity-50" />
@@ -130,25 +166,25 @@ export function PayrollDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Employees</p>
-                <p className="text-2xl font-bold">{summary?.employee_count || 0}</p>
+                <p className="text-2xl font-bold">{employeeCount}</p>
               </div>
               <Users className="h-8 w-8 text-accent opacity-50" />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Tax Deductions</p>
                 <p className="text-2xl font-bold">
-                  ₹{summary?.total_tax_deductions.toLocaleString() || 0}
+                  ₹{(summary?.total_tax_deductions || 0).toLocaleString()}
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-accent opacity-50" />
@@ -156,13 +192,13 @@ export function PayrollDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Net Pay</p>
                 <p className="text-2xl font-bold">
-                  ₹{summary?.total_net_pay.toLocaleString() || 0}
+                  ₹{(summary?.total_net_pay || totalMonthlyPayroll).toLocaleString()}
                 </p>
               </div>
               <FileText className="h-8 w-8 text-accent opacity-50" />
@@ -172,29 +208,35 @@ export function PayrollDashboard() {
       </div>
 
       {/* Chart */}
-      <Card>
+      <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
         <CardHeader>
           <CardTitle>6-Month Payroll Trend</CardTitle>
           <CardDescription>Monthly payroll breakdown over the last 6 months</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip formatter={(value: number) => `₹${value.toLocaleString()}`} />
-              <Legend />
-              <Bar dataKey="total" fill="hsl(var(--accent))" name="Total Payroll" />
-              <Bar dataKey="gross" fill="hsl(142, 76%, 36%)" name="Gross Pay" />
-              <Bar dataKey="taxes" fill="hsl(346, 77%, 49%)" name="Tax Deductions" />
-            </BarChart>
-          </ResponsiveContainer>
+          {chartData.some((d) => d.total > 0 || d.gross > 0) ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip formatter={(value: number) => `₹${value.toLocaleString()}`} />
+                <Legend />
+                <Bar dataKey="total" fill="hsl(var(--accent))" name="Total Payroll" />
+                <Bar dataKey="gross" fill="hsl(142, 76%, 36%)" name="Gross Pay" />
+                <Bar dataKey="taxes" fill="hsl(346, 77%, 49%)" name="Tax Deductions" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No historical payroll data available</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Employee Payroll Table */}
-      <Card>
+      <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -205,7 +247,7 @@ export function PayrollDashboard() {
             </div>
             <Button
               onClick={handleAnalyzePayroll}
-              disabled={analyzing || !payrollData || payrollData.length === 0}
+              disabled={analyzing || (!payrollData || payrollData.length === 0)}
               variant="outline"
               className="gap-2"
             >
@@ -224,10 +266,43 @@ export function PayrollDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          {payrollData.length === 0 ? (
+          {payrollData.length === 0 && employees.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No payroll data for this month</p>
+              <p className="text-xs mt-2">No employees found. Add employees from HR Hub first.</p>
+            </div>
+          ) : payrollData.length === 0 ? (
+            <div className="space-y-4">
+              <div className="text-center py-4 text-muted-foreground">
+                <p className="mb-2">No payroll records for this month</p>
+                <p className="text-xs">Payroll records will appear here once created</p>
+              </div>
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-sm mb-3">Available Employees ({employees.length})</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Designation</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Monthly Salary</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {employees.map((emp: any) => (
+                      <TableRow key={emp.id}>
+                        <TableCell className="font-medium">{emp.name}</TableCell>
+                        <TableCell>{emp.designation || "-"}</TableCell>
+                        <TableCell>{emp.department || "-"}</TableCell>
+                        <TableCell className="font-semibold">
+                          ₹{emp.salary ? Number(emp.salary).toLocaleString() : "0"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           ) : (
             <Table>
@@ -280,7 +355,7 @@ export function PayrollDashboard() {
 
       {/* AI Insights */}
       {payrollAnalysis && (
-        <Card>
+        <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-accent" />
