@@ -1,12 +1,25 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Briefcase, Calendar, DollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, Briefcase, Calendar, DollarSign, FileText, Eye } from "lucide-react";
 import { useHRCandidates, useHRRoles } from "@/hooks/useHRData";
 import { format } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export function Workforce() {
   const { data: candidates = [], isLoading } = useHRCandidates();
   const { data: roles = [] } = useHRRoles();
+  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
+  const [showOfferLetter, setShowOfferLetter] = useState(false);
 
   // Get hired candidates (status = "hired")
   const hiredCandidates = candidates.filter((c) => c.status === "hired");
@@ -110,11 +123,31 @@ export function Workforce() {
                       </Badge>
                     </div>
                   )}
+                  {employee.salary && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <DollarSign className="h-4 w-4" />
+                      <span className="font-medium">{employee.salary}</span>
+                    </div>
+                  )}
                   {role?.department && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Briefcase className="h-4 w-4" />
                       <span>{role.department}</span>
                     </div>
+                  )}
+                  {employee.offer_letter && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full mt-2 text-xs"
+                      onClick={() => {
+                        setSelectedEmployee(employee);
+                        setShowOfferLetter(true);
+                      }}
+                    >
+                      <FileText className="h-3 w-3 mr-2" />
+                      View Offer Letter
+                    </Button>
                   )}
                 </div>
               </div>
@@ -122,6 +155,60 @@ export function Workforce() {
           })}
         </div>
       </CardContent>
+      
+      {/* Offer Letter Dialog */}
+      {selectedEmployee && (
+        <Dialog open={showOfferLetter} onOpenChange={setShowOfferLetter}>
+          <DialogContent className="max-w-3xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Offer Letter - {selectedEmployee.name}</DialogTitle>
+              <DialogDescription>
+                {selectedEmployee.salary && `Salary: ${selectedEmployee.salary}`}
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh] pr-4">
+              <div className="bg-muted/50 rounded-lg p-6 whitespace-pre-wrap font-mono text-sm">
+                {selectedEmployee.offer_letter || "No offer letter available"}
+              </div>
+            </ScrollArea>
+            <div className="flex gap-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (selectedEmployee.offer_letter) {
+                    navigator.clipboard.writeText(selectedEmployee.offer_letter);
+                    toast.success("Copied to clipboard!");
+                  }
+                }}
+              >
+                Copy
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (selectedEmployee.offer_letter) {
+                    const blob = new Blob([selectedEmployee.offer_letter], { type: "text/plain" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `offer-letter-${selectedEmployee.name.replace(/\s+/g, "-").toLowerCase()}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    toast.success("Offer letter downloaded!");
+                  }
+                }}
+              >
+                Download
+              </Button>
+              <Button variant="outline" onClick={() => setShowOfferLetter(false)}>
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }

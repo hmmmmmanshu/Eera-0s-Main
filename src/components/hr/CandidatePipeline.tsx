@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, Sparkles, CheckCircle, UserPlus, X, ArrowRight, Briefcase, FileText, Copy, Download, Loader2 } from "lucide-react";
 import { useHRCandidates, useHRRoles, useUpdateCandidate } from "@/hooks/useHRData";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ export function CandidatePipeline() {
   const { data: candidates = [], isLoading } = useHRCandidates();
   const { data: roles = [] } = useHRRoles();
   const updateCandidate = useUpdateCandidate();
+  const queryClient = useQueryClient();
   const [localCandidates, setLocalCandidates] = useState(candidates);
   const [offerLetterCandidate, setOfferLetterCandidate] = useState<any>(null);
   const [showOfferLetterDialog, setShowOfferLetterDialog] = useState(false);
@@ -291,12 +293,21 @@ export function CandidatePipeline() {
 
 // Simplified Offer Letter Form Component
 function OfferLetterForm({ candidate, role, onClose }: { candidate: any; role: any; onClose: () => void }) {
-  const [salary, setSalary] = useState("");
+  const [salary, setSalary] = useState(candidate.salary || "");
   const [startDate, setStartDate] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [offerLetter, setOfferLetter] = useState("");
+  const [offerLetter, setOfferLetter] = useState(candidate.offer_letter || "");
   const { user } = useAuth();
   const [organizationContext, setOrganizationContext] = useState<any>(null);
+  const updateCandidate = useUpdateCandidate();
+  const queryClient = useQueryClient();
+  
+  // If offer letter already exists, show it
+  useEffect(() => {
+    if (candidate.offer_letter) {
+      setOfferLetter(candidate.offer_letter);
+    }
+  }, [candidate.offer_letter]);
 
   useEffect(() => {
     if (user?.id) {
@@ -345,7 +356,23 @@ function OfferLetterForm({ candidate, role, onClose }: { candidate: any; role: a
         organizationContext
       );
       setOfferLetter(letter);
-      toast.success("Offer letter generated successfully!");
+      
+      // Save offer letter and salary to candidate record
+      try {
+        await updateCandidate.mutateAsync({
+          id: candidate.id,
+          updates: {
+            offer_letter: letter,
+            salary: salary,
+            status: "offer", // Ensure status is set to offer if not already
+          },
+        });
+        queryClient.invalidateQueries({ queryKey: ["hr-candidates"] });
+        toast.success("Offer letter generated and saved successfully!");
+      } catch (error) {
+        console.error("Error saving offer letter:", error);
+        toast.error("Offer letter generated but failed to save to database");
+      }
     } catch (error) {
       console.error("Error generating offer letter:", error);
       toast.error("Failed to generate offer letter. Please try again.");

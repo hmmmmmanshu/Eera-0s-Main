@@ -9,7 +9,6 @@ import { AIResumeScreener } from "./AIResumeScreener";
 import { AIOfferLetterGenerator } from "./AIOfferLetterGenerator";
 import { PositionsList } from "./PositionsList";
 import { CandidatePipeline } from "./CandidatePipeline";
-import { Workforce } from "./Workforce";
 import { useHRCandidates } from "@/hooks/useHRData";
 
 export function HiringScreening() {
@@ -52,9 +51,6 @@ export function HiringScreening() {
 
       {/* Candidate Pipeline - Kanban View */}
       <CandidatePipeline />
-
-      {/* Current Workforce */}
-      <Workforce />
 
       {/* AI Screening Status */}
       <div className="grid md:grid-cols-3 gap-4">

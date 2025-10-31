@@ -4,6 +4,7 @@ import { DynamicAppSidebar } from "@/components/DynamicAppSidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HROverview } from "@/components/hr/HROverview";
 import { HiringScreening } from "@/components/hr/HiringScreening";
+import { Workforce } from "@/components/hr/Workforce";
 
 const HRHub = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -25,9 +26,10 @@ const HRHub = () => {
             </div>
 
             <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2 lg:w-auto">
+              <TabsList className="grid w-full grid-cols-3 lg:w-auto">
                 <TabsTrigger value="overview">Dashboard</TabsTrigger>
                 <TabsTrigger value="hiring">Hiring & Screening</TabsTrigger>
+                <TabsTrigger value="workforce">Workforce</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6">
@@ -36,6 +38,10 @@ const HRHub = () => {
 
               <TabsContent value="hiring" className="space-y-6">
                 <HiringScreening />
+              </TabsContent>
+
+              <TabsContent value="workforce" className="space-y-6">
+                <Workforce />
               </TabsContent>
             </Tabs>
           </div>

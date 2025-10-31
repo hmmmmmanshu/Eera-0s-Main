@@ -31,6 +31,8 @@ export type HRCandidate = {
   applied_date: string;
   interview_notes: string | null;
   screening_results: any;
+  offer_letter: string | null;
+  salary: string | null;
   created_at: string;
   updated_at: string;
 };
