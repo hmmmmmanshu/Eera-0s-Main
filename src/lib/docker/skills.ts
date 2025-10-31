@@ -170,4 +170,28 @@ export async function runSkillUnified<T = any>(skillId: keyof typeof SKILLS, inp
   }
 }
 
+// Skills status helper used by UI to display availability
+export interface SkillStatus {
+  dockerAvailable: boolean;
+  skills: Array<{ id: string; healthy: boolean }>;
+}
+
+export async function getSkillsStatus(): Promise<SkillStatus> {
+  const dockerAvailable = await isDockerAvailable();
+  const entries = Object.values(SKILLS);
+  const results: Array<{ id: string; healthy: boolean }> = [];
+  for (const s of entries) {
+    let healthy = false;
+    try {
+      const healthUrl = `http://127.0.0.1:${s.port}${s.healthPath || "/healthz"}`;
+      const h = await fetch(healthUrl);
+      healthy = h.ok;
+    } catch {
+      healthy = false;
+    }
+    results.push({ id: s.id, healthy });
+  }
+  return { dockerAvailable, skills: results };
+}
+
 
