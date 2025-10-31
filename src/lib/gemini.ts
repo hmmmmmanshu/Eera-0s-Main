@@ -67,6 +67,7 @@ export async function generateJobDescription(
   additionalContext?: string,
   organizationContext?: {
     companyName?: string;
+    founderName?: string;
     industry?: string;
     about?: string;
     keyOfferings?: string;
@@ -75,20 +76,39 @@ export async function generateJobDescription(
     targetAudience?: string;
     competitiveEdge?: string;
     brandValues?: string[];
+    websiteUrl?: string;
+    marketingGoal?: string;
+    tonePersonality?: string[];
+    writingStyle?: string;
+    languageStyle?: string;
+    designPhilosophy?: string;
+    inspirationalBrands?: string;
+    offlimitTopics?: string;
+    contentThemes?: string[];
   }
 ) {
   const model = await getGeminiModel();
 
-  // Build organization context section
+  // Build comprehensive organization context section
   let orgContextSection = "";
   if (organizationContext) {
     const orgParts: string[] = [];
+    
+    // Core Company Info
     if (organizationContext.companyName) {
       orgParts.push(`Company Name: ${organizationContext.companyName}`);
+    }
+    if (organizationContext.founderName) {
+      orgParts.push(`Founder: ${organizationContext.founderName}`);
     }
     if (organizationContext.tagline) {
       orgParts.push(`Tagline: ${organizationContext.tagline}`);
     }
+    if (organizationContext.websiteUrl) {
+      orgParts.push(`Website: ${organizationContext.websiteUrl}`);
+    }
+    
+    // Business Info
     if (organizationContext.about) {
       orgParts.push(`About: ${organizationContext.about}`);
     }
@@ -107,17 +127,54 @@ export async function generateJobDescription(
     if (organizationContext.competitiveEdge) {
       orgParts.push(`Competitive Edge: ${organizationContext.competitiveEdge}`);
     }
+    if (organizationContext.marketingGoal) {
+      orgParts.push(`Marketing Goal: ${organizationContext.marketingGoal}`);
+    }
+    
+    // Brand Identity
     if (organizationContext.brandValues && organizationContext.brandValues.length > 0) {
       orgParts.push(`Brand Values: ${organizationContext.brandValues.join(", ")}`);
+    }
+    if (organizationContext.tonePersonality && organizationContext.tonePersonality.length > 0) {
+      orgParts.push(`Tone & Personality: ${organizationContext.tonePersonality.join(", ")}`);
+    }
+    if (organizationContext.writingStyle) {
+      orgParts.push(`Writing Style: ${organizationContext.writingStyle}`);
+    }
+    if (organizationContext.languageStyle) {
+      orgParts.push(`Language Style: ${organizationContext.languageStyle}`);
+    }
+    if (organizationContext.designPhilosophy) {
+      orgParts.push(`Design Philosophy: ${organizationContext.designPhilosophy}`);
+    }
+    
+    // Additional Context
+    if (organizationContext.inspirationalBrands) {
+      orgParts.push(`Inspirational Brands: ${organizationContext.inspirationalBrands}`);
+    }
+    if (organizationContext.contentThemes && organizationContext.contentThemes.length > 0) {
+      orgParts.push(`Content Themes: ${organizationContext.contentThemes.join(", ")}`);
+    }
+    if (organizationContext.offlimitTopics) {
+      orgParts.push(`Off-Limit Topics: ${organizationContext.offlimitTopics}`);
     }
 
     if (orgParts.length > 0) {
       orgContextSection = `
 
-ORGANIZATION CONTEXT:
+ORGANIZATION CONTEXT (COMPREHENSIVE):
 ${orgParts.join("\n")}
 
-IMPORTANT: Use this organization context to tailor the job description. Make it specific to ${organizationContext.companyName || "this company"}, reflect their ${organizationContext.industry || "industry"}, and align with their ${organizationContext.companyStage || "stage"} stage. The job description should feel authentic to this organization's culture and values.`;
+IMPORTANT INSTRUCTIONS FOR JOB DESCRIPTION:
+1. This job description MUST be tailored specifically for ${organizationContext.companyName || "this organization"}
+2. Reflect the ${organizationContext.industry || "industry"} industry and ${organizationContext.companyStage || "company stage"} stage
+3. Align with the organization's brand values: ${organizationContext.brandValues?.join(", ") || "authenticity, innovation"}
+4. Match their ${organizationContext.tonePersonality?.join(", ") || "professional"} tone and ${organizationContext.writingStyle || "clear"} writing style
+5. Incorporate their competitive edge: ${organizationContext.competitiveEdge || "innovation"}
+6. Target their audience: ${organizationContext.targetAudience || "professionals"}
+7. The job description should feel authentic to this organization's unique culture, values, and identity
+
+Make the job description compelling and specific to this organization - not generic!`;
     }
   }
 
@@ -194,21 +251,39 @@ export async function generateOfferLetter(
   startDate: string,
   companyName: string,
   organizationContext?: {
-    tagline?: string;
-    about?: string;
+    companyName?: string;
+    founderName?: string;
     industry?: string;
+    about?: string;
     companyStage?: string;
+    tagline?: string;
+    targetAudience?: string;
+    competitiveEdge?: string;
     brandValues?: string[];
+    websiteUrl?: string;
+    tonePersonality?: string[];
+    writingStyle?: string;
+    languageStyle?: string;
   }
 ) {
   const model = await getGeminiModel();
 
-  // Build organization context section
+  // Build comprehensive organization context section
   let orgContextSection = "";
   if (organizationContext) {
     const orgParts: string[] = [];
+    
+    if (organizationContext.companyName) {
+      orgParts.push(`Company Name: ${organizationContext.companyName}`);
+    }
+    if (organizationContext.founderName) {
+      orgParts.push(`Founder: ${organizationContext.founderName}`);
+    }
     if (organizationContext.tagline) {
       orgParts.push(`Tagline: ${organizationContext.tagline}`);
+    }
+    if (organizationContext.websiteUrl) {
+      orgParts.push(`Website: ${organizationContext.websiteUrl}`);
     }
     if (organizationContext.about) {
       orgParts.push(`About: ${organizationContext.about}`);
@@ -219,8 +294,23 @@ export async function generateOfferLetter(
     if (organizationContext.companyStage) {
       orgParts.push(`Company Stage: ${organizationContext.companyStage}`);
     }
+    if (organizationContext.targetAudience) {
+      orgParts.push(`Target Audience: ${organizationContext.targetAudience}`);
+    }
+    if (organizationContext.competitiveEdge) {
+      orgParts.push(`Competitive Edge: ${organizationContext.competitiveEdge}`);
+    }
     if (organizationContext.brandValues && organizationContext.brandValues.length > 0) {
       orgParts.push(`Brand Values: ${organizationContext.brandValues.join(", ")}`);
+    }
+    if (organizationContext.tonePersonality && organizationContext.tonePersonality.length > 0) {
+      orgParts.push(`Tone & Personality: ${organizationContext.tonePersonality.join(", ")}`);
+    }
+    if (organizationContext.writingStyle) {
+      orgParts.push(`Writing Style: ${organizationContext.writingStyle}`);
+    }
+    if (organizationContext.languageStyle) {
+      orgParts.push(`Language Style: ${organizationContext.languageStyle}`);
     }
 
     if (orgParts.length > 0) {
@@ -229,7 +319,13 @@ export async function generateOfferLetter(
 ORGANIZATION CONTEXT:
 ${orgParts.join("\n")}
 
-IMPORTANT: Use this organization context to make the offer letter feel authentic to ${companyName}'s culture and values. Reflect their ${organizationContext.industry || "industry"} and ${organizationContext.companyStage || "stage"} stage.`;
+IMPORTANT: Use this organization context to make the offer letter feel authentic to ${companyName}'s culture and values. 
+- Reflect their ${organizationContext.industry || "industry"} and ${organizationContext.companyStage || "stage"} stage
+- Match their ${organizationContext.tonePersonality?.join(", ") || "professional"} tone
+- Align with their brand values: ${organizationContext.brandValues?.join(", ") || "innovation"}
+- Use their ${organizationContext.writingStyle || "professional"} writing style
+
+Make it personal, warm, and specific to this organization - not generic!`;
     }
   }
 

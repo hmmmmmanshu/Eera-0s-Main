@@ -21,24 +21,51 @@ export function AIOfferLetterGenerator() {
   const [copied, setCopied] = useState(false);
   const [organizationContext, setOrganizationContext] = useState<any>(null);
 
-  // Fetch organization context from user profile and auto-fill company name
+  // Fetch comprehensive organization context from user profile and auto-fill company name
   useEffect(() => {
     if (user?.id) {
       supabase
         .from("profiles")
-        .select("startup_name, industry, about, company_stage, tagline, brand_values")
+        .select(`
+          startup_name,
+          founder_name,
+          industry,
+          about,
+          company_stage,
+          tagline,
+          target_audience,
+          competitive_edge,
+          brand_values,
+          website_url,
+          tone_personality,
+          writing_style,
+          language_style
+        `)
         .eq("id", user.id)
         .single()
         .then(({ data, error }) => {
-          if (!error && data) {
+          if (error) {
+            console.error("Error fetching organization context:", error);
+            return;
+          }
+          
+          if (data) {
             // Auto-fill company name if empty
             setCompanyName((prev) => prev || data.startup_name || "");
             setOrganizationContext({
+              companyName: data.startup_name,
+              founderName: data.founder_name,
               tagline: data.tagline,
               about: data.about,
               industry: data.industry,
               companyStage: data.company_stage,
+              targetAudience: data.target_audience,
+              competitiveEdge: data.competitive_edge,
               brandValues: Array.isArray(data.brand_values) ? data.brand_values : null,
+              websiteUrl: data.website_url,
+              tonePersonality: Array.isArray(data.tone_personality) ? data.tone_personality : null,
+              writingStyle: data.writing_style,
+              languageStyle: data.language_style,
             });
           }
         });

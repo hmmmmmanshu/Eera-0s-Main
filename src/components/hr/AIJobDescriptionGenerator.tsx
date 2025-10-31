@@ -30,18 +30,51 @@ export function AIJobDescriptionGenerator() {
   
   const createRole = useCreateRole();
 
-  // Fetch organization context from user profile
+  // Fetch comprehensive organization context from user profile
   useEffect(() => {
     if (user?.id) {
       supabase
         .from("profiles")
-        .select("startup_name, industry, about, key_offerings, company_stage, tagline, target_audience, competitive_edge, brand_values")
+        .select(`
+          startup_name,
+          founder_name,
+          industry,
+          about,
+          key_offerings,
+          company_stage,
+          tagline,
+          target_audience,
+          competitive_edge,
+          brand_values,
+          website_url,
+          marketing_goal,
+          tone_personality,
+          writing_style,
+          language_style,
+          design_philosophy,
+          inspirational_brands,
+          offlimit_topics,
+          content_themes
+        `)
         .eq("id", user.id)
         .single()
         .then(({ data, error }) => {
-          if (!error && data) {
+          if (error) {
+            console.error("Error fetching organization context:", error);
+            toast.error("Failed to load organization context. Using basic mode.");
+            return;
+          }
+          
+          if (data) {
+            console.log("Organization context loaded:", {
+              companyName: data.startup_name,
+              hasAbout: !!data.about,
+              hasIndustry: !!data.industry,
+            });
+            
             setOrganizationContext({
               companyName: data.startup_name,
+              founderName: data.founder_name,
               industry: data.industry,
               about: data.about,
               keyOfferings: data.key_offerings,
@@ -50,7 +83,19 @@ export function AIJobDescriptionGenerator() {
               targetAudience: data.target_audience,
               competitiveEdge: data.competitive_edge,
               brandValues: Array.isArray(data.brand_values) ? data.brand_values : null,
+              websiteUrl: data.website_url,
+              marketingGoal: data.marketing_goal,
+              tonePersonality: Array.isArray(data.tone_personality) ? data.tone_personality : null,
+              writingStyle: data.writing_style,
+              languageStyle: data.language_style,
+              designPhilosophy: data.design_philosophy,
+              inspirationalBrands: data.inspirational_brands,
+              offlimitTopics: data.offlimit_topics,
+              contentThemes: Array.isArray(data.content_themes) ? data.content_themes : null,
             });
+          } else {
+            console.warn("No organization context found in profile");
+            toast.warning("No organization profile found. Please complete your profile for better AI context.");
           }
         });
     }
