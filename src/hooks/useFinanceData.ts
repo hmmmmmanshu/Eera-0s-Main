@@ -145,6 +145,33 @@ export interface Runway {
   updated_at: string;
 }
 
+export interface FundingRound {
+  id: string;
+  user_id: string;
+  name: string;
+  stage: "prospecting" | "pitch" | "due_diligence" | "term_sheet" | "closed";
+  target_amount: number;
+  committed_amount: number;
+  investors?: any[];
+  expected_close?: string;
+  actual_close?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CapTable {
+  id: string;
+  user_id: string;
+  shareholder_name: string;
+  shareholder_type: "founder" | "investor" | "employee" | "other";
+  shares: number;
+  share_class: "common" | "preferred";
+  investment_amount?: number;
+  investment_date?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PayrollData {
   id: string;
   user_id: string;
@@ -644,6 +671,321 @@ export function useRunway() {
   }, [queryClient]);
 
   return query;
+}
+
+export function useUpdateRunway() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (updates: { cash_balance?: number; monthly_burn_rate?: number }) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Check if runway exists
+      const { data: existing } = await supabase
+        .from("finance_runway")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existing) {
+        const { data, error } = await supabase
+          .from("finance_runway")
+          .update(updates)
+          .eq("id", existing.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data as Runway;
+      } else {
+        // Create new runway if it doesn't exist
+        if (!updates.cash_balance || !updates.monthly_burn_rate) {
+          throw new Error("Cash balance and monthly burn rate are required");
+        }
+
+        const { data, error } = await supabase
+          .from("finance_runway")
+          .insert({
+            user_id: user.id,
+            cash_balance: updates.cash_balance,
+            monthly_burn_rate: updates.monthly_burn_rate,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data as Runway;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["runway"] });
+      toast.success("Runway updated!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update runway: ${error.message}`);
+    },
+  });
+}
+
+// ========================================
+// FUNDING ROUNDS HOOKS
+// ========================================
+
+export function useFundingRounds() {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ["funding-rounds"],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("finance_funding_rounds")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as FundingRound[];
+    },
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("funding-rounds-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "finance_funding_rounds",
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["funding-rounds"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [queryClient]);
+
+  return query;
+}
+
+export function useCreateFundingRound() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (round: Omit<FundingRound, "id" | "user_id" | "created_at" | "updated_at">) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("finance_funding_rounds")
+        .insert({
+          ...round,
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as FundingRound;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["funding-rounds"] });
+      toast.success("Funding round added!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to add funding round: ${error.message}`);
+    },
+  });
+}
+
+export function useUpdateFundingRound() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<FundingRound> }) => {
+      const { data, error } = await supabase
+        .from("finance_funding_rounds")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as FundingRound;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["funding-rounds"] });
+      toast.success("Funding round updated!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update funding round: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteFundingRound() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("finance_funding_rounds")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["funding-rounds"] });
+      toast.success("Funding round deleted!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete funding round: ${error.message}`);
+    },
+  });
+}
+
+// ========================================
+// CAP TABLE HOOKS
+// ========================================
+
+export function useCapTable() {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ["cap-table"],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("finance_cap_table")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as CapTable[];
+    },
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("cap-table-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "finance_cap_table",
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["cap-table"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [queryClient]);
+
+  return query;
+}
+
+export function useCreateCapTableEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (entry: Omit<CapTable, "id" | "user_id" | "created_at" | "updated_at">) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("finance_cap_table")
+        .insert({
+          ...entry,
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as CapTable;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cap-table"] });
+      toast.success("Shareholder added!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to add shareholder: ${error.message}`);
+    },
+  });
+}
+
+export function useUpdateCapTableEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<CapTable> }) => {
+      const { data, error } = await supabase
+        .from("finance_cap_table")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as CapTable;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cap-table"] });
+      toast.success("Shareholder updated!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update shareholder: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteCapTableEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("finance_cap_table")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cap-table"] });
+      toast.success("Shareholder deleted!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete shareholder: ${error.message}`);
+    },
+  });
 }
 
 // ========================================
