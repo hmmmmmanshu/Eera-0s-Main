@@ -447,7 +447,7 @@ export function useCognitiveActions(userId?: string | null) {
     return getSkillsStatus();
   }, []);
 
-  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, skillsStatus };
+  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, skillsStatus, sendChatWithPlanExtract, pinPlanToSession };
 }
 
 function personaSystem(persona: Persona, tone?: string) {
