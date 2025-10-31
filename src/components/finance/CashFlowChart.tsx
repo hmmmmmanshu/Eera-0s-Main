@@ -16,7 +16,7 @@ import {
 import { useCashFlow } from "@/hooks/useFinanceData";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { syncCashFlow } from "@/lib/virtualCFO";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -26,6 +26,59 @@ export function CashFlowChart() {
   const { data: cashFlowData = [], isLoading, refetch } = useCashFlow(6);
   const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState(false);
+
+  // Auto-sync cash flow when component mounts and data changes
+  useEffect(() => {
+    const autoSync = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        await syncCashFlow(user.id, 6);
+        await queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+        await refetch();
+      } catch (error: any) {
+        console.error("Error auto-syncing cash flow:", error);
+      }
+    };
+
+    // Sync on mount
+    autoSync();
+
+    // Also listen for changes to invoices, expenses, income, and payroll
+    const channels = [
+      supabase
+        .channel("auto-sync-invoices")
+        .on("postgres_changes", { event: "*", schema: "public", table: "finance_invoices" }, () => {
+          autoSync();
+        })
+        .subscribe(),
+      supabase
+        .channel("auto-sync-expenses")
+        .on("postgres_changes", { event: "*", schema: "public", table: "finance_expenses" }, () => {
+          autoSync();
+        })
+        .subscribe(),
+      supabase
+        .channel("auto-sync-income")
+        .on("postgres_changes", { event: "*", schema: "public", table: "finance_income" }, () => {
+          autoSync();
+        })
+        .subscribe(),
+      supabase
+        .channel("auto-sync-payroll")
+        .on("postgres_changes", { event: "*", schema: "public", table: "hr_payroll" }, () => {
+          autoSync();
+        })
+        .subscribe(),
+    ];
+
+    return () => {
+      channels.forEach((channel) => channel.unsubscribe());
+    };
+  }, [queryClient, refetch]);
 
   const handleSyncCashFlow = async () => {
     try {

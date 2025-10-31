@@ -346,6 +346,15 @@ export async function syncCashFlow(userId: string, months: number = 6): Promise<
 
     if (expenseError) throw expenseError;
 
+    // Fetch payroll data (contributes to outflow)
+    const { data: payroll, error: payrollError } = await supabase
+      .from("hr_payroll")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "paid");
+
+    if (payrollError && payrollError.code !== "PGRST116") throw payrollError;
+
     // Fetch all manual income (contributes to inflow)
     const { data: income, error: incomeError } = await supabase
       .from("finance_income")
@@ -390,6 +399,18 @@ export async function syncCashFlow(userId: string, months: number = 6): Promise<
           cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
         }
         cashFlowByMonth[monthKey].outflow += Number(exp.amount) || 0;
+      }
+    });
+
+    // Process payroll (paid payroll contributes to outflow)
+    payroll?.forEach((pay) => {
+      const payDate = pay.payment_date ? new Date(pay.payment_date) : new Date(pay.created_at);
+      if (payDate >= startDate && payDate <= endDate) {
+        const monthKey = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
+        if (!cashFlowByMonth[monthKey]) {
+          cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
+        }
+        cashFlowByMonth[monthKey].outflow += Number(pay.net_pay || pay.gross_pay || 0);
       }
     });
 
