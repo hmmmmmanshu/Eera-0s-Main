@@ -121,9 +121,9 @@ export function InvoiceTracker() {
                   }
                 }}
               >
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(invoice.status)}
-                  <div>
+              <div className="flex items-center gap-3">
+                {getStatusIcon(invoice.status)}
+                <div>
                     <p className="font-medium text-sm">{invoice.client_name}</p>
                     <p className="text-xs text-muted-foreground">
                       {invoice.status === "draft" ? "Draft" : `Due: ${format(new Date(invoice.due_date), "MMM dd, yyyy")}`}

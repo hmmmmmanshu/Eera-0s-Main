@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Loader2 } from "lucide-react";
+import { Activity, Loader2, RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -15,9 +15,37 @@ import {
 } from "recharts";
 import { useCashFlow } from "@/hooks/useFinanceData";
 import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { syncCashFlow } from "@/lib/virtualCFO";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export function CashFlowChart() {
-  const { data: cashFlowData = [], isLoading } = useCashFlow(6);
+  const { data: cashFlowData = [], isLoading, refetch } = useCashFlow(6);
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncCashFlow = async () => {
+    try {
+      setSyncing(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      await syncCashFlow(user.id, 6);
+      await queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+      await refetch();
+      toast.success("Cash flow data synced successfully!");
+    } catch (error: any) {
+      console.error("Error syncing cash flow:", error);
+      toast.error(`Failed to sync cash flow: ${error.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Transform data for chart
   let data = cashFlowData.map((cf) => ({
@@ -94,19 +122,40 @@ export function CashFlowChart() {
             <Activity className="h-5 w-5 text-accent" />
             Cash Flow Forecast
           </span>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span className="text-muted-foreground">Inflow</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                <span className="text-muted-foreground">Inflow</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-rose-500" />
+                <span className="text-muted-foreground">Outflow</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-accent" />
+                <span className="text-muted-foreground">Net</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-rose-500" />
-              <span className="text-muted-foreground">Outflow</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-accent" />
-              <span className="text-muted-foreground">Net</span>
-            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSyncCashFlow}
+              disabled={syncing}
+              className="gap-2"
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Sync Data
+                </>
+              )}
+            </Button>
           </div>
         </CardTitle>
       </CardHeader>

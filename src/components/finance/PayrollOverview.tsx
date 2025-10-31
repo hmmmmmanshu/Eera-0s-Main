@@ -118,17 +118,17 @@ export function PayrollOverview() {
         </div>
 
         {breakdownArray.length > 0 ? (
-          <div className="space-y-3 pt-2 border-t border-border">
+        <div className="space-y-3 pt-2 border-t border-border">
             {breakdownArray.map((item, idx) => (
-              <div key={idx} className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{item.category}</span>
+            <div key={idx} className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{item.category}</span>
                   <span className="font-semibold">₹{item.amount.toLocaleString()}</span>
-                </div>
-                <Progress value={item.percentage} className="h-1.5" />
               </div>
-            ))}
-          </div>
+              <Progress value={item.percentage} className="h-1.5" />
+            </div>
+          ))}
+        </div>
         ) : (
           <div className="pt-2 border-t border-border">
             <p className="text-sm text-muted-foreground text-center py-4">

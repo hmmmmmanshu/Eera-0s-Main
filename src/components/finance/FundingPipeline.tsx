@@ -77,36 +77,36 @@ export function FundingPipeline() {
       <CardContent className="space-y-4">
         {rounds.length > 0 ? (
           <>
-            <div>
-              <div className="flex items-baseline gap-2 mb-1">
+        <div>
+          <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-4xl font-bold">₹{(totalPipeline / 1000000).toFixed(1)}M</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
+          </div>
+          <p className="text-sm text-muted-foreground">
                 Weighted: ₹{(weightedValue / 1000000).toFixed(1)}M
-              </p>
-            </div>
+          </p>
+        </div>
 
-            <div className="space-y-3 pt-2 border-t border-border">
+        <div className="space-y-3 pt-2 border-t border-border">
               {rounds.map((round) => (
                 <div key={round.id} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
                       <Circle className={`h-2 w-2 fill-current ${getStageColor(round.stage || "prospecting")}`} />
                       <span className="text-sm font-medium">{round.name}</span>
-                    </div>
+                </div>
                     <span className="text-sm font-semibold">₹{(Number(round.target_amount || 0) / 1000).toLocaleString()}K</span>
-                  </div>
-                  <div className="flex items-center justify-between ml-4">
+              </div>
+              <div className="flex items-center justify-between ml-4">
                     <span className="text-xs text-muted-foreground">{getStageLabel(round.stage || "prospecting")}</span>
                     {Number(round.committed_amount || 0) > 0 && (
-                      <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs">
                         ₹{(Number(round.committed_amount || 0) / 1000).toLocaleString()}K committed
-                      </Badge>
+                </Badge>
                     )}
-                  </div>
-                </div>
-              ))}
+              </div>
             </div>
+          ))}
+        </div>
           </>
         ) : (
           <div className="text-center py-8 text-muted-foreground text-sm">

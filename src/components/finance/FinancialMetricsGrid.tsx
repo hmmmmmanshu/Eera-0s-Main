@@ -102,55 +102,55 @@ export function FinancialMetricsGrid() {
       : 0;
 
     return [
-      {
-        label: "Monthly Revenue",
+    {
+      label: "Monthly Revenue",
         value: `₹${(currentMonthRevenue / 1000).toFixed(0)}K`,
         change: `${revenueChange >= 0 ? "+" : ""}${revenueChange.toFixed(0)}%`,
         trend: revenueChange > 0 ? "up" : revenueChange < 0 ? "down" : "neutral",
-        icon: DollarSign,
-        color: "text-green-500"
-      },
-      {
-        label: "Monthly Expenses",
+      icon: DollarSign,
+      color: "text-green-500"
+    },
+    {
+      label: "Monthly Expenses",
         value: `₹${((currentMonthExpenses + (payrollSummary?.total_monthly_payroll || 0)) / 1000).toFixed(0)}K`,
         change: `${expensesChange >= 0 ? "+" : ""}${expensesChange.toFixed(0)}%`,
         trend: expensesChange > 0 ? "up" : expensesChange < 0 ? "down" : "neutral",
-        icon: CreditCard,
-        color: "text-red-500"
-      },
-      {
-        label: "Net Profit (MTD)",
+      icon: CreditCard,
+      color: "text-red-500"
+    },
+    {
+      label: "Net Profit (MTD)",
         value: `₹${(netProfit / 1000).toFixed(0)}K`,
         change: `${profitChange >= 0 ? "+" : ""}${profitChange.toFixed(0)}%`,
         trend: profitChange > 0 ? "up" : profitChange < 0 ? "down" : "neutral",
-        icon: PiggyBank,
-        color: "text-accent"
-      },
-      {
-        label: "Outstanding Invoices",
+      icon: PiggyBank,
+      color: "text-accent"
+    },
+    {
+      label: "Outstanding Invoices",
         value: `₹${(outstandingInvoices / 1000).toFixed(0)}K`,
         change: "—",
         trend: "neutral",
-        icon: Receipt,
-        color: "text-yellow-500"
-      },
-      {
-        label: "Payroll (Monthly)",
+      icon: Receipt,
+      color: "text-yellow-500"
+    },
+    {
+      label: "Payroll (Monthly)",
         value: `₹${((payrollSummary?.total_monthly_payroll || 0) / 1000).toFixed(0)}K`,
         change: "—",
-        trend: "neutral",
-        icon: DollarSign,
-        color: "text-muted-foreground"
-      },
-      {
-        label: "Operating Margin",
+      trend: "neutral",
+      icon: DollarSign,
+      color: "text-muted-foreground"
+    },
+    {
+      label: "Operating Margin",
         value: `${operatingMargin.toFixed(0)}%`,
         change: "—",
         trend: operatingMargin > 20 ? "up" : operatingMargin < 10 ? "down" : "neutral",
-        icon: TrendingUp,
-        color: "text-accent"
-      }
-    ];
+      icon: TrendingUp,
+      color: "text-accent"
+    }
+  ];
   }, [invoices, expenses, payrollSummary, currentMonthStart, currentMonthEnd, lastMonthStart, lastMonthEnd]);
 
   if (!metrics || metrics.length === 0) {

@@ -78,33 +78,33 @@ export function CapTable() {
       <CardContent className="space-y-4">
         {stakeholders.length > 0 ? (
           <>
-            <div>
-              <div className="flex items-baseline gap-2 mb-1">
+        <div>
+          <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-4xl font-bold">₹{(postMoneyValuation / 1000000).toFixed(1)}M</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
+          </div>
+          <p className="text-sm text-muted-foreground">
                 {totalShares > 0 ? `${totalShares.toLocaleString()} shares • ₹${pricePerShare.toFixed(4)}/share` : "No shares defined"}
-              </p>
-            </div>
+          </p>
+        </div>
 
-            <div className="space-y-3 pt-2 border-t border-border">
+        <div className="space-y-3 pt-2 border-t border-border">
               {percentages.map((holder, idx) => (
-                <div key={idx} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{holder.name}</span>
+            <div key={idx} className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{holder.name}</span>
                     <span className="font-semibold">{holder.percentage.toFixed(1)}%</span>
-                  </div>
-                  <Progress 
-                    value={holder.percentage} 
-                    className="h-2"
-                  />
-                  <p className="text-xs text-muted-foreground">
+              </div>
+              <Progress 
+                value={holder.percentage} 
+                className="h-2"
+              />
+              <p className="text-xs text-muted-foreground">
                     {holder.shares.toLocaleString()} shares
                     {holder.investment > 0 && ` • ₹${(holder.investment / 1000000).toFixed(2)}M invested`}
-                  </p>
-                </div>
-              ))}
+              </p>
             </div>
+          ))}
+        </div>
           </>
         ) : (
           <div className="text-center py-8 text-muted-foreground text-sm">

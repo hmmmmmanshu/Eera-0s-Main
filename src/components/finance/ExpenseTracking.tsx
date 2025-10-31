@@ -517,9 +517,9 @@ export function ExpenseTracking() {
               ) : (
                 <TrendingDown className="h-3 w-3 text-red-500" />
               )}
-              <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
                 {netIncome >= 0 ? "Profit" : "Loss"}
-              </p>
+          </p>
             </div>
           </div>
         </div>
@@ -614,7 +614,7 @@ export function ExpenseTracking() {
                 </div>
               ))
             )}
-          </div>
+              </div>
         </div>
       </CardContent>
     </Card>

@@ -19,7 +19,7 @@ import { ComplianceManager } from "@/components/finance/ComplianceManager";
 import { PitchDeckAnalyzer } from "@/components/finance/PitchDeckAnalyzer";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
+import { 
   DollarSign,
   Building2,
   FileText,
@@ -92,7 +92,7 @@ const FinanceHub = () => {
                   </p>
                 </div>
               </div>
-
+              
               {/* Role Toggle */}
               <div className="flex justify-center">
                 <RoleToggle value={role} onChange={setRole} />
@@ -113,81 +113,81 @@ const FinanceHub = () => {
                 })}
               </TabsList>
 
-              <AnimatePresence mode="wait">
-                <motion.div
+            <AnimatePresence mode="wait">
+              <motion.div
                   key={activeTab}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
-                >
+              >
                   {/* Overview Tab */}
                   <TabsContent value="overview" className="space-y-6 mt-6">
-                    <AICFOInsightBox role={role} />
+                <AICFOInsightBox role={role} />
 
-                    {role === "all" && (
-                      <>
-                        {/* Top Row - Critical Metrics */}
-                        <div className="grid lg:grid-cols-3 gap-6">
-                          <RunwayCard />
-                          <FundingPipeline />
-                          <CapTable />
-                        </div>
+                {role === "all" && (
+                  <>
+                    {/* Top Row - Critical Metrics */}
+                    <div className="grid lg:grid-cols-3 gap-6">
+                      <RunwayCard />
+                      <FundingPipeline />
+                      <CapTable />
+                    </div>
 
-                        {/* Financial Metrics Grid */}
-                        <FinancialMetricsGrid />
+                    {/* Financial Metrics Grid */}
+                    <FinancialMetricsGrid />
 
-                        {/* Cash Flow Chart */}
-                        <CashFlowChart />
+                    {/* Cash Flow Chart */}
+                    <CashFlowChart />
 
-                        {/* Operations Row */}
-                        <div className="grid lg:grid-cols-3 gap-6">
-                          <InvoiceTracker />
-                          <PayrollOverview />
-                          <ExpenseTracking />
-                        </div>
+                    {/* Operations Row */}
+                    <div className="grid lg:grid-cols-3 gap-6">
+                      <InvoiceTracker />
+                      <PayrollOverview />
+                      <ExpenseTracking />
+                    </div>
 
-                        {/* Virtual CFO Insights */}
-                        <VirtualCFOInsights />
-                      </>
-                    )}
+                    {/* Virtual CFO Insights */}
+                    <VirtualCFOInsights />
+                  </>
+                )}
 
-                    {role === "accountant" && (
-                      <>
-                        {/* Accountant Focus: Operations First */}
-                        <div className="grid lg:grid-cols-3 gap-6">
-                          <InvoiceTracker />
-                          <PayrollOverview />
-                          <ExpenseTracking />
-                        </div>
+                {role === "accountant" && (
+                  <>
+                    {/* Accountant Focus: Operations First */}
+                    <div className="grid lg:grid-cols-3 gap-6">
+                      <InvoiceTracker />
+                      <PayrollOverview />
+                      <ExpenseTracking />
+                    </div>
 
-                        {/* Financial Metrics Grid */}
-                        <FinancialMetricsGrid />
+                    {/* Financial Metrics Grid */}
+                    <FinancialMetricsGrid />
 
-                        {/* Cash Flow Chart */}
-                        <CashFlowChart />
-                      </>
-                    )}
+                    {/* Cash Flow Chart */}
+                    <CashFlowChart />
+                  </>
+                )}
 
-                    {role === "cfo" && (
-                      <>
-                        {/* CFO Focus: Strategy First */}
-                        <div className="grid lg:grid-cols-3 gap-6">
-                          <RunwayCard />
-                          <FundingPipeline />
-                          <CapTable />
-                        </div>
+                {role === "cfo" && (
+                  <>
+                    {/* CFO Focus: Strategy First */}
+                    <div className="grid lg:grid-cols-3 gap-6">
+                      <RunwayCard />
+                      <FundingPipeline />
+                      <CapTable />
+                    </div>
 
-                        {/* Cash Flow Chart */}
-                        <CashFlowChart />
+                    {/* Cash Flow Chart */}
+                    <CashFlowChart />
 
-                        {/* Financial Metrics Grid */}
-                        <FinancialMetricsGrid />
+                    {/* Financial Metrics Grid */}
+                    <FinancialMetricsGrid />
 
-                        {/* Virtual CFO Insights */}
-                        <VirtualCFOInsights />
-                      </>
-                    )}
+                    {/* Virtual CFO Insights */}
+                    <VirtualCFOInsights />
+                  </>
+                )}
                   </TabsContent>
 
                   {/* Company Setup Tab */}
@@ -236,8 +236,8 @@ const FinanceHub = () => {
                   <TabsContent value="pitch-analysis" className="mt-6">
                     <PitchDeckAnalyzer />
                   </TabsContent>
-                </motion.div>
-              </AnimatePresence>
+              </motion.div>
+            </AnimatePresence>
             </Tabs>
           </div>
         </main>
