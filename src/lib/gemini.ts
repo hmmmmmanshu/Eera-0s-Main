@@ -554,3 +554,406 @@ Return ONLY the enhanced prompt text (no JSON, no explanation, just the prompt r
   return response.text().trim();
 }
 
+// ========================================
+// FINANCE AI FUNCTIONS
+// ========================================
+
+export interface InvoiceLineItem {
+  description: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+}
+
+export interface InvoiceParams {
+  clientName: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  companyInfo: {
+    companyName: string;
+    gstNumber?: string;
+    panNumber?: string;
+    address?: string;
+  };
+  lineItems: InvoiceLineItem[];
+  dueDate: string;
+  invoiceDate: string;
+  gstPercentage?: number;
+}
+
+export interface GeneratedInvoice {
+  invoiceNumber: string;
+  formattedInvoice: string;
+  subtotal: number;
+  gstAmount: number;
+  totalAmount: number;
+  breakdown: {
+    cgst?: number;
+    sgst?: number;
+    igst?: number;
+  };
+}
+
+/**
+ * Generate a professional invoice in Indian format with GST breakdown
+ */
+export async function generateInvoice(
+  params: InvoiceParams
+): Promise<GeneratedInvoice> {
+  const model = await getGeminiModel();
+
+  const subtotal = params.lineItems.reduce((sum, item) => sum + item.amount, 0);
+  const gstPercentage = params.gstPercentage || 18;
+  const gstAmount = (subtotal * gstPercentage) / 100;
+  const totalAmount = subtotal + gstAmount;
+
+  const cgst = gstAmount / 2; // 9% CGST
+  const sgst = gstAmount / 2; // 9% SGST
+
+  const prompt = `Generate a professional invoice in Indian format with GST breakdown.
+
+INVOICE DETAILS:
+- Invoice Date: ${params.invoiceDate}
+- Due Date: ${params.dueDate}
+- Invoice Number: (Generate sequential format like INV-${new Date().getFullYear()}-XXX)
+
+COMPANY DETAILS (Your Company):
+- Company Name: ${params.companyInfo.companyName}
+${params.companyInfo.gstNumber ? `- GST Number: ${params.companyInfo.gstNumber}` : ""}
+${params.companyInfo.panNumber ? `- PAN Number: ${params.companyInfo.panNumber}` : ""}
+${params.companyInfo.address ? `- Address: ${params.companyInfo.address}` : ""}
+
+CLIENT DETAILS:
+- Client Name: ${params.clientName}
+${params.clientEmail ? `- Email: ${params.clientEmail}` : ""}
+${params.clientPhone ? `- Phone: ${params.clientPhone}` : ""}
+
+LINE ITEMS:
+${params.lineItems
+  .map(
+    (item, idx) =>
+      `${idx + 1}. ${item.description} - Quantity: ${item.quantity}, Rate: ₹${item.rate}, Amount: ₹${item.amount}`
+  )
+  .join("\n")}
+
+TAX CALCULATION:
+- Subtotal: ₹${subtotal.toFixed(2)}
+- GST (${gstPercentage}%): ₹${gstAmount.toFixed(2)}
+  - CGST (${gstPercentage / 2}%): ₹${cgst.toFixed(2)}
+  - SGST (${gstPercentage / 2}%): ₹${sgst.toFixed(2)}
+- Total Amount: ₹${totalAmount.toFixed(2)}
+
+Generate the invoice as formatted markdown with:
+1. Professional header with company logo placeholder
+2. Invoice number and dates
+3. Bill To section (client details)
+4. Itemized table with description, quantity, rate, amount
+5. Tax breakdown section
+6. Total amount prominently displayed
+7. Payment terms and bank details placeholder
+8. Footer with thank you message
+
+Return as JSON:
+{
+  "invoiceNumber": "INV-YYYY-XXX",
+  "formattedInvoice": "Full markdown formatted invoice text",
+  "subtotal": ${subtotal},
+  "gstAmount": ${gstAmount},
+  "totalAmount": ${totalAmount},
+  "breakdown": {
+    "cgst": ${cgst},
+    "sgst": ${sgst}
+  }
+}`;
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const text = response.text();
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  throw new Error("Failed to parse AI response for invoice generation");
+}
+
+export interface PayrollAnalysisResult {
+  totalPayroll: number;
+  taxEfficiency: number; // 0-100 score
+  anomalies: string[];
+  optimizationSuggestions: string[];
+  complianceNotes: string[];
+  salaryDistribution: {
+    department: string;
+    totalSalary: number;
+    employeeCount: number;
+  }[];
+}
+
+/**
+ * Analyze payroll data for compliance and optimization suggestions
+ */
+export async function analyzePayroll(
+  payrollData: any[],
+  employees: any[]
+): Promise<PayrollAnalysisResult> {
+  const model = await getGeminiModel();
+
+  const prompt = `Analyze payroll data for compliance and optimization suggestions.
+
+PAYROLL DATA:
+${JSON.stringify(payrollData, null, 2)}
+
+EMPLOYEE DATA:
+${JSON.stringify(employees, null, 2)}
+
+Provide analysis covering:
+1. Tax efficiency score (0-100) - how well salaries are structured for tax optimization
+2. Anomalies - any unusual patterns (e.g., inconsistent deductions, missing TDS)
+3. Optimization suggestions - ways to reduce tax burden legally
+4. Compliance notes - any compliance risks (PF, ESI, TDS)
+5. Salary distribution by department
+
+Return as JSON:
+{
+  "totalPayroll": <total monthly payroll>,
+  "taxEfficiency": <score 0-100>,
+  "anomalies": ["anomaly1", "anomaly2"],
+  "optimizationSuggestions": ["suggestion1", "suggestion2"],
+  "complianceNotes": ["note1", "note2"],
+  "salaryDistribution": [
+    {
+      "department": "Engineering",
+      "totalSalary": <amount>,
+      "employeeCount": <count>
+    }
+  ]
+}`;
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const text = response.text();
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  throw new Error("Failed to parse AI response for payroll analysis");
+}
+
+/**
+ * Generate a friendly reminder for compliance tasks
+ */
+export async function generateComplianceReminder(
+  task: {
+    title: string;
+    description?: string;
+    dueDate: string;
+    priority: string;
+  },
+  daysUntilDue: number
+): Promise<string> {
+  const model = await getGeminiModel();
+
+  const urgency =
+    daysUntilDue < 7 ? "urgent" : daysUntilDue < 15 ? "high" : daysUntilDue < 30 ? "medium" : "low";
+
+  const prompt = `Generate a friendly reminder for the founder about an upcoming compliance task.
+
+TASK DETAILS:
+- Title: ${task.title}
+- Description: ${task.description || "No description"}
+- Due Date: ${task.dueDate}
+- Priority: ${task.priority}
+- Days Until Due: ${daysUntilDue} days
+- Urgency: ${urgency}
+
+Generate a concise, friendly reminder (2-3 sentences) that:
+1. Clearly states what needs to be done
+2. Mentions the due date and urgency
+3. Provides brief action steps if needed
+4. Uses a supportive, helpful tone (like a virtual CFO assistant)
+
+Keep it professional but warm. Return only the reminder text (no JSON, no quotes).`;
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  return response.text().trim();
+}
+
+export interface PitchDeckAnalysisResult {
+  financialHealthScore: number; // 0-100
+  investorReadinessScore: number; // 0-100
+  keyInsights: string[];
+  redFlags: string[];
+  recommendations: string[];
+  summary: string;
+}
+
+/**
+ * Analyze pitch deck for financial soundness and investor readiness
+ */
+export async function analyzePitchDeck(
+  deckText: string,
+  companyInfo?: {
+    companyName?: string;
+    industry?: string;
+    stage?: string;
+  },
+  financialData?: {
+    revenue?: number;
+    expenses?: number;
+    runway?: number;
+    burnRate?: number;
+  }
+): Promise<PitchDeckAnalysisResult> {
+  const model = await getGeminiModel();
+
+  const prompt = `You are a CFO. Analyze this pitch deck for financial soundness, investor readiness, and overall investment appeal.
+
+PITCH DECK CONTENT:
+${deckText.substring(0, 5000)}${deckText.length > 5000 ? "... (truncated)" : ""}
+
+COMPANY CONTEXT:
+${companyInfo ? JSON.stringify(companyInfo, null, 2) : "Not provided"}
+
+CURRENT FINANCIAL DATA:
+${financialData ? JSON.stringify(financialData, null, 2) : "Not provided"}
+
+Provide comprehensive analysis covering:
+
+1. FINANCIAL HEALTH SCORE (0-100):
+   - Revenue growth trends
+   - Unit economics (CAC, LTV, margins)
+   - Cash flow sustainability
+   - Burn rate and runway
+   - Financial projections credibility
+
+2. INVESTOR READINESS SCORE (0-100):
+   - Clarity of value proposition
+   - Market opportunity sizing
+   - Competitive positioning
+   - Team and execution capability
+   - Financial transparency
+   - Ask clarity and use of funds
+
+3. KEY INSIGHTS:
+   - 5-7 key positive points
+   - What stands out favorably
+
+4. RED FLAGS:
+   - 3-5 concerns or gaps
+   - Missing information
+   - Unrealistic assumptions
+
+5. RECOMMENDATIONS:
+   - 5-7 actionable improvements
+   - Specific areas to strengthen
+   - What investors will likely ask
+
+6. SUMMARY:
+   - 2-3 sentence executive summary
+
+Return as JSON:
+{
+  "financialHealthScore": <0-100>,
+  "investorReadinessScore": <0-100>,
+  "keyInsights": ["insight1", "insight2", ...],
+  "redFlags": ["flag1", "flag2", ...],
+  "recommendations": ["rec1", "rec2", ...],
+  "summary": "Executive summary here"
+}`;
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const text = response.text();
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  throw new Error("Failed to parse AI response for pitch deck analysis");
+}
+
+export interface CashFlowForecast {
+  months: {
+    month: string;
+    projectedInflow: number;
+    projectedOutflow: number;
+    projectedNet: number;
+  }[];
+  runwayExtension: number; // months
+  recommendations: string[];
+}
+
+/**
+ * Forecast next 3 months cash flow based on historical trends
+ */
+export async function generateCashFlowForecast(
+  historicalData: {
+    month: string;
+    inflow: number;
+    outflow: number;
+    net: number;
+  }[],
+  plannedExpenses?: {
+    category: string;
+    amount: number;
+    month: string;
+  }[],
+  revenueForecast?: {
+    month: string;
+    amount: number;
+  }[]
+): Promise<CashFlowForecast> {
+  const model = await getGeminiModel();
+
+  const prompt = `Forecast next 3 months cash flow based on historical trends and planned expenses.
+
+HISTORICAL DATA (last 6 months):
+${JSON.stringify(historicalData, null, 2)}
+
+PLANNED EXPENSES:
+${plannedExpenses ? JSON.stringify(plannedExpenses, null, 2) : "None provided"}
+
+REVENUE FORECAST:
+${revenueForecast ? JSON.stringify(revenueForecast, null, 2) : "None provided"}
+
+Analyze trends and project:
+1. Projected inflow for each of next 3 months
+2. Projected outflow for each of next 3 months
+3. Projected net cash flow
+4. How many months this extends runway
+5. Recommendations for optimizing cash flow
+
+Consider:
+- Historical growth/decline trends
+- Seasonality if evident
+- Planned expenses impact
+- Revenue forecast if provided
+
+Return as JSON:
+{
+  "months": [
+    {
+      "month": "YYYY-MM",
+      "projectedInflow": <amount>,
+      "projectedOutflow": <amount>,
+      "projectedNet": <amount>
+    }
+  ],
+  "runwayExtension": <months>,
+  "recommendations": ["rec1", "rec2", ...]
+}`;
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const text = response.text();
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return JSON.parse(jsonMatch[0]);
+  }
+  throw new Error("Failed to parse AI response for cash flow forecast");
+}
+

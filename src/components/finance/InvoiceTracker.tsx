@@ -1,19 +1,38 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { FileText, Clock, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useInvoices } from "@/hooks/useFinanceData";
+import { format, isPast, isToday } from "date-fns";
+import { useEffect } from "react";
+import { useUpdateInvoice } from "@/hooks/useFinanceData";
 
 export function InvoiceTracker() {
-  const invoices = [
-    { id: "INV-2401", client: "Acme Corp", amount: 15000, status: "paid", dueDate: "2024-01-15" },
-    { id: "INV-2402", client: "TechStart Inc", amount: 8500, status: "pending", dueDate: "2024-01-20" },
-    { id: "INV-2403", client: "Global Solutions", amount: 22000, status: "overdue", dueDate: "2024-01-10" },
-  ];
+  const { data: invoices = [], isLoading } = useInvoices();
+  const updateInvoiceMutation = useUpdateInvoice();
+
+  // Auto-update overdue invoices
+  useEffect(() => {
+    invoices.forEach((invoice) => {
+      if (
+        invoice.status !== "paid" &&
+        invoice.status !== "overdue" &&
+        isPast(new Date(invoice.due_date)) &&
+        !isToday(new Date(invoice.due_date))
+      ) {
+        updateInvoiceMutation.mutate({
+          id: invoice.id,
+          updates: { status: "overdue" },
+        });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices]);
 
   const stats = {
+    paid: invoices.filter((inv) => inv.status === "paid").length,
+    pending: invoices.filter((inv) => inv.status === "pending" || inv.status === "sent").length,
+    overdue: invoices.filter((inv) => inv.status === "overdue").length,
     total: invoices.reduce((sum, inv) => sum + inv.amount, 0),
-    paid: invoices.filter(inv => inv.status === "paid").length,
-    pending: invoices.filter(inv => inv.status === "pending").length,
-    overdue: invoices.filter(inv => inv.status === "overdue").length,
   };
 
   const getStatusIcon = (status: string) => {
@@ -30,6 +49,21 @@ export function InvoiceTracker() {
     };
     return <Badge variant={variants[status]}>{status}</Badge>;
   };
+
+  if (isLoading) {
+    return (
+      <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Get recent invoices (last 5)
+  const recentInvoices = invoices.slice(0, 5);
 
   return (
     <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
@@ -58,21 +92,32 @@ export function InvoiceTracker() {
         </div>
 
         <div className="space-y-3 pt-2 border-t border-border max-h-48 overflow-y-auto">
-          {invoices.map((invoice) => (
-            <div key={invoice.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/10 transition-colors">
-              <div className="flex items-center gap-3">
-                {getStatusIcon(invoice.status)}
-                <div>
-                  <p className="font-medium text-sm">{invoice.id}</p>
-                  <p className="text-xs text-muted-foreground">{invoice.client}</p>
+          {recentInvoices.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              No invoices yet
+            </div>
+          ) : (
+            recentInvoices.map((invoice) => (
+              <div
+                key={invoice.id}
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/10 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {getStatusIcon(invoice.status)}
+                  <div>
+                    <p className="font-medium text-sm">{invoice.client_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Due: {format(new Date(invoice.due_date), "MMM dd, yyyy")}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-sm">₹{invoice.amount.toLocaleString()}</p>
+                  {getStatusBadge(invoice.status)}
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-semibold text-sm">${invoice.amount.toLocaleString()}</p>
-                {getStatusBadge(invoice.status)}
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </CardContent>
     </Card>

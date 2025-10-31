@@ -6,6 +6,7 @@ import ActivityHeatmap from "@/components/dashboard/ActivityHeatmap";
 import UpcomingCalendar from "@/components/dashboard/UpcomingCalendar";
 import HubsGrid from "@/components/dashboard/HubsGrid";
 import ActivityFeed from "@/components/dashboard/ActivityFeed";
+import { FinanceWidget } from "@/components/dashboard/FinanceWidget";
 import { IncompleteProfileBanner } from "@/components/IncompleteProfileBanner";
 
 const Dashboard = () => {
@@ -21,9 +22,10 @@ const Dashboard = () => {
           <div className="space-y-8 pb-12">
             <div className="container mx-auto px-6">
               <IncompleteProfileBanner />
-              <div className="grid lg:grid-cols-2 gap-6">
+              <div className="grid lg:grid-cols-3 gap-6">
                 <ActivityHeatmap />
                 <UpcomingCalendar />
+                <FinanceWidget />
               </div>
             </div>
             <HubsGrid />

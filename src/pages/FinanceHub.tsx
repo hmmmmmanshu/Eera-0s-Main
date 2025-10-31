@@ -12,33 +12,25 @@ import { ExpenseTracking } from "@/components/finance/ExpenseTracking";
 import { VirtualCFOInsights } from "@/components/finance/VirtualCFOInsights";
 import { RoleToggle } from "@/components/finance/RoleToggle";
 import { AICFOInsightBox } from "@/components/finance/AICFOInsightBox";
+import { CompanySetup } from "@/components/finance/CompanySetup";
+import { InvoiceGenerator } from "@/components/finance/InvoiceGenerator";
+import { PayrollDashboard } from "@/components/finance/PayrollDashboard";
+import { ComplianceManager } from "@/components/finance/ComplianceManager";
+import { PitchDeckAnalyzer } from "@/components/finance/PitchDeckAnalyzer";
 import { Button } from "@/components/ui/button";
-import { 
-  Zap, 
-  Plus, 
-  TrendingUp, 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
   DollarSign,
+  Building2,
   FileText,
   Users,
-  ShoppingCart,
-  Calculator,
-  TrendingDown,
   Shield,
-  LineChart,
   PresentationIcon,
-  Award,
-  Briefcase
+  LineChart,
+  ShoppingCart,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 type FinanceRole = "all" | "accountant" | "cfo";
 
@@ -47,38 +39,36 @@ const FinanceHub = () => {
   const [role, setRole] = useState<FinanceRole>(() => {
     return (localStorage.getItem("financeRole") as FinanceRole) || "all";
   });
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return localStorage.getItem("financeTab") || "overview";
+  });
 
   useEffect(() => {
     localStorage.setItem("financeRole", role);
   }, [role]);
 
-  const handleAction = (action: string) => {
-    toast.info(`Opening ${action}...`);
+  useEffect(() => {
+    localStorage.setItem("financeTab", activeTab);
+  }, [activeTab]);
+
+  // Define tabs based on role
+  const getTabsForRole = () => {
+    const allTabs = [
+      { value: "overview", label: "Overview", icon: DollarSign, availableFor: ["all", "accountant", "cfo"] },
+      { value: "company-setup", label: "Company Setup", icon: Building2, availableFor: ["all", "accountant", "cfo"] },
+      { value: "invoices", label: "Invoices", icon: FileText, availableFor: ["all", "accountant"] },
+      { value: "payroll", label: "Payroll", icon: Users, availableFor: ["all", "accountant"] },
+      { value: "expenses", label: "Expenses", icon: ShoppingCart, availableFor: ["all", "accountant"] },
+      { value: "cash-flow", label: "Cash Flow", icon: LineChart, availableFor: ["all", "accountant", "cfo"] },
+      { value: "compliance", label: "Compliance", icon: Shield, availableFor: ["all", "cfo"] },
+      { value: "pitch-analysis", label: "Pitch Analysis", icon: PresentationIcon, availableFor: ["all", "cfo"] },
+    ];
+
+    if (role === "all") return allTabs;
+    return allTabs.filter((tab) => tab.availableFor.includes(role));
   };
 
-  const accountantActions = [
-    { label: "Invoices", icon: FileText, action: "invoices" },
-    { label: "Payroll", icon: Users, action: "payroll" },
-    { label: "Purchases Tracking", icon: ShoppingCart, action: "purchases" },
-    { label: "Tax Computation", icon: Calculator, action: "tax" },
-    { label: "Cash Flow Management", icon: TrendingDown, action: "cashflow" },
-    { label: "Compliances", icon: Shield, action: "compliances" },
-  ];
-
-  const cfoActions = [
-    { label: "Financial Models", icon: LineChart, action: "models" },
-    { label: "Investor Updates", icon: PresentationIcon, action: "investors" },
-    { label: "Grants Application", icon: Award, action: "grants" },
-    { label: "Pitch Decks", icon: Briefcase, action: "pitch" },
-  ];
-
-  const allActions = [...accountantActions, ...cfoActions];
-
-  const getActionsForRole = () => {
-    if (role === "accountant") return accountantActions;
-    if (role === "cfo") return cfoActions;
-    return allActions;
-  };
+  const tabs = getTabsForRole();
 
   return (
     <div className="flex min-h-screen w-full">
@@ -101,125 +91,154 @@ const FinanceHub = () => {
                     {role === "cfo" && "Strategic financial insights and forecasting"}
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="lg" variant="outline" className="gap-2">
-                        <Plus className="h-5 w-5" />
-                        {role === "accountant" ? "Accountant Actions" : role === "cfo" ? "CFO Actions" : "Finance Actions"}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuLabel>
-                        {role === "accountant" ? "Operations" : role === "cfo" ? "Strategy" : "All Actions"}
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {getActionsForRole().map((action) => {
-                        const Icon = action.icon;
-                        return (
-                          <DropdownMenuItem
-                            key={action.action}
-                            onClick={() => handleAction(action.label)}
-                            className="gap-2"
-                          >
-                            <Icon className="h-4 w-4" />
-                            {action.label}
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <Button size="lg" className="gap-2" onClick={() => handleAction(role === "cfo" ? "Virtual CFO" : "Virtual Accountant")}>
-                    <Zap className="h-5 w-5" />
-                    {role === "cfo" ? "Virtual CFO" : role === "accountant" ? "Virtual Accountant" : "Quick Action"}
-                  </Button>
-                </div>
               </div>
-              
+
               {/* Role Toggle */}
               <div className="flex justify-center">
                 <RoleToggle value={role} onChange={setRole} />
               </div>
             </div>
 
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={role}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.4 }}
-                className="space-y-6"
-              >
-                {/* AI Insight Box */}
-                <AICFOInsightBox role={role} />
+            {/* Tab Navigation */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
+                      <Icon className="h-4 w-4" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
 
-                {role === "all" && (
-                  <>
-                    {/* Top Row - Critical Metrics */}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* Overview Tab */}
+                  <TabsContent value="overview" className="space-y-6 mt-6">
+                    <AICFOInsightBox role={role} />
+
+                    {role === "all" && (
+                      <>
+                        {/* Top Row - Critical Metrics */}
+                        <div className="grid lg:grid-cols-3 gap-6">
+                          <RunwayCard />
+                          <FundingPipeline />
+                          <CapTable />
+                        </div>
+
+                        {/* Financial Metrics Grid */}
+                        <FinancialMetricsGrid />
+
+                        {/* Cash Flow Chart */}
+                        <CashFlowChart />
+
+                        {/* Operations Row */}
+                        <div className="grid lg:grid-cols-3 gap-6">
+                          <InvoiceTracker />
+                          <PayrollOverview />
+                          <ExpenseTracking />
+                        </div>
+
+                        {/* Virtual CFO Insights */}
+                        <VirtualCFOInsights />
+                      </>
+                    )}
+
+                    {role === "accountant" && (
+                      <>
+                        {/* Accountant Focus: Operations First */}
+                        <div className="grid lg:grid-cols-3 gap-6">
+                          <InvoiceTracker />
+                          <PayrollOverview />
+                          <ExpenseTracking />
+                        </div>
+
+                        {/* Financial Metrics Grid */}
+                        <FinancialMetricsGrid />
+
+                        {/* Cash Flow Chart */}
+                        <CashFlowChart />
+                      </>
+                    )}
+
+                    {role === "cfo" && (
+                      <>
+                        {/* CFO Focus: Strategy First */}
+                        <div className="grid lg:grid-cols-3 gap-6">
+                          <RunwayCard />
+                          <FundingPipeline />
+                          <CapTable />
+                        </div>
+
+                        {/* Cash Flow Chart */}
+                        <CashFlowChart />
+
+                        {/* Financial Metrics Grid */}
+                        <FinancialMetricsGrid />
+
+                        {/* Virtual CFO Insights */}
+                        <VirtualCFOInsights />
+                      </>
+                    )}
+                  </TabsContent>
+
+                  {/* Company Setup Tab */}
+                  <TabsContent value="company-setup" className="mt-6">
+                    <CompanySetup />
+                  </TabsContent>
+
+                  {/* Invoices Tab */}
+                  <TabsContent value="invoices" className="mt-6 space-y-6">
+                    <div className="grid lg:grid-cols-3 gap-6">
+                      <div className="lg:col-span-2">
+                        <InvoiceGenerator />
+                      </div>
+                      <div>
+                        <InvoiceTracker />
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  {/* Payroll Tab */}
+                  <TabsContent value="payroll" className="mt-6">
+                    <PayrollDashboard />
+                  </TabsContent>
+
+                  {/* Expenses Tab */}
+                  <TabsContent value="expenses" className="mt-6">
+                    <ExpenseTracking />
+                  </TabsContent>
+
+                  {/* Cash Flow Tab */}
+                  <TabsContent value="cash-flow" className="mt-6 space-y-6">
+                    <CashFlowChart />
                     <div className="grid lg:grid-cols-3 gap-6">
                       <RunwayCard />
                       <FundingPipeline />
                       <CapTable />
                     </div>
+                  </TabsContent>
 
-                    {/* Financial Metrics Grid */}
-                    <FinancialMetricsGrid />
+                  {/* Compliance Tab */}
+                  <TabsContent value="compliance" className="mt-6">
+                    <ComplianceManager />
+                  </TabsContent>
 
-                    {/* Cash Flow Chart */}
-                    <CashFlowChart />
-
-                    {/* Operations Row */}
-                    <div className="grid lg:grid-cols-3 gap-6">
-                      <InvoiceTracker />
-                      <PayrollOverview />
-                      <ExpenseTracking />
-                    </div>
-
-                    {/* Virtual CFO Insights */}
-                    <VirtualCFOInsights />
-                  </>
-                )}
-
-                {role === "accountant" && (
-                  <>
-                    {/* Accountant Focus: Operations First */}
-                    <div className="grid lg:grid-cols-3 gap-6">
-                      <InvoiceTracker />
-                      <PayrollOverview />
-                      <ExpenseTracking />
-                    </div>
-
-                    {/* Financial Metrics Grid */}
-                    <FinancialMetricsGrid />
-
-                    {/* Cash Flow Chart */}
-                    <CashFlowChart />
-                  </>
-                )}
-
-                {role === "cfo" && (
-                  <>
-                    {/* CFO Focus: Strategy First */}
-                    <div className="grid lg:grid-cols-3 gap-6">
-                      <RunwayCard />
-                      <FundingPipeline />
-                      <CapTable />
-                    </div>
-
-                    {/* Cash Flow Chart */}
-                    <CashFlowChart />
-
-                    {/* Financial Metrics Grid */}
-                    <FinancialMetricsGrid />
-
-                    {/* Virtual CFO Insights */}
-                    <VirtualCFOInsights />
-                  </>
-                )}
-              </motion.div>
-            </AnimatePresence>
+                  {/* Pitch Analysis Tab */}
+                  <TabsContent value="pitch-analysis" className="mt-6">
+                    <PitchDeckAnalyzer />
+                  </TabsContent>
+                </motion.div>
+              </AnimatePresence>
+            </Tabs>
           </div>
         </main>
       </div>

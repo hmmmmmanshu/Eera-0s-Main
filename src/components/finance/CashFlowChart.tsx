@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity } from "lucide-react";
+import { Activity, Loader2 } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -13,20 +13,42 @@ import {
   Legend,
   ComposedChart,
 } from "recharts";
+import { useCashFlow } from "@/hooks/useFinanceData";
+import { format } from "date-fns";
 
 export function CashFlowChart() {
-  const data = [
-    { month: "Jan", inflow: 120, outflow: 85, net: 35 },
-    { month: "Feb", inflow: 115, outflow: 88, net: 27 },
-    { month: "Mar", inflow: 135, outflow: 92, net: 43 },
-    { month: "Apr", inflow: 128, outflow: 89, net: 39 },
-    { month: "May", inflow: 142, outflow: 91, net: 51 },
-    { month: "Jun", inflow: 138, outflow: 87, net: 51 },
-  ];
+  const { data: cashFlowData = [], isLoading } = useCashFlow(6);
 
-  const avgInflow = data.reduce((sum, d) => sum + d.inflow, 0) / data.length;
-  const avgOutflow = data.reduce((sum, d) => sum + d.outflow, 0) / data.length;
-  const avgNet = data.reduce((sum, d) => sum + d.net, 0) / data.length;
+  // Transform data for chart
+  let data = cashFlowData.map((cf) => ({
+    month: format(new Date(cf.month), "MMM"),
+    inflow: Number(cf.inflow) / 1000, // Convert to thousands
+    outflow: Number(cf.outflow) / 1000,
+    net: Number(cf.net_cash_flow) / 1000,
+  }));
+
+  // If no data, use placeholder
+  if (data.length === 0 && !isLoading) {
+    // Show placeholder data structure
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
+    data = months.map((month) => ({ month, inflow: 0, outflow: 0, net: 0 }));
+  }
+
+  const avgInflow = data.length > 0 ? data.reduce((sum, d) => sum + d.inflow, 0) / data.length : 0;
+  const avgOutflow = data.length > 0 ? data.reduce((sum, d) => sum + d.outflow, 0) / data.length : 0;
+  const avgNet = data.length > 0 ? data.reduce((sum, d) => sum + d.net, 0) / data.length : 0;
+
+  if (isLoading) {
+    return (
+      <Card className="border-accent/20 bg-gradient-to-br from-background to-accent/5">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
