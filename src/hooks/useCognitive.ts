@@ -385,20 +385,44 @@ TEXT: ${text}`;
     if (!userId) throw new Error("No user");
     const ctx = await assembleCognitiveContext(userId);
     const system = personaSystem(persona, ctx.userProfile.tone);
-    const prompt = `Using themes=${JSON.stringify(ctx.goalsThemes)}, generate 5 startup ideas as JSON array of {title, category, rationale, nextStep}. Keep each field under 160 chars.`;
+    const prompt = `Using themes=${JSON.stringify(ctx.goalsThemes)}, generate exactly 5 startup ideas. Output as a JSON array directly, not wrapped in an object. Each idea should have: title, category, rationale, nextStep. Keep each field under 160 chars. Example: [{"title": "...", "category": "...", "rationale": "...", "nextStep": "..."}, ...]`;
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
     try {
       const t0 = Date.now();
       const json = (await generateText({ model: TEXT_MODEL_PRIMARY, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
       await logLLM(userId, "ideas.generate", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
-      return JSON.parse(json);
+      const parsed = JSON.parse(json);
+      // Handle case where JSON mode returns an object with an array inside
+      if (Array.isArray(parsed)) {
+        return parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        // Check common keys where array might be nested
+        if (Array.isArray(parsed.ideas)) return parsed.ideas;
+        if (Array.isArray(parsed.items)) return parsed.items;
+        if (Array.isArray(parsed.result)) return parsed.result;
+        // If it's an object with array values, return first array found
+        const arrays = Object.values(parsed).filter(Array.isArray);
+        if (arrays.length > 0) return arrays[0] as any[];
+      }
+      return [];
     } catch (e: any) {
       const msg = e?.message || "";
       if (msg.includes("429") || msg.includes("rate") || msg.includes("402")) {
         const t1 = Date.now();
         const json2 = (await generateText({ model: TEXT_MODEL_FALLBACK, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
         await logLLM(userId, "ideas.generate", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
-        try { return JSON.parse(json2); } catch { return []; }
+        try {
+          const parsed = JSON.parse(json2);
+          if (Array.isArray(parsed)) return parsed;
+          if (parsed && typeof parsed === 'object') {
+            if (Array.isArray(parsed.ideas)) return parsed.ideas;
+            if (Array.isArray(parsed.items)) return parsed.items;
+            if (Array.isArray(parsed.result)) return parsed.result;
+            const arrays = Object.values(parsed).filter(Array.isArray);
+            if (arrays.length > 0) return arrays[0] as any[];
+          }
+          return [];
+        } catch { return []; }
       }
       return [];
     }
@@ -406,9 +430,11 @@ TEXT: ${text}`;
 
   const saveIdea = useCallback(async (idea: { title: string; category?: string; rationale?: string; nextStep?: string }) => {
     if (!userId) throw new Error("No user");
+    // Combine rationale and nextStep into description field
+    const description = [idea.rationale, idea.nextStep].filter(Boolean).join(". ");
     const { data, error } = await supabase
       .from("cognitive_ideas")
-      .insert({ user_id: userId, title: idea.title, category: idea.category, rationale: idea.rationale, next_step: idea.nextStep, status: "new", priority: 5 })
+      .insert({ user_id: userId, title: idea.title, category: idea.category, description: description || null, status: "brainstorm", priority: 5 })
       .select("id")
       .single();
     if (error) throw error;

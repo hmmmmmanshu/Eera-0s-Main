@@ -23,7 +23,7 @@ export function IdeasPanel() {
       try {
         const { data } = await supabase
           .from("cognitive_ideas")
-          .select("id, title, category, rationale, next_step, status, priority")
+          .select("id, title, category, description, status, priority")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(10);
@@ -60,8 +60,8 @@ export function IdeasPanel() {
                 {idea.category && (
                   <Badge variant="outline" className="text-xs mt-1">{idea.category}</Badge>
                 )}
-                {idea.rationale && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{idea.rationale}</p>
+                {idea.description && (
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{idea.description}</p>
                 )}
                 {idea.status && (
                   <Badge variant="secondary" className="text-xs mt-1 ml-1">{idea.status}</Badge>
@@ -93,7 +93,7 @@ export function IdeasPanel() {
                   // Refresh saved ideas
                   const { data } = await supabase
                     .from("cognitive_ideas")
-                    .select("id, title, category, rationale, next_step, status, priority")
+                    .select("id, title, category, description, status, priority")
                     .eq("user_id", user?.id)
                     .order("created_at", { ascending: false })
                     .limit(10);
