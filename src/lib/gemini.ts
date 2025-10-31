@@ -517,37 +517,81 @@ Return as JSON array: ["hashtag1", "hashtag2", ...]`;
 }
 
 /**
- * Enhance user's prompt for image generation with brand context
+ * Enhance user's prompt for image generation with brand context and image type
  */
 export async function enhanceImagePrompt(
   userPrompt: string,
   brandContext: BrandContext,
-  platform: "linkedin" | "instagram"
+  platform: "linkedin" | "instagram",
+  imageType?: string | null
 ): Promise<string> {
   const model = await getGeminiModel();
 
-  const prompt = `You are an expert at creating detailed prompts for AI image generation tools like DALL-E, Stable Diffusion, and Midjourney.
+  // Import image type presets if imageType is provided
+  let presetInstructions = "";
+  if (imageType) {
+    try {
+      const { IMAGE_TYPE_PRESETS } = await import("./imageTypePresets");
+      const preset = IMAGE_TYPE_PRESETS[imageType as keyof typeof IMAGE_TYPE_PRESETS];
+      if (preset) {
+        presetInstructions = `
+IMAGE TYPE: ${imageType}
 
-USER'S INITIAL IDEA:
+COMPOSITION RULES:
+${preset.compositionInstructions}
+
+LAYOUT GUIDELINES:
+${preset.layoutGuidelines}
+
+TEXT ZONES (important - reserve these areas):
+${preset.textZones}
+
+STYLE: ${preset.style}
+ASPECT RATIO: ${preset.aspectRatio}
+
+REFERENCE EXAMPLES (style to emulate):
+${preset.examplePrompts.map((ex, i) => `${i + 1}. ${ex}`).join("\n")}
+
+`;
+      }
+    } catch (e) {
+      console.warn("Failed to load image type preset", e);
+    }
+  }
+
+  const prompt = `You are a professional art director specializing in ${imageType ? `${imageType} design` : "social media design"} for ${platform}.
+
+${presetInstructions}
+
+USER'S IDEA:
 "${userPrompt}"
 
 BRAND CONTEXT:
 - Brand: ${brandContext.business.name}
 - Industry: ${brandContext.business.industry}
+- Primary Color: ${brandContext.visual.colors?.primary || "not specified"} (use as dominant 60%)
+- Secondary Color: ${brandContext.visual.colors?.secondary || "not specified"} (use as accent 30%)
 - Visual Style: ${brandContext.visual.style}
-- Brand Colors: Primary ${brandContext.visual.colors?.primary || "not specified"}, Secondary ${brandContext.visual.colors?.secondary || "not specified"}
 - Mood: ${brandContext.visual.mood.join(", ")}
-- Platform: ${platform}
+
+PLATFORM OPTIMIZATION:
+${platform === "linkedin" ? "Professional, clean, business-appropriate, high-trust" : "Engaging, vibrant, scroll-stopping, mobile-optimized"}
 
 TASK:
-Transform the user's idea into a detailed, specific image generation prompt that:
-1. Incorporates brand colors naturally
+Create a single, detailed prompt for AI image generation that:
+${imageType ? `1. Follows the ${imageType} composition rules exactly
+2. Reserves specified text zones (DO NOT put important graphics there)
+3. Integrates brand colors naturally (${brandContext.visual.colors?.primary || "primary color"} dominant)
+4. Matches the preset style
+5. Optimized for the preset aspect ratio
+6. Includes lighting, atmosphere, technical quality descriptors
+7. Platform-optimized for ${platform}` : `1. Integrates brand colors naturally (${brandContext.visual.colors?.primary || "primary color"} dominant)
 2. Matches the visual style (${brandContext.visual.style})
 3. Captures the desired mood (${brandContext.visual.mood.join(", ")})
-4. Optimized for ${platform} format ${platform === "linkedin" ? "(professional, clean, 1200x627)" : "(engaging, vibrant, 1080x1080)"}
-5. Includes composition, lighting, style descriptors
+4. Includes lighting, atmosphere, technical quality descriptors
+5. Platform-optimized for ${platform}`}
 
-Return ONLY the enhanced prompt text (no JSON, no explanation, just the prompt ready to send to an image AI).`;
+OUTPUT: One detailed prompt ready for AI image generation (no JSON, no explanation).`;
 
   const result = await model.generateContent(prompt);
   const response = await result.response;

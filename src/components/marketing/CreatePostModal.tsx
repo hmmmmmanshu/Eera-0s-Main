@@ -33,7 +33,15 @@ import {
   CheckCircle, 
   Settings,
   Palette,
-  Zap 
+  Zap,
+  BarChart3,
+  Package,
+  MessageSquareQuote,
+  Megaphone,
+  BookOpen,
+  Award,
+  GitCompare,
+  Calendar
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -50,6 +58,10 @@ import {
   IMAGE_MODELS,
   type ImageGenerationOptions
 } from "@/lib/openrouter";
+
+// Image Type System
+import type { ImageType } from "@/types/imageTypes";
+import { IMAGE_TYPE_PRESETS } from "@/lib/imageTypePresets";
 
 interface CreatePostModalProps {
   open: boolean;
@@ -77,6 +89,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   // Form data with auto-restore
   const [platform, setPlatform] = useState<"linkedin" | "instagram">(savedDraft?.platform || "linkedin");
   const [contentType, setContentType] = useState<"text" | "image" | "carousel" | "video">(savedDraft?.contentType || "text");
+  const [imageType, setImageType] = useState<ImageType | null>(savedDraft?.imageType || null);
   const [headline, setHeadline] = useState(savedDraft?.headline || "");
   const [keyPoints, setKeyPoints] = useState(savedDraft?.keyPoints || "");
   const [tone, setTone] = useState<"quirky" | "humble" | "inspirational" | "professional" | "witty">(savedDraft?.tone || "professional");
@@ -84,7 +97,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   
   // Image generation (Step 3.5)
   const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("google/gemini-2.5-flash-image-preview");
-  const [aspectRatio, setAspectRatio] = useState<"1:1" | "16:9" | "9:16">("1:1");
+  const [aspectRatio, setAspectRatio] = useState<"1:1" | "4:5" | "16:9" | "9:16">("1:1");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [consistentStyle, setConsistentStyle] = useState(true);
   const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1_000_000));
@@ -122,6 +135,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       const draftData = {
         platform,
         contentType,
+        imageType,
         headline,
         keyPoints,
         tone,
@@ -130,7 +144,24 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       };
       localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(draftData));
     }
-  }, [open, platform, contentType, headline, keyPoints, tone, objective]);
+  }, [open, platform, contentType, imageType, headline, keyPoints, tone, objective]);
+
+  // Auto-select model, aspect ratio, and negative prompt based on image type
+  useEffect(() => {
+    if (imageType && (contentType === "image" || contentType === "carousel")) {
+      const preset = IMAGE_TYPE_PRESETS[imageType];
+      // Map preset model to OpenRouter model keys
+      const modelMap: Record<string, keyof typeof IMAGE_MODELS> = {
+        gemini: "google/gemini-2.5-flash-image-preview",
+        dalle3: "google/gemini-2.5-flash-image-preview", // Using Gemini for now
+        sdxl: "google/gemini-2.5-flash-image-preview", // Using Gemini for now
+        leonardo: "google/gemini-2.5-flash-image-preview", // Using Gemini for now
+      };
+      setSelectedModel(modelMap[preset.suggestedModel] || "google/gemini-2.5-flash-image-preview");
+      setAspectRatio(preset.aspectRatio);
+      setNegativePrompt(preset.negativePrompt);
+    }
+  }, [imageType, contentType]);
 
   // Reset wizard when modal opens
   useEffect(() => {
@@ -185,13 +216,14 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setSlideActionsBusy(index);
       const brandContext = assembleBrandContext(profile!);
       const prompt = slides[index].prompt || `${headline}. ${keyPoints || ""}`;
-      const result = await generateImageWithFallback({
-        model: selectedModel,
-        prompt,
-        brandContext,
-        aspectRatio,
-        negativePrompt: negativePrompt || undefined,
-      });
+          const result = await generateImageWithFallback({
+            model: selectedModel,
+            prompt,
+            brandContext,
+            aspectRatio,
+            negativePrompt: negativePrompt || undefined,
+            imageType: imageType || undefined,
+          });
       setSlides((prev) => {
         const next = [...prev];
         next[index] = { ...next[index], url: result.url };
@@ -222,8 +254,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         brandContext,
         aspectRatio,
         negativePrompt: negativePrompt || undefined,
+        imageType: imageType || undefined,
       });
-      setSlides((prev) => [...prev, { url: result.url, prompt: newSlidePrompt, aspectRatio, seed: consistentStyle ? seed : undefined }]);
+      setSlides((prev) => [...prev, { url: result.url, prompt: newSlidePrompt, aspectRatio, seed: consistentStyle ? seed : undefined, imageType }]);
       setNewSlidePrompt("");
     } catch (e) {
       toast.error("Failed to add slide");
@@ -275,10 +308,11 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             brandContext,
             aspectRatio,
             negativePrompt: negativePrompt || "blurry, lowres, watermark, text artifacts, extra limbs",
+            imageType: imageType || undefined,
           });
           setSlideStatuses(prev => ({ ...prev, [idx]: "uploading" }));
           // upload already handled inside generateImageWithFallback -> result.url is public URL
-          setSlides(prev => [...prev, { url: result.url, prompt, aspectRatio, seed: consistentStyle ? seed : undefined }]);
+          setSlides(prev => [...prev, { url: result.url, prompt, aspectRatio, seed: consistentStyle ? seed : undefined, imageType }]);
           setSlideStatuses(prev => ({ ...prev, [idx]: "done" }));
         } catch (e) {
           setSlideStatuses(prev => ({ ...prev, [idx]: "error" }));
@@ -298,6 +332,52 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     { id: "carousel" as const, icon: ImageIcon, label: "Carousel", platforms: ["instagram"] },
     { id: "video" as const, icon: Video, label: "Reel/Short", platforms: ["instagram"] },
   ];
+
+  const imageTypes = [
+    { id: "infographic" as const, icon: BarChart3, label: "Infographic", desc: "Stats, process flows, data viz", platforms: ["linkedin", "instagram"] },
+    { id: "product" as const, icon: Package, label: "Product Shot", desc: "Hero images, features, mockups", platforms: ["linkedin", "instagram"] },
+    { id: "quote" as const, icon: MessageSquareQuote, label: "Quote Card", desc: "Testimonials, insights, wisdom", platforms: ["linkedin", "instagram"] },
+    { id: "announcement" as const, icon: Megaphone, label: "Announcement", desc: "Launches, milestones, news", platforms: ["linkedin", "instagram"] },
+    { id: "educational" as const, icon: BookOpen, label: "Educational", desc: "How-to guides, tips, tutorials", platforms: ["linkedin"] },
+    { id: "social_proof" as const, icon: Award, label: "Social Proof", desc: "Reviews, case studies, trust", platforms: ["linkedin", "instagram"] },
+    { id: "comparison" as const, icon: GitCompare, label: "Comparison", desc: "Before/after, us vs them", platforms: ["linkedin"] },
+    { id: "event" as const, icon: Calendar, label: "Event/Webinar", desc: "Registrations, live sessions", platforms: ["linkedin", "instagram"] },
+  ];
+
+  const placeholders: Record<ImageType, { headline: string; keyPoints: string }> = {
+    infographic: {
+      headline: "e.g., How Our Process Works in 3 Steps",
+      keyPoints: "Step 1: Discovery\nStep 2: Implementation\nStep 3: Results",
+    },
+    product: {
+      headline: "e.g., Introducing Our New AI-Powered Dashboard",
+      keyPoints: "• Real-time analytics\n• Beautiful visualizations\n• Easy to use",
+    },
+    quote: {
+      headline: "e.g., 'This tool saved us 10 hours per week'",
+      keyPoints: "- Sarah Chen, CEO at TechCorp",
+    },
+    announcement: {
+      headline: "e.g., We Just Hit 10,000 Users!",
+      keyPoints: "Thank you to our amazing community for making this possible",
+    },
+    educational: {
+      headline: "e.g., 5 Ways to Improve Your Marketing ROI",
+      keyPoints: "1. Focus on quality over quantity\n2. Track the right metrics\n3. Test and iterate",
+    },
+    social_proof: {
+      headline: "e.g., Customer Success Story: 300% Growth",
+      keyPoints: "Company: TechCorp\nResult: 300% increase in leads\nTimeframe: 3 months",
+    },
+    comparison: {
+      headline: "e.g., Before vs After: Our New Approach",
+      keyPoints: "Before: Manual process, slow\nAfter: Automated, 10x faster",
+    },
+    event: {
+      headline: "e.g., Free Webinar: AI for Founders",
+      keyPoints: "Date: March 15, 2025\nTime: 2:00 PM EST\nSpeaker: Jane Doe",
+    },
+  };
 
   // Auto-trigger generation when reaching step 4
   useEffect(() => {
@@ -360,10 +440,11 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             brandContext,
             aspectRatio: aspectRatio,
             negativePrompt: negativePrompt || undefined,
+            imageType: imageType || undefined,
           });
           imageUrl = imageResult.url;
           setGeneratedImageUrl(imageUrl);
-          setSlides([{ url: imageUrl, prompt: imagePrompt, aspectRatio, seed: consistentStyle ? seed : undefined }]);
+          setSlides([{ url: imageUrl, prompt: imagePrompt, aspectRatio, seed: consistentStyle ? seed : undefined, imageType }]);
           console.log("[CreatePostModal] Image generation complete", { url: imageUrl });
         }
         setGenerationStatus(prev => ({ ...prev, imageGen: "complete" }));
@@ -401,6 +482,58 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     }
   };
 
+  // Quick edit handlers
+  const handleQuickEdit = async (editType: "change_background" | "adjust_colors" | "add_text_space") => {
+    if (!generatedImageUrl || !profile || !imageType) {
+      toast.error("No image to edit. Please generate an image first.");
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      const brandContext = assembleBrandContext(profile);
+      
+      // Build edit-specific prompt modification
+      let editInstruction = "";
+      const basePrompt = `${headline}. ${keyPoints || ""}`;
+      
+      switch (editType) {
+        case "change_background":
+          editInstruction = "Regenerate this image with a completely different background style - try a gradient, abstract pattern, or contrasting color background while keeping the main subject unchanged.";
+          break;
+        case "adjust_colors":
+          editInstruction = "Regenerate this image with adjusted color scheme - make it more vibrant and aligned with brand colors, adjusting saturation and contrast while maintaining the same composition.";
+          break;
+        case "add_text_space":
+          editInstruction = "Regenerate this image with more empty space reserved for text overlay - ensure the main visual elements are pushed to one side leaving a clear text zone (typically 40% of the image area should be clean for text).";
+          break;
+      }
+
+      const modifiedPrompt = `${basePrompt}. ${editInstruction}`;
+      
+      toast.info(`Regenerating image with ${editType.replace("_", " ")}...`);
+      
+      const imageResult = await generateImageWithFallback({
+        model: selectedModel,
+        prompt: modifiedPrompt,
+        brandContext,
+        aspectRatio: aspectRatio,
+        negativePrompt: negativePrompt || undefined,
+        imageType: imageType || undefined,
+      });
+      
+      setGeneratedImageUrl(imageResult.url);
+      setSlides([{ url: imageResult.url, prompt: modifiedPrompt, aspectRatio, seed: consistentStyle ? seed : undefined, imageType }]);
+      toast.success("Image regenerated successfully!");
+      
+    } catch (error) {
+      console.error("Quick edit failed:", error);
+      toast.error(`Failed to regenerate image: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleSaveDraft = async () => {
     if (!generatedContent) {
       toast.error("No content to save");
@@ -429,7 +562,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         comments: 0,
         shares: 0,
         post_meta: {
-          images: slides.length > 0 ? slides : (generatedImageUrl ? [{ url: generatedImageUrl, aspectRatio }] : []),
+          images: slides.length > 0 ? slides.map(s => ({ ...s, imageType })) : (generatedImageUrl ? [{ url: generatedImageUrl, aspectRatio, imageType }] : []),
           ...(contentType === "video" && reelStoryboard ? { reel_storyboard: reelStoryboard } : {}),
         },
       };
@@ -529,7 +662,68 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>
                 Back
               </Button>
-              <Button className="flex-1" onClick={() => setStep(3)}>
+              <Button className="flex-1" onClick={() => {
+                // If image or carousel, go to image type selection. Otherwise go to content input.
+                if (contentType === "image" || contentType === "carousel") {
+                  setStep(2.5);
+                } else {
+                  setStep(3);
+                }
+              }}>
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2.5: Image Type Selection (only for image/carousel) */}
+        {step === 2.5 && (contentType === "image" || contentType === "carousel") && (
+          <div className="space-y-4">
+            <div>
+              <Label>Choose Image Type</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Select the type of image you want to create. This helps AI generate the perfect design.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {imageTypes
+                .filter(type => type.platforms.includes(platform))
+                .map((type) => {
+                  const Icon = type.icon;
+                  const preset = imageType ? IMAGE_TYPE_PRESETS[imageType] : null;
+                  return (
+                    <Card
+                      key={type.id}
+                      className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                        imageType === type.id ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border"
+                      }`}
+                      onClick={() => setImageType(type.id)}
+                    >
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <Icon className={`w-5 h-5 ${imageType === type.id ? "text-primary" : "text-muted-foreground"}`} />
+                          </div>
+                          {preset && imageType === type.id && (
+                            <Badge variant="secondary" className="text-xs">✨ Recommended</Badge>
+                          )}
+                        </div>
+                        <p className={`font-semibold text-sm ${imageType === type.id ? "text-foreground" : "text-foreground"}`}>{type.label}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{type.desc}</p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>
+                Back
+              </Button>
+              <Button 
+                className="flex-1" 
+                onClick={() => setStep(3)}
+                disabled={!imageType}
+              >
                 Continue
               </Button>
             </div>
@@ -543,7 +737,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               <Label htmlFor="headline">Headline / Hook *</Label>
               <Input 
                 id="headline" 
-                placeholder="What's your main message?" 
+                placeholder={imageType && placeholders[imageType] ? placeholders[imageType].headline : "What's your main message?"}
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
               />
@@ -584,7 +778,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 <Label htmlFor="keypoints">Key Points (optional)</Label>
                 <Textarea 
                   id="keypoints" 
-                  placeholder="• Point 1&#10;• Point 2&#10;• Point 3"
+                  placeholder={imageType && placeholders[imageType] ? placeholders[imageType].keyPoints : "• Point 1\n• Point 2\n• Point 3"}
                   rows={4}
                   value={keyPoints}
                   onChange={(e) => setKeyPoints(e.target.value)}
@@ -626,7 +820,14 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>
+              <Button variant="outline" className="flex-1" onClick={() => {
+                // If image/carousel, go back to image type selection. Otherwise go to content type.
+                if (contentType === "image" || contentType === "carousel") {
+                  setStep(2.5);
+                } else {
+                  setStep(2);
+                }
+              }}>
                 Back
               </Button>
               <Button 
@@ -658,6 +859,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             <div className="grid grid-cols-2 gap-3">
               {Object.entries(IMAGE_MODELS).map(([modelKey, info]) => {
                 const model = modelKey as keyof typeof IMAGE_MODELS;
+                const preset = imageType ? IMAGE_TYPE_PRESETS[imageType] : null;
+                const isRecommended = preset && imageType && IMAGE_TYPE_PRESETS[imageType].suggestedModel === "gemini"; // All current models map to Gemini
                 return (
                   <Card
                     key={model}
@@ -671,7 +874,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                         <div className="flex items-center gap-2">
                           <Sparkles className={`w-5 h-5 ${selectedModel === model ? "text-primary" : "text-muted-foreground"}`} />
                         </div>
-                        <Badge variant="secondary" className="text-xs">{info.badge}</Badge>
+                        <Badge variant={isRecommended && selectedModel === model ? "default" : "secondary"} className="text-xs">
+                          {isRecommended ? "✨ Recommended" : info.badge}
+                        </Badge>
                       </div>
                       <p className={`font-semibold text-sm ${selectedModel === model ? "text-foreground" : "text-foreground"}`}>{info.name}</p>
                       <p className="text-xs text-muted-foreground line-clamp-2">{info.description}</p>
@@ -937,12 +1142,54 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     </div>
                     
                     {generatedImageUrl && (
-                      <div className="aspect-video rounded-lg overflow-hidden">
-                        <img 
-                          src={generatedImageUrl} 
-                          alt="Generated content" 
-                          className="w-full h-full object-cover"
-                        />
+                      <div className="space-y-2">
+                        <div className="aspect-video rounded-lg overflow-hidden">
+                          <img 
+                            src={generatedImageUrl} 
+                            alt="Generated content" 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        {/* Quick Edit Options */}
+                        <div className="space-y-2">
+                          <Label>Quick Edits</Label>
+                          <div className="flex gap-2 flex-wrap">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleQuickEdit("change_background")}
+                              disabled={isGenerating || !generatedImageUrl || !imageType}
+                            >
+                              Change Background
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleQuickEdit("adjust_colors")}
+                              disabled={isGenerating || !generatedImageUrl || !imageType}
+                            >
+                              Adjust Colors
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleQuickEdit("add_text_space")}
+                              disabled={isGenerating || !generatedImageUrl || !imageType}
+                            >
+                              Add Text Space
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={async () => {
+                                await handleGeneration();
+                              }}
+                              disabled={isGenerating || !imageType}
+                            >
+                              Regenerate
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     )}
                     

@@ -25,6 +25,7 @@ export interface ImageGenerationOptions {
   aspectRatio?: "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "4:5" | "5:4" | "2:3" | "3:2" | "21:9";
   brandContext?: BrandContext;
   negativePrompt?: string;
+  imageType?: string | null;
 }
 
 export interface GeneratedText {
@@ -104,40 +105,50 @@ function getOpenRouterKey(): string {
   return key;
 }
 
-function enhancePromptWithBrand(
+async function enhancePromptWithBrand(
   prompt: string,
-  brandContext?: BrandContext
-): string {
+  brandContext?: BrandContext,
+  platform: "linkedin" | "instagram" = "linkedin",
+  imageType?: string | null
+): Promise<string> {
   if (!brandContext) return prompt;
 
-  const { visual, voice, business } = brandContext;
+  // Use Gemini enhanceImagePrompt for better results
+  try {
+    const { enhanceImagePrompt } = await import("./gemini");
+    return await enhanceImagePrompt(prompt, brandContext, platform, imageType);
+  } catch (e) {
+    console.warn("Gemini prompt enhancement failed, using fallback", e);
+    
+    // Fallback: Manual enhancement
+    const { visual, voice, business } = brandContext;
+    let enhanced = prompt;
 
-  let enhanced = prompt;
+    // Add visual style
+    if (visual?.style) {
+      enhanced += `, ${visual.style} aesthetic`;
+    }
 
-  // Add visual style
-  if (visual?.style) {
-    enhanced += `, ${visual.style} aesthetic`;
+    // Add brand colors
+    if (visual?.colors?.primary && visual?.colors?.secondary) {
+      enhanced += `, brand colors ${visual.colors.primary} and ${visual.colors.secondary}`;
+    }
+
+    // Add mood/tone
+    if (visual?.mood) {
+      enhanced += `, ${visual.mood} mood`;
+    }
+
+    // Add business context
+    if (business?.industry) {
+      enhanced += `, ${business.industry} industry context`;
+    }
+
+    // Add quality markers
+    enhanced += ", high quality, professional, clean composition";
+
+    return enhanced;
   }
-
-  // Add brand colors
-  if (visual?.colors?.primary && visual?.colors?.secondary) {
-    enhanced += `, brand colors ${visual.colors.primary} and ${visual.colors.secondary}`;
-  }
-
-  // Add mood/tone
-  if (visual?.mood) {
-    enhanced += `, ${visual.mood} mood`;
-  }
-
-  // Add business context
-  if (business?.industry) {
-    enhanced += `, ${business.industry} industry context`;
-  }
-
-  // Add quality markers
-  enhanced += ", high quality, professional, clean composition";
-
-  return enhanced;
 }
 
 export async function preflightModel(model: string): Promise<{ ok: boolean; code?: number; message?: string }> {
@@ -279,15 +290,16 @@ export async function generateText(
 export async function generateImage(
   options: ImageGenerationOptions
 ): Promise<GeneratedImage> {
-  const { model, prompt, aspectRatio = "1:1", brandContext } = options;
+  const { model, prompt, aspectRatio = "1:1", brandContext, imageType } = options;
 
-  console.log("[OpenRouter Image] Starting generation:", { model, prompt, aspectRatio });
+  console.log("[OpenRouter Image] Starting generation:", { model, prompt, aspectRatio, imageType });
 
   const startTime = Date.now();
   const apiKey = getOpenRouterKey();
 
-  // Enhance prompt with brand context
-  const enhancedPrompt = enhancePromptWithBrand(prompt, brandContext);
+  // Enhance prompt with brand context and image type
+  const platform = "linkedin"; // Default, could be derived from context
+  const enhancedPrompt = await enhancePromptWithBrand(prompt, brandContext, platform, imageType);
   console.log("[OpenRouter Image] Enhanced prompt:", enhancedPrompt);
 
   try {

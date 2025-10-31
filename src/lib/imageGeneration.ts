@@ -29,6 +29,7 @@ export interface ImageGenerationParams {
   negativePrompt?: string; // For SDXL
   seed?: number; // For reproducibility
   referenceImage?: string; // URL for image-to-image
+  imageType?: string | null; // Image type for preset-based enhancement
 }
 
 export interface GeneratedImage {
@@ -137,7 +138,8 @@ async function enhancePromptWithBrandContext(
   userPrompt: string,
   brandContext: BrandContext,
   aspectRatio: AspectRatio,
-  style?: ImageStyle
+  style?: ImageStyle,
+  imageType?: string | null
 ): Promise<string> {
   const { visual, business } = brandContext;
 
@@ -146,7 +148,8 @@ async function enhancePromptWithBrandContext(
     const enhanced = await geminiEnhancePrompt(
       userPrompt,
       brandContext,
-      "linkedin" // Default platform for image generation
+      "linkedin", // Default platform for image generation
+      imageType || undefined
     );
     return enhanced;
   } catch (error) {
@@ -215,29 +218,33 @@ export async function generateImage(
     params.prompt,
     params.brandContext,
     params.aspectRatio,
-    params.style
+    params.style,
+    params.imageType
   );
 
-  console.log(`[Image Gen] Model: ${params.model}, Enhanced prompt:`, enhancedPrompt);
+  // 2. Format prompt for specific model
+  const formattedPrompt = formatPromptForModel(enhancedPrompt, params.model);
 
-  // 2. Route to appropriate model
+  console.log(`[Image Gen] Model: ${params.model}, Enhanced prompt:`, formattedPrompt);
+
+  // 3. Route to appropriate model
   let imageUrl: string;
   let seed: number | undefined;
 
   switch (params.model) {
     case "gemini":
-      imageUrl = await generateWithGemini(enhancedPrompt, params);
+      imageUrl = await generateWithGemini(formattedPrompt, params);
       break;
     case "dalle3":
-      imageUrl = await generateWithDallE(enhancedPrompt, params);
+      imageUrl = await generateWithDallE(formattedPrompt, params);
       break;
     case "sdxl":
-      const sdxlResult = await generateWithSDXL(enhancedPrompt, params);
+      const sdxlResult = await generateWithSDXL(formattedPrompt, params);
       imageUrl = sdxlResult.url;
       seed = sdxlResult.seed;
       break;
     case "leonardo":
-      imageUrl = await generateWithLeonardo(enhancedPrompt, params);
+      imageUrl = await generateWithLeonardo(formattedPrompt, params);
       break;
     default:
       throw new Error(`Unknown model: ${params.model}`);
@@ -248,7 +255,7 @@ export async function generateImage(
   return {
     url: imageUrl,
     model: params.model,
-    prompt: enhancedPrompt,
+    prompt: formattedPrompt,
     metadata: {
       seed: seed || params.seed,
       aspectRatio: params.aspectRatio,

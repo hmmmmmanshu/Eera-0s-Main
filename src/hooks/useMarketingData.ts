@@ -19,6 +19,7 @@ export interface PostImageMeta {
   model?: string;
   seed?: number;
   aspectRatio?: "1:1" | "4:5" | "9:16";
+  imageType?: string | null;
 }
 
 export interface PostMeta {
