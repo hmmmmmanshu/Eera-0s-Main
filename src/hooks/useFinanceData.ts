@@ -2,6 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import {
+  syncOnInvoicePaid,
+  syncOnIncomeAdded,
+  syncOnExpenseAdded,
+  syncAllFinanceData,
+} from "@/lib/syncFinanceData";
 
 // ========================================
 // TYPES
@@ -1074,9 +1080,23 @@ export function useCreateInvoice() {
       if (error) throw error;
       return data as Invoice;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Invoice created!");
+      // Auto-sync if invoice is created as paid
+      if (data.status === "paid") {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          try {
+            await syncOnInvoicePaid(user.id);
+            queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
+          } catch (error) {
+            console.error("Error auto-syncing on invoice paid:", error);
+          }
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to create invoice: ${error.message}`);
@@ -1105,9 +1125,23 @@ export function useUpdateInvoice() {
       if (error) throw error;
       return data as Invoice;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast.success("Invoice updated!");
+      // Auto-sync if invoice status changed to paid
+      if (data.status === "paid") {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          try {
+            await syncOnInvoicePaid(user.id);
+            queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
+          } catch (error) {
+            console.error("Error auto-syncing on invoice paid:", error);
+          }
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to update invoice: ${error.message}`);
@@ -1199,9 +1233,21 @@ export function useCreateExpense() {
       if (error) throw error;
       return data as Expense;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       toast.success("Expense added!");
+      // Auto-sync runway and cash flow
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          await syncOnExpenseAdded(user.id);
+          queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
+        } catch (error) {
+          console.error("Error auto-syncing on expense added:", error);
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to add expense: ${error.message}`);
@@ -1224,9 +1270,21 @@ export function useUpdateExpense() {
       if (error) throw error;
       return data as Expense;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       toast.success("Expense updated!");
+      // Auto-sync runway and cash flow
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          await syncOnExpenseAdded(user.id);
+          queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
+        } catch (error) {
+          console.error("Error auto-syncing on expense updated:", error);
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to update expense: ${error.message}`);
@@ -1246,9 +1304,21 @@ export function useDeleteExpense() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       toast.success("Expense deleted!");
+      // Auto-sync runway and cash flow
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          await syncOnExpenseAdded(user.id);
+          queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
+        } catch (error) {
+          console.error("Error auto-syncing on expense deleted:", error);
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to delete expense: ${error.message}`);
@@ -1340,9 +1410,21 @@ export function useCreateIncome() {
       if (error) throw error;
       return data as Income;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["income"] });
       toast.success("Income added!");
+      // Auto-sync runway and cash flow
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          await syncOnIncomeAdded(user.id);
+          queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
+        } catch (error) {
+          console.error("Error auto-syncing on income added:", error);
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to add income: ${error.message}`);
@@ -1365,9 +1447,21 @@ export function useUpdateIncome() {
       if (error) throw error;
       return data as Income;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["income"] });
       toast.success("Income updated!");
+      // Auto-sync runway and cash flow
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          await syncOnIncomeAdded(user.id);
+          queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
+        } catch (error) {
+          console.error("Error auto-syncing on income updated:", error);
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to update income: ${error.message}`);
@@ -1387,9 +1481,21 @@ export function useDeleteIncome() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["income"] });
       toast.success("Income deleted!");
+      // Auto-sync runway and cash flow
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          await syncOnIncomeAdded(user.id);
+          queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
+        } catch (error) {
+          console.error("Error auto-syncing on income deleted:", error);
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to delete income: ${error.message}`);

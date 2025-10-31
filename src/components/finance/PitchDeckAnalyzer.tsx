@@ -47,30 +47,48 @@ export function PitchDeckAnalyzer() {
     if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
       // Extract text from PDF using dynamic import
       try {
+        // Use dynamic import with proper error handling
         const pdfParseModule = await import("pdf-parse");
-        // pdf-parse can export as default, named export, or as a function itself
+        
+        // Handle different export patterns
         let pdfParse: any;
         if (typeof pdfParseModule === "function") {
           pdfParse = pdfParseModule;
-        } else if (pdfParseModule.default && typeof pdfParseModule.default === "function") {
+        } else if (pdfParseModule.default) {
           pdfParse = pdfParseModule.default;
-        } else if (pdfParseModule.pdfParse && typeof pdfParseModule.pdfParse === "function") {
+        } else if (pdfParseModule.pdfParse) {
           pdfParse = pdfParseModule.pdfParse;
         } else {
-          // Try to find any function export
-          const keys = Object.keys(pdfParseModule);
-          const funcKey = keys.find((k) => typeof (pdfParseModule as any)[k] === "function");
-          if (funcKey) {
-            pdfParse = (pdfParseModule as any)[funcKey];
-          } else {
-            throw new Error("Could not find pdf-parse function");
-          }
+          // Get the default export or the module itself
+          pdfParse = pdfParseModule.default || pdfParseModule;
+        }
+        
+        // Ensure pdfParse is a function
+        if (typeof pdfParse !== "function") {
+          throw new Error("pdf-parse is not a function");
         }
         
         const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const data = await pdfParse(buffer);
-        return data.text || "";
+        // Use Uint8Array and convert to Buffer safely
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const buffer = Buffer.from(uint8Array);
+        
+        // Call with 'new' if it's a class, otherwise call as function
+        let data;
+        try {
+          data = await pdfParse(buffer);
+        } catch (constructorError: any) {
+          // If it fails, try as constructor
+          if (constructorError.message?.includes("cannot be invoked without 'new'")) {
+            const PdfParseClass = pdfParse as any;
+            const instance = new PdfParseClass(buffer);
+            data = await instance.parse ? instance.parse() : instance;
+          } else {
+            throw constructorError;
+          }
+        }
+        
+        return data?.text || "";
       } catch (error: any) {
         console.error("PDF parsing error:", error);
         toast.error(`Failed to parse PDF: ${error.message}`);
