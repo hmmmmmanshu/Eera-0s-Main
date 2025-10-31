@@ -20,7 +20,8 @@ export default defineConfig(({ mode }) => ({
     global: "globalThis",
   },
   optimizeDeps: {
-    include: ["pdf-parse", "mammoth", "buffer"],
+    include: ["mammoth", "buffer"],
+    exclude: ["pdf-parse"], // Exclude pdf-parse as it's dynamically imported
     esbuildOptions: {
       define: {
         global: "globalThis",
