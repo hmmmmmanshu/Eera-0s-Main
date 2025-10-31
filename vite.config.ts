@@ -21,5 +21,22 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     include: ["pdf-parse", "mammoth", "buffer"],
+    esbuildOptions: {
+      define: {
+        global: "globalThis",
+      },
+    },
+  },
+  build: {
+    commonjsOptions: {
+      include: [/pdf-parse/, /node_modules/],
+      transformMixedEsModules: true,
+    },
+    rollupOptions: {
+      external: [], // Don't externalize anything
+      output: {
+        manualChunks: undefined, // Let Vite handle chunking
+      },
+    },
   },
 }));

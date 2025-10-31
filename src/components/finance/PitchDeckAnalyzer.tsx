@@ -22,7 +22,6 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
-import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import { Buffer } from "buffer";
 
@@ -46,7 +45,11 @@ export function PitchDeckAnalyzer() {
 
   const extractTextFromFile = async (file: File): Promise<string> => {
     if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
-      // Extract text from PDF
+      // Extract text from PDF using dynamic import
+      // pdf-parse exports differently in CJS vs ESM, handle both cases
+      const pdfParseModule = await import("pdf-parse");
+      // Handle both default export and named export cases
+      const pdfParse = pdfParseModule.default || pdfParseModule.pdfParse || pdfParseModule;
       const arrayBuffer = await file.arrayBuffer();
       const data = await pdfParse(Buffer.from(arrayBuffer));
       return data.text;
