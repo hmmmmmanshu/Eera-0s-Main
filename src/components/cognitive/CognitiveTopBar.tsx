@@ -76,9 +76,35 @@ export function CognitiveTopBar() {
             try {
               await supabase.from("cognitive_moods").insert({ user_id: user.id, mood, intensity: intensityMap[mood] || 5, tags: [] });
               toast.success("Mood saved");
+              setMood(undefined);
+              // Refresh mood average and delta
               const snap = await weeklyOverview();
               const payload = (snap as any)?.payload || snap;
-              setMoodAvg(payload?.moodAverage ?? null);
+              const currentAvg = payload?.moodAverage ?? null;
+              setMoodAvg(currentAvg);
+
+              // Recalculate delta
+              if (currentAvg !== null) {
+                const now = Date.now();
+                const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+                const fourteenDaysAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);
+
+                const { data: prevWeek } = await supabase
+                  .from("cognitive_moods")
+                  .select("intensity")
+                  .eq("user_id", user.id)
+                  .gte("created_at", fourteenDaysAgo.toISOString())
+                  .lt("created_at", sevenDaysAgo.toISOString());
+
+                const prevAvg = prevWeek?.length 
+                  ? prevWeek.reduce((sum, m) => sum + (m.intensity || 0), 0) / prevWeek.length 
+                  : null;
+
+                const calculatedDelta = prevAvg !== null 
+                  ? Math.round((currentAvg - prevAvg) * 10) / 10 
+                  : 0;
+                setDelta(calculatedDelta);
+              }
             } catch (e: any) { toast.error(e?.message || "Failed"); }
           }}>Save</Button>
         </div>
