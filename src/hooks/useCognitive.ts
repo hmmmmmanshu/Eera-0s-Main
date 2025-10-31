@@ -8,6 +8,9 @@ import { logLLM, logSkill } from "@/lib/cognitive/telemetry";
 
 const TEXT_MODEL_PRIMARY = LIGHT_TEXT_PRIMARY;
 const TEXT_MODEL_FALLBACK = LIGHT_TEXT_FALLBACK;
+const OUTPUT_TOKENS = 450; // max tokens per assistant reply
+const JSON_TOKENS = 480;   // classification JSON budget
+const CONTEXT_BUDGET = 9000; // ~9KB context budget
 
 export function useCognitiveActions(userId?: string | null) {
   // Simple call budget: max 5 LLM calls per 60s per session
@@ -31,6 +34,137 @@ export function useCognitiveActions(userId?: string | null) {
     if (input.length <= maxChars) return input;
     return input.slice(0, maxChars) + "\n[...truncated...]";
   }
+
+  // --- New: Chat sessions & plan extraction ---
+  const createOrGetSession = useCallback(async (activeHub?: string) => {
+    if (!userId) throw new Error("No user");
+    const { data } = await supabase
+      .from("chat_sessions")
+      .select("id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data?.id) return data.id as string;
+    const { data: inserted, error } = await supabase
+      .from("chat_sessions")
+      .insert({ user_id: userId, active_hub: activeHub || null, title: "Session" })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return inserted.id as string;
+  }, [userId]);
+
+  const pinPlanToSession = useCallback(async (planId: string) => {
+    if (!userId) throw new Error("No user");
+    const sid = await createOrGetSession();
+    await supabase.from("chat_sessions").update({ pinned_plan_id: planId }).eq("id", sid);
+    return sid;
+  }, [userId, createOrGetSession]);
+
+  async function buildContextBudgeted(sessionId: string, hub?: string, pinnedPlanId?: string | null) {
+    const ctx = await assembleCognitiveContext(userId!);
+    // last 10 messages
+    const { data: msgs } = await supabase
+      .from("chat_messages")
+      .select("role, content")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    // recent plans for hub
+    let plans: any[] = [];
+    if (hub) {
+      const { data } = await supabase
+        .from("hub_plans")
+        .select("id, title, summary, status, next_step, last_discussed_at")
+        .eq("user_id", userId)
+        .eq("hub", hub)
+        .order("last_discussed_at", { ascending: false })
+        .limit(3);
+      plans = data || [];
+    }
+    // pinned plan details
+    let pinned: any = null;
+    if (pinnedPlanId) {
+      const { data } = await supabase
+        .from("hub_plans")
+        .select("id, hub, title, summary, status, next_step, due_date")
+        .eq("id", pinnedPlanId)
+        .maybeSingle();
+      pinned = data || null;
+    }
+    // hub notes
+    let notes: any[] = [];
+    if (hub) {
+      const { data } = await supabase
+        .from("hub_context_notes")
+        .select("key, value")
+        .eq("user_id", userId)
+        .eq("hub", hub)
+        .limit(10);
+      notes = data || [];
+    }
+    const payload = { profile: ctx.userProfile, week: ctx.currentWeek, hub, notes, plans, pinned, recent: (msgs || []).reverse() };
+    let s = JSON.stringify(payload);
+    const budget = CONTEXT_BUDGET; // ~9KB budget
+    if (s.length > budget) s = s.slice(0, budget) + "\n[...truncated context...]";
+    return s;
+  }
+
+  const sendChatWithPlanExtract = useCallback(async (message: string) => {
+    if (!userId) throw new Error("No user");
+    const sessionId = await createOrGetSession();
+    // Save user message
+    await supabase.from("chat_messages").insert({ session_id: sessionId, user_id: userId, role: "user", content: message });
+
+    // Classify hub + subcategories and plan extraction
+    const classifyPrompt = `Classify the user's message. Output strict JSON with fields: {hub: one of marketing|sales|finance|ops|hr|legal|cognitive, subcategories: string[], intent: one of plan|question|journal|issue, plan: {title: string, summary: string, next_step: string} | null}`;
+    const t0 = Date.now();
+    let classification = "";
+    try {
+      classification = await generateText({ model: TEXT_MODEL_PRIMARY, system: classifyPrompt, prompt: trimText(message, 4000), json: true as any, maxTokens: JSON_TOKENS });
+      await logLLM(userId, "chat.classify", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
+    } catch {
+      classification = await generateText({ model: TEXT_MODEL_FALLBACK, system: classifyPrompt, prompt: trimText(message, 4000), json: true as any, maxTokens: JSON_TOKENS });
+      await logLLM(userId, "chat.classify", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t0 });
+    }
+    let cls: any = {};
+    try { cls = JSON.parse(classification); } catch {}
+
+    // Upsert plan if present
+    let pinnedPlan: string | null = null;
+    if (cls?.plan?.title && cls?.hub) {
+      const { data: plan } = await supabase
+        .from("hub_plans")
+        .insert({
+          user_id: userId,
+          hub: cls.hub,
+          subcategories: Array.isArray(cls.subcategories) ? cls.subcategories : [],
+          title: cls.plan.title,
+          summary: cls.plan.summary || null,
+          next_step: cls.plan.next_step || null,
+          last_discussed_at: new Date().toISOString(),
+          source_session_id: sessionId,
+        })
+        .select("id")
+        .single();
+      pinnedPlan = plan?.id || null;
+    }
+
+    // Compose assistant reply with context
+    const system = `You are Acharya, an operator-mentor. Be concise. Use user's tone if given. If a plan exists, reflect and propose next logical step.`;
+    const contextPrompt = await buildContextBudgeted(sessionId, cls?.hub, pinnedPlan);
+    const t1 = Date.now();
+    let reply = await generateText({ model: TEXT_MODEL_PRIMARY, system, prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 7000), maxTokens: OUTPUT_TOKENS });
+    await logLLM(userId, "chat.reply", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t1 });
+    if (!reply) {
+      reply = await generateText({ model: TEXT_MODEL_FALLBACK, system, prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 7000), maxTokens: OUTPUT_TOKENS });
+      await logLLM(userId, "chat.reply", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
+    }
+
+    await supabase.from("chat_messages").insert({ session_id: sessionId, user_id: userId, role: "assistant", content: reply, hub: cls?.hub || null, subcategories: Array.isArray(cls?.subcategories) ? cls.subcategories : [] });
+    return { reply, sessionId, pinnedPlanId: pinnedPlan, classification: cls };
+  }, [userId, createOrGetSession]);
   const addReflection = useCallback(async (payload: { type: "journal" | "insight" | "goal" | "gratitude"; content: string }) => {
     if (!userId) throw new Error("No user");
     const { data: inserted, error } = await supabase
@@ -87,6 +221,15 @@ export function useCognitiveActions(userId?: string | null) {
     if (ai_summary) {
       await supabase.from("cognitive_reflections").update({ ai_summary }).eq("id", inserted.id);
     }
+
+    // Lightweight classification for journaling
+    try {
+      const classifyPrompt = `Classify reflection. Output JSON {intent: journal|insight|plan|issue, hub: marketing|sales|finance|ops|hr|legal|cognitive, subcategories: string[], sentiment: string, tags: string[]}`;
+      let res = await generateText({ model: TEXT_MODEL_PRIMARY, system: classifyPrompt, prompt: trimText(payload.content, 3500), json: true as any, maxTokens: 300 });
+      try { const cls = JSON.parse(res);
+        await supabase.from("journal_classifications").insert({ user_id: userId, reflection_id: inserted.id, intent: cls?.intent || 'journal', hub: cls?.hub || null, subcategories: Array.isArray(cls?.subcategories)? cls.subcategories:[], sentiment: cls?.sentiment || null, tags: Array.isArray(cls?.tags)? cls.tags: [] });
+      } catch {}
+    } catch {}
 
     return { id: inserted.id, tags, sentiment_score, ai_summary };
   }, [userId]);

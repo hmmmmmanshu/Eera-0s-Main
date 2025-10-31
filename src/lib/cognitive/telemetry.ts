@@ -18,7 +18,7 @@ export async function logOpsAgentic(userId: string, action: string, status: Stat
       .from("ops_agentic_logs")
       .insert({
         user_id: userId,
-        agent: "cognitive",
+        agent: "OpsAI",
         action,
         status,
         details: sanitize(details),
