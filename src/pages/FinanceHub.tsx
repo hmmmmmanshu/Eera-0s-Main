@@ -29,7 +29,6 @@ import {
   LineChart,
   ShoppingCart,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 type FinanceRole = "all" | "accountant" | "cfo";
