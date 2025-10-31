@@ -83,21 +83,77 @@ export function PitchDeckAnalyzer() {
           }
         }
         
-        // Ensure pdfParse is a function
-        if (typeof pdfParse !== "function") {
-          console.error("pdf-parse module structure:", pdfParseModule);
-          throw new Error(`pdf-parse is not a function. Module type: ${typeof pdfParseModule}, Keys: ${Object.keys(pdfParseModule).join(", ")}`);
-        }
-        
         const arrayBuffer = await file.arrayBuffer();
         // Use Uint8Array and convert to Buffer safely
         const uint8Array = new Uint8Array(arrayBuffer);
         const buffer = Buffer.from(uint8Array);
         
-        // Call pdf-parse - it should work as a function
-        const data = await pdfParse(buffer);
+        // Try calling as function first
+        let data;
+        try {
+          // First, try as a function call
+          if (typeof pdfParse === "function") {
+            // Check if it's a class constructor (has prototype)
+            if (pdfParse.prototype && pdfParse.prototype.constructor === pdfParse) {
+              // It's a class, instantiate it
+              const instance = new pdfParse(buffer);
+              // Some classes might have a parse method, others might be callable directly
+              if (typeof instance.parse === "function") {
+                data = await instance.parse();
+              } else if (typeof instance === "object" && instance.text) {
+                data = instance;
+              } else {
+                // Try calling the instance itself
+                data = instance;
+              }
+            } else {
+              // It's a regular function, call it directly
+              data = await pdfParse(buffer);
+            }
+          } else {
+            // Not a function, try to access default or parse method
+            if (pdfParseModule.default && typeof pdfParseModule.default === "function") {
+              const PdfClass = pdfParseModule.default;
+              const instance = new PdfClass(buffer);
+              data = instance.text ? instance : await (instance.parse ? instance.parse() : instance);
+            } else {
+              throw new Error("Could not find callable pdf-parse function or class");
+            }
+          }
+        } catch (error: any) {
+          // If function call fails, try as class constructor
+          if (error.message?.includes("cannot be invoked without 'new'")) {
+            try {
+              // It's definitely a class, instantiate it
+              const PdfClass = pdfParse as any;
+              const instance = new PdfClass(buffer);
+              // Try different ways to get the text
+              if (instance.text) {
+                data = instance;
+              } else if (typeof instance.parse === "function") {
+                data = await instance.parse();
+              } else if (typeof instance.then === "function") {
+                // It's a promise, await it
+                data = await instance;
+              } else {
+                // Last resort: try calling the instance
+                data = instance;
+              }
+            } catch (classError: any) {
+              console.error("Failed to instantiate pdf-parse as class:", classError);
+              throw new Error(`Failed to parse PDF: ${classError.message}`);
+            }
+          } else {
+            throw error;
+          }
+        }
         
-        return data?.text || "";
+        // Extract text from result
+        if (data && typeof data === "object") {
+          return data.text || data.content || "";
+        }
+        
+        return "";
       } catch (error: any) {
         console.error("PDF parsing error:", error);
         console.error("Error details:", error.stack);
