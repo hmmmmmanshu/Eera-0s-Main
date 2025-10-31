@@ -113,19 +113,11 @@ const FinanceHub = () => {
                 })}
               </TabsList>
 
-            <AnimatePresence mode="wait">
-              <motion.div
-                  key={activeTab}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-              >
                   {/* Overview Tab */}
                   <TabsContent value="overview" className="space-y-6 mt-6">
-                <AICFOInsightBox role={role} />
+                    <AICFOInsightBox role={role} />
 
-                {role === "all" && (
+                    {role === "all" && (
                   <>
                     {/* Top Row - Critical Metrics */}
                     <div className="grid lg:grid-cols-3 gap-6">
@@ -186,8 +178,15 @@ const FinanceHub = () => {
 
                     {/* Virtual CFO Insights */}
                     <VirtualCFOInsights />
-                  </>
-                )}
+                    </>
+                    )}
+
+                    {/* Show empty state if no role matches */}
+                    {role !== "all" && role !== "accountant" && role !== "cfo" && (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <p>Please select a role to view the overview</p>
+                      </div>
+                    )}
                   </TabsContent>
 
                   {/* Company Setup Tab */}

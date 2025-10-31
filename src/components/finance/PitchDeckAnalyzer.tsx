@@ -50,22 +50,43 @@ export function PitchDeckAnalyzer() {
         // Use dynamic import with proper error handling
         const pdfParseModule = await import("pdf-parse");
         
-        // Handle different export patterns
+        // Handle different export patterns - pdf-parse exports in various ways
         let pdfParse: any;
-        if (typeof pdfParseModule === "function") {
-          pdfParse = pdfParseModule;
-        } else if (pdfParseModule.default) {
+        
+        // Try default export first
+        if (pdfParseModule.default && typeof pdfParseModule.default === "function") {
           pdfParse = pdfParseModule.default;
-        } else if (pdfParseModule.pdfParse) {
+        } 
+        // Try named export
+        else if (pdfParseModule.pdfParse && typeof pdfParseModule.pdfParse === "function") {
           pdfParse = pdfParseModule.pdfParse;
-        } else {
-          // Get the default export or the module itself
-          pdfParse = pdfParseModule.default || pdfParseModule;
+        }
+        // Try direct function
+        else if (typeof pdfParseModule === "function") {
+          pdfParse = pdfParseModule;
+        }
+        // Try accessing any function in the module
+        else {
+          const keys = Object.keys(pdfParseModule);
+          const funcKey = keys.find((k) => typeof (pdfParseModule as any)[k] === "function" && k.toLowerCase().includes("parse"));
+          if (funcKey) {
+            pdfParse = (pdfParseModule as any)[funcKey];
+          } else {
+            // Last resort: try to find any function
+            const anyFuncKey = keys.find((k) => typeof (pdfParseModule as any)[k] === "function");
+            if (anyFuncKey) {
+              pdfParse = (pdfParseModule as any)[anyFuncKey];
+            } else {
+              // If still nothing, try using default or module itself
+              pdfParse = pdfParseModule.default || pdfParseModule;
+            }
+          }
         }
         
         // Ensure pdfParse is a function
         if (typeof pdfParse !== "function") {
-          throw new Error("pdf-parse is not a function");
+          console.error("pdf-parse module structure:", pdfParseModule);
+          throw new Error(`pdf-parse is not a function. Module type: ${typeof pdfParseModule}, Keys: ${Object.keys(pdfParseModule).join(", ")}`);
         }
         
         const arrayBuffer = await file.arrayBuffer();
@@ -73,24 +94,13 @@ export function PitchDeckAnalyzer() {
         const uint8Array = new Uint8Array(arrayBuffer);
         const buffer = Buffer.from(uint8Array);
         
-        // Call with 'new' if it's a class, otherwise call as function
-        let data;
-        try {
-          data = await pdfParse(buffer);
-        } catch (constructorError: any) {
-          // If it fails, try as constructor
-          if (constructorError.message?.includes("cannot be invoked without 'new'")) {
-            const PdfParseClass = pdfParse as any;
-            const instance = new PdfParseClass(buffer);
-            data = await instance.parse ? instance.parse() : instance;
-          } else {
-            throw constructorError;
-          }
-        }
+        // Call pdf-parse - it should work as a function
+        const data = await pdfParse(buffer);
         
         return data?.text || "";
       } catch (error: any) {
         console.error("PDF parsing error:", error);
+        console.error("Error details:", error.stack);
         toast.error(`Failed to parse PDF: ${error.message}`);
         throw error;
       }
