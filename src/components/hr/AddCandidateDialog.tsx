@@ -31,7 +31,7 @@ export function AddCandidateDialog({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [selectedRoleId, setSelectedRoleId] = useState(preselectedRoleId || "");
+  const [selectedRoleId, setSelectedRoleId] = useState<string | undefined>(preselectedRoleId);
   
   const { data: roles = [] } = useHRRoles();
   const createCandidate = useCreateCandidate();
@@ -54,7 +54,7 @@ export function AddCandidateDialog({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || null,
-        role_id: selectedRoleId || null,
+        role_id: selectedRoleId && selectedRoleId !== "none" ? selectedRoleId : null,
         resume_url: null,
         score: null,
         status: "interested",
@@ -66,7 +66,7 @@ export function AddCandidateDialog({
       setName("");
       setEmail("");
       setPhone("");
-      setSelectedRoleId(preselectedRoleId || "");
+      setSelectedRoleId(preselectedRoleId);
       
       onOpenChange(false);
       if (onCandidateAdded) {
@@ -121,12 +121,15 @@ export function AddCandidateDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="candidate-role">Position</Label>
-            <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+            <Select 
+              value={selectedRoleId || "none"} 
+              onValueChange={(value) => setSelectedRoleId(value === "none" ? undefined : value)}
+            >
               <SelectTrigger id="candidate-role">
                 <SelectValue placeholder="Select a position (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">No Position</SelectItem>
                 {roles.filter(r => r.status === 'open').map((role) => (
                   <SelectItem key={role.id} value={role.id}>
                     {role.title} {role.department ? `- ${role.department}` : ""}

@@ -41,7 +41,7 @@ export function AIResumeScreener({
   const [candidateName, setCandidateName] = useState("");
   const [candidateEmail, setCandidateEmail] = useState("");
   const [candidatePhone, setCandidatePhone] = useState("");
-  const [selectedRoleId, setSelectedRoleId] = useState<string>(preselectedRoleId || "");
+  const [selectedRoleId, setSelectedRoleId] = useState<string | undefined>(preselectedRoleId);
   
   const { data: roles = [] } = useHRRoles();
   const createCandidate = useCreateCandidate();
@@ -104,7 +104,7 @@ export function AIResumeScreener({
         name: candidateName.trim(),
         email: candidateEmail.trim(),
         phone: candidatePhone.trim() || null,
-        role_id: selectedRoleId || null,
+        role_id: selectedRoleId && selectedRoleId !== "none" ? selectedRoleId : null,
         resume_url: null,
         score: result.score,
         status: "screening",
@@ -120,7 +120,7 @@ export function AIResumeScreener({
       setCandidateName("");
       setCandidateEmail("");
       setCandidatePhone("");
-      setSelectedRoleId("");
+      setSelectedRoleId(preselectedRoleId);
       toast.success("Candidate saved successfully!");
     } catch (error) {
       console.error("Error saving candidate:", error);
@@ -306,12 +306,15 @@ export function AIResumeScreener({
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="candidate-role">Role</Label>
-                      <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+                      <Select 
+                        value={selectedRoleId || "none"} 
+                        onValueChange={(value) => setSelectedRoleId(value === "none" ? undefined : value)}
+                      >
                         <SelectTrigger id="candidate-role">
                           <SelectValue placeholder="Select a role (optional)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">No Role</SelectItem>
                           {roles.map((role) => (
                             <SelectItem key={role.id} value={role.id}>
                               {role.title}
