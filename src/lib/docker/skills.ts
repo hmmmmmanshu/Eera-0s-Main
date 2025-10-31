@@ -136,4 +136,14 @@ export async function getSkillsStatus(): Promise<SkillStatus> {
   return { edgeFunctionsAvailable: results.some((s) => s.healthy), skills: results };
 }
 
+// Back-compat simple runner used by some hooks
+export async function runSkill<TReq extends object, TRes = any>(
+  skillId: keyof typeof SKILLS,
+  payload: TReq
+): Promise<TRes | null> {
+  const res = await runSkillUnified<TRes>(skillId, payload);
+  if (res.status === "ok") return (res.output as TRes) ?? null;
+  return null;
+}
+
 
