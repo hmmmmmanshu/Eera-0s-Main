@@ -2,6 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus, FolderOpen } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOpsSkills } from "@/hooks/useOpsSkills";
+import { toast } from "sonner";
 
 export function SOPLibrary() {
   const sops = [
@@ -44,6 +50,12 @@ export function SOPLibrary() {
 
   const categories = ["All", "Finance", "HR", "Marketing", "Product", "Support"];
 
+  const { user } = useAuth();
+  const { generateSOPSteps } = useOpsSkills(user?.id);
+  const [title, setTitle] = useState("");
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
   return (
     <Card className="border-accent/20">
       <CardHeader>
@@ -69,6 +81,21 @@ export function SOPLibrary() {
               {cat}
             </Badge>
           ))}
+        </div>
+
+        <div className="p-3 rounded-lg border space-y-2">
+          <div className="text-sm font-medium">Convert draft into SOP steps</div>
+          <Input placeholder="SOP title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Textarea rows={4} placeholder="Paste a draft procedure here..." value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <Button disabled={busy} onClick={async () => {
+            if (!title.trim() || !draft.trim()) { toast.error("Enter title and draft"); return; }
+            try {
+              setBusy(true);
+              const id = await generateSOPSteps(title.trim(), draft.trim());
+              toast.success("SOP created");
+              setTitle(""); setDraft("");
+            } catch (e: any) { toast.error(e?.message || "Failed to generate steps"); } finally { setBusy(false); }
+          }}>Convert to Steps</Button>
         </div>
 
         <div className="space-y-3 max-h-96 overflow-y-auto">

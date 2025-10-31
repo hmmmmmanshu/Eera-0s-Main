@@ -14,12 +14,19 @@ import { AITeamPanel } from "@/components/ops/AITeamPanel";
 import { WorkflowGraph } from "@/components/ops/WorkflowGraph";
 import { OptimizationInsights } from "@/components/ops/OptimizationInsights";
 import { OpsAnalytics } from "@/components/ops/OpsAnalytics";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOpsSkills } from "@/hooks/useOpsSkills";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 type ViewMode = "manual" | "ai" | "hybrid";
 
 const OpsHub = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("hybrid");
+  const { user } = useAuth();
+  const { runWorkflow, scheduleWorkflowCron } = useOpsSkills(user?.id);
+  const [cron, setCron] = useState("0 9 * * 1-5");
 
   return (
     <div className="flex min-h-screen w-full">
@@ -39,11 +46,33 @@ const OpsHub = () => {
                   Your operations team in one screen
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <Input className="w-[170px]" value={cron} onChange={(e) => setCron(e.target.value)} placeholder="cron (UTC)" />
                 <Button 
                   size="lg" 
                   variant="outline"
                   className="gap-2"
+                  disabled={!user}
+                  onClick={async () => {
+                    try {
+                      await scheduleWorkflowCron("Demo Workflow", cron);
+                      toast.success("Schedule updated");
+                    } catch (e: any) { toast.error(e?.message || "Failed to schedule"); }
+                  }}
+                >
+                  Schedule
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  className="gap-2"
+                  disabled={!user}
+                  onClick={async () => {
+                    try {
+                      const id = await runWorkflow("Demo Workflow", { sample: true });
+                      toast.success("Workflow started");
+                    } catch (e: any) { toast.error(e?.message || "Failed to start workflow"); }
+                  }}
                 >
                   <Zap className="h-5 w-5" />
                   Run Workflow
