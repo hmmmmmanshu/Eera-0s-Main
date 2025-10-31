@@ -1,16 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Sparkles, CheckCircle, UserPlus, X, ArrowRight } from "lucide-react";
+import { Users, Sparkles, CheckCircle, UserPlus, X, ArrowRight, Briefcase } from "lucide-react";
 import { useHRCandidates, useHRRoles, useUpdateCandidate } from "@/hooks/useHRData";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 const PIPELINE_STAGES = [
-  { id: "interested", label: "Interested", icon: UserPlus, color: "bg-blue-500" },
+  { id: "applied", label: "Applied", icon: UserPlus, color: "bg-blue-500" },
   { id: "screening", label: "Screening", icon: Sparkles, color: "bg-amber-500" },
-  { id: "offer_sent", label: "Offer Sent", icon: CheckCircle, color: "bg-green-500" },
-  { id: "accepted", label: "Accepted", icon: CheckCircle, color: "bg-emerald-600" },
+  { id: "interview", label: "Interview", icon: Users, color: "bg-purple-500" },
+  { id: "offer", label: "Offer", icon: CheckCircle, color: "bg-green-500" },
+  { id: "hired", label: "Hired", icon: CheckCircle, color: "bg-emerald-600" },
   { id: "rejected", label: "Rejected", icon: X, color: "bg-red-500" },
 ];
 
@@ -62,8 +63,13 @@ export function CandidatePipeline() {
   const getNextStage = (currentStage: string) => {
     const stages = PIPELINE_STAGES.map((s) => s.id);
     const currentIndex = stages.indexOf(currentStage);
-    if (currentIndex < stages.length - 1 && currentStage !== "rejected") {
+    // Allow progression through all stages except rejected and hired (which are final)
+    if (currentIndex < stages.length - 1 && currentStage !== "rejected" && currentStage !== "hired") {
       return stages[currentIndex + 1];
+    }
+    // Special case: allow moving from offer directly to hired
+    if (currentStage === "offer") {
+      return "hired";
     }
     return null;
   };

@@ -57,7 +57,7 @@ export function AddCandidateDialog({
         role_id: selectedRoleId && selectedRoleId !== "none" ? selectedRoleId : null,
         resume_url: null,
         score: null,
-        status: "interested",
+        status: "applied",
         interview_notes: null,
         screening_results: null,
       });
