@@ -113,6 +113,19 @@ export interface Expense {
   updated_at: string;
 }
 
+export interface Income {
+  id: string;
+  user_id: string;
+  description: string;
+  amount: number;
+  source: string;
+  income_date: string;
+  category: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CashFlow {
   id: string;
   user_id: string;
@@ -897,6 +910,147 @@ export function useDeleteExpense() {
     },
     onError: (error: Error) => {
       toast.error(`Failed to delete expense: ${error.message}`);
+    },
+  });
+}
+
+// ========================================
+// INCOME HOOKS
+// ========================================
+
+export function useIncome(category?: string, dateRange?: { start: string; end: string }) {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ["income", category, dateRange],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      let query = supabase
+        .from("finance_income")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("income_date", { ascending: false });
+
+      if (category) {
+        query = query.eq("category", category);
+      }
+
+      if (dateRange) {
+        query = query
+          .gte("income_date", dateRange.start)
+          .lte("income_date", dateRange.end);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as Income[];
+    },
+  });
+
+  // Real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel("income-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "finance_income",
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["income"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [queryClient]);
+
+  return query;
+}
+
+export function useCreateIncome() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (income: Omit<Income, "id" | "user_id" | "created_at" | "updated_at">) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("finance_income")
+        .insert({
+          ...income,
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Income;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["income"] });
+      toast.success("Income added!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to add income: ${error.message}`);
+    },
+  });
+}
+
+export function useUpdateIncome() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Income> }) => {
+      const { data, error } = await supabase
+        .from("finance_income")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Income;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["income"] });
+      toast.success("Income updated!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update income: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteIncome() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("finance_income")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["income"] });
+      toast.success("Income deleted!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete income: ${error.message}`);
     },
   });
 }
