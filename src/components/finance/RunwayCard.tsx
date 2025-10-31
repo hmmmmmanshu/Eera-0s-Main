@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingDown, AlertTriangle, Loader2, Edit } from "lucide-react";
+import { TrendingDown, AlertTriangle, Loader2, Edit, RefreshCw } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -9,15 +9,93 @@ import { Label } from "@/components/ui/label";
 import { useRunway, useUpdateRunway } from "@/hooks/useFinanceData";
 import { format, addMonths } from "date-fns";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { syncRunway, syncAllFinanceData } from "@/lib/syncFinanceData";
 
 export function RunwayCard() {
-  const { data: runway, isLoading } = useRunway();
+  const { data: runway, isLoading, refetch } = useRunway();
   const updateRunwayMutation = useUpdateRunway();
+  const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [formData, setFormData] = useState({
     cash_balance: runway?.cash_balance?.toString() || "",
     monthly_burn_rate: runway?.monthly_burn_rate?.toString() || "",
   });
+
+  // Auto-sync runway on mount and when data changes
+  useEffect(() => {
+    const autoSync = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        await syncRunway(user.id);
+        await queryClient.invalidateQueries({ queryKey: ["runway"] });
+        await refetch();
+      } catch (error: any) {
+        console.error("Error auto-syncing runway:", error);
+      }
+    };
+
+    // Sync on mount
+    autoSync();
+
+    // Listen for changes to invoices, expenses, income, and payroll
+    const channels = [
+      supabase
+        .channel("runway-sync-invoices")
+        .on("postgres_changes", { event: "*", schema: "public", table: "finance_invoices" }, () => {
+          autoSync();
+        })
+        .subscribe(),
+      supabase
+        .channel("runway-sync-expenses")
+        .on("postgres_changes", { event: "*", schema: "public", table: "finance_expenses" }, () => {
+          autoSync();
+        })
+        .subscribe(),
+      supabase
+        .channel("runway-sync-income")
+        .on("postgres_changes", { event: "*", schema: "public", table: "finance_income" }, () => {
+          autoSync();
+        })
+        .subscribe(),
+      supabase
+        .channel("runway-sync-payroll")
+        .on("postgres_changes", { event: "*", schema: "public", table: "hr_payroll" }, () => {
+          autoSync();
+        })
+        .subscribe(),
+    ];
+
+    return () => {
+      channels.forEach((channel) => channel.unsubscribe());
+    };
+  }, [queryClient, refetch]);
+
+  const handleAutoSync = async () => {
+    try {
+      setSyncing(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      await syncRunway(user.id);
+      await queryClient.invalidateQueries({ queryKey: ["runway"] });
+      await refetch();
+      toast.success("Runway synced from balance sheet and payroll!");
+    } catch (error: any) {
+      console.error("Error syncing runway:", error);
+      toast.error(`Failed to sync runway: ${error.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleUpdateRunway = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +142,25 @@ export function RunwayCard() {
           <span className="text-lg">Runway</span>
           <div className="flex items-center gap-2">
             {runway && runwayMonths < 12 && <AlertTriangle className="h-5 w-5 text-yellow-500" />}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleAutoSync}
+              disabled={syncing}
+              className="gap-2"
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Auto-Sync
+                </>
+              )}
+            </Button>
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
               if (!open) {
@@ -134,10 +231,14 @@ export function RunwayCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!runway ? (
+        {!runway || (cashBalance === 0 && burnRate === 0) ? (
           <div className="text-center py-8 text-muted-foreground">
             <p className="text-sm">No runway data available</p>
-            <p className="text-xs mt-2">Click Setup to configure your runway</p>
+            <p className="text-xs mt-2">
+              {cashBalance === 0 && burnRate === 0
+                ? "Click 'Auto-Sync' to calculate from balance sheet and payroll, or Setup to enter manually"
+                : "Click Setup to configure your runway"}
+            </p>
           </div>
         ) : (
           <>
