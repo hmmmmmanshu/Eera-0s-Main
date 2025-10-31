@@ -23,11 +23,13 @@ interface ResumeScore {
 interface AIResumeScreenerProps {
   jobRequirements?: string[];
   onScoreGenerated?: (score: number) => void;
+  preselectedRoleId?: string;
 }
 
 export function AIResumeScreener({ 
   jobRequirements = [],
-  onScoreGenerated 
+  onScoreGenerated,
+  preselectedRoleId
 }: AIResumeScreenerProps) {
   const [resumeText, setResumeText] = useState("");
   const [requirements, setRequirements] = useState(
@@ -39,10 +41,17 @@ export function AIResumeScreener({
   const [candidateName, setCandidateName] = useState("");
   const [candidateEmail, setCandidateEmail] = useState("");
   const [candidatePhone, setCandidatePhone] = useState("");
-  const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+  const [selectedRoleId, setSelectedRoleId] = useState<string>(preselectedRoleId || "");
   
   const { data: roles = [] } = useHRRoles();
   const createCandidate = useCreateCandidate();
+
+  // Update selected role when preselectedRoleId changes
+  useEffect(() => {
+    if (preselectedRoleId) {
+      setSelectedRoleId(preselectedRoleId);
+    }
+  }, [preselectedRoleId]);
 
   const handleScore = async () => {
     if (!resumeText.trim()) {

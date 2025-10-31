@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
+import { AddCandidateDialog } from "./AddCandidateDialog";
 
 export function PositionsList() {
   const { data: roles = [], isLoading } = useHRRoles();
@@ -78,6 +79,7 @@ export function PositionsList() {
 
 function PositionCard({ role, candidateCount }: { role: any; candidateCount: number }) {
   const [showDetails, setShowDetails] = useState(false);
+  const [showAddCandidate, setShowAddCandidate] = useState(false);
 
   return (
     <div className="p-4 rounded-lg border border-accent/20 hover:border-accent/40 transition-all bg-background/50">
@@ -156,16 +158,21 @@ function PositionCard({ role, candidateCount }: { role: any; candidateCount: num
               </ScrollArea>
             </DialogContent>
           </Dialog>
-          <Button size="sm" onClick={() => {
-            // TODO: Navigate to add candidate for this role
-            // For now, just show a message
-            console.log("Add candidate for role:", role.id);
-          }}>
+          <Button size="sm" onClick={() => setShowAddCandidate(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Candidate
           </Button>
         </div>
       </div>
+      
+      <AddCandidateDialog
+        open={showAddCandidate}
+        onOpenChange={setShowAddCandidate}
+        preselectedRoleId={role.id}
+        onCandidateAdded={() => {
+          // Invalidate queries will automatically refresh the candidate count
+        }}
+      />
     </div>
   );
 }

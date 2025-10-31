@@ -8,6 +8,7 @@ import { AIJobDescriptionGenerator } from "./AIJobDescriptionGenerator";
 import { AIResumeScreener } from "./AIResumeScreener";
 import { AIOfferLetterGenerator } from "./AIOfferLetterGenerator";
 import { PositionsList } from "./PositionsList";
+import { CandidatePipeline } from "./CandidatePipeline";
 import { useHRCandidates } from "@/hooks/useHRData";
 
 export function HiringScreening() {
@@ -48,51 +49,8 @@ export function HiringScreening() {
         </TabsContent>
       </Tabs>
 
-      {/* Candidate Pipeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-accent" />
-            Candidate Pipeline
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading candidates...
-            </div>
-          ) : candidates.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No candidates yet. Add candidates using the tools above.
-            </div>
-          ) : (
-          <div className="space-y-3">
-            {candidates.map((candidate, idx) => (
-              <div key={idx} className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-accent/50 transition-all">
-                <div>
-                  <p className="font-medium">{candidate.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {typeof candidate.role === 'string' ? candidate.role : 'Role not specified'}
-                    </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                      <p className="text-2xl font-bold text-accent">
-                        {candidate.score || 'N/A'}
-                      </p>
-                    <p className="text-xs text-muted-foreground">AI Score</p>
-                  </div>
-                    <Badge variant={candidate.status?.includes("Offer") || candidate.status === "offer" ? "default" : "outline"}>
-                      {candidate.status || 'Applied'}
-                  </Badge>
-                  <Button size="sm" variant="outline">View Profile</Button>
-                </div>
-              </div>
-            ))}
-          </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Candidate Pipeline - Kanban View */}
+      <CandidatePipeline />
 
       {/* AI Screening Status */}
       <div className="grid md:grid-cols-3 gap-4">
