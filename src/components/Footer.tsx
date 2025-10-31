@@ -23,10 +23,10 @@ const Footer = () => {
           {/* Optional links section */}
           <div className="mt-8 pt-8 border-t border-border/50">
             <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">
+              <a href="/privacy" className="hover:text-foreground transition-colors">
                 Privacy Policy
               </a>
-              <a href="#" className="hover:text-foreground transition-colors">
+              <a href="/terms" className="hover:text-foreground transition-colors">
                 Terms of Service
               </a>
               <a href="mailto:hello@eera.app" className="hover:text-foreground transition-colors">

@@ -17,6 +17,8 @@ import SalesHub from "./pages/SalesHub";
 import Onboarding from "./pages/Onboarding";
 import ProfileSettings from "./pages/ProfileSettings";
 import NotFound from "./pages/NotFound";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 
 const App = () => (
     <TooltipProvider>
@@ -107,6 +109,9 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Public legal pages */}
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
