@@ -43,14 +43,19 @@ export function KanbanBoard() {
   const addTask = async () => {
     if (!newTaskTitle.trim() || !user?.id) return;
     try {
+      // Map UI columns to database status values
+      const statusMap: Record<string, string> = {
+        todo: "todo",
+        progress: "in_progress",
+        done: "done",
+      };
       const { data, error } = await supabase
         .from("ops_tasks")
         .insert({
           user_id: user.id,
           title: newTaskTitle.trim(),
-          status: activeColumn,
+          status: statusMap[activeColumn] || "todo",
           priority: "medium",
-          completed: false,
         })
         .select()
         .single();
@@ -67,9 +72,15 @@ export function KanbanBoard() {
   const moveTask = async (taskId: string, newStatus: "todo" | "progress" | "done") => {
     if (!user?.id) return;
     try {
+      // Map UI status to database status
+      const statusMap: Record<string, string> = {
+        todo: "todo",
+        progress: "in_progress",
+        done: "done",
+      };
       const { error } = await supabase
         .from("ops_tasks")
-        .update({ status: newStatus, completed: newStatus === "done" })
+        .update({ status: statusMap[newStatus] || "todo" })
         .eq("id", taskId)
         .eq("user_id", user.id);
       if (error) throw error;
@@ -107,8 +118,15 @@ export function KanbanBoard() {
     { id: "done" as const, title: "Done", status: "done" as const },
   ];
 
-  const getTasksForColumn = (status: string) => {
-    return tasks.filter((t) => t.status === status);
+  const getTasksForColumn = (columnStatus: string) => {
+    // Map column IDs to database status values
+    const statusMap: Record<string, string[]> = {
+      todo: ["todo"],
+      progress: ["in_progress"],
+      done: ["done"],
+    };
+    const dbStatuses = statusMap[columnStatus] || [];
+    return tasks.filter((t) => dbStatuses.includes(t.status));
   };
 
   return (

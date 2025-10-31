@@ -49,7 +49,6 @@ export function TodoList() {
         user_id: user.id,
         title: newTask.trim(),
         status: "todo",
-        completed: false,
         priority: "medium",
       });
       if (error) throw error;
@@ -61,12 +60,13 @@ export function TodoList() {
     }
   };
 
-  const toggleTodo = async (id: string, currentStatus: boolean) => {
+  const toggleTodo = async (id: string, currentStatus: string) => {
     if (!user?.id) return;
     try {
+      const newStatus = currentStatus === "done" ? "todo" : "done";
       const { error } = await supabase
         .from("ops_tasks")
-        .update({ completed: !currentStatus, status: !currentStatus ? "done" : "todo" })
+        .update({ status: newStatus })
         .eq("id", id)
         .eq("user_id", user.id);
       if (error) throw error;
@@ -116,28 +116,31 @@ export function TodoList() {
           ) : todos.length === 0 ? (
             <div className="text-sm text-muted-foreground text-center py-8">No tasks yet</div>
           ) : (
-            todos.map((todo) => (
-              <div
-                key={todo.id}
-                className={`flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-background/50 hover:border-accent/40 transition-all ${
-                  todo.completed ? "opacity-60" : ""
-                }`}
-              >
-                <Checkbox checked={!!todo.completed} onCheckedChange={() => toggleTodo(todo.id, !!todo.completed)} />
-                <div className="flex-1">
-                  <p className={`text-sm ${todo.completed ? "line-through" : ""}`}>{todo.title}</p>
-                  {todo.due_date && (
-                    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      <span>{new Date(todo.due_date).toLocaleDateString()}</span>
-                    </div>
-                  )}
+            todos.map((todo) => {
+              const isCompleted = todo.status === "done";
+              return (
+                <div
+                  key={todo.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-background/50 hover:border-accent/40 transition-all ${
+                    isCompleted ? "opacity-60" : ""
+                  }`}
+                >
+                  <Checkbox checked={isCompleted} onCheckedChange={() => toggleTodo(todo.id, todo.status)} />
+                  <div className="flex-1">
+                    <p className={`text-sm ${isCompleted ? "line-through" : ""}`}>{todo.title}</p>
+                    {todo.due_date && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        <span>{new Date(todo.due_date).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteTodo(todo.id)}>
+                    <X className="h-3 w-3" />
+                  </Button>
                 </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteTodo(todo.id)}>
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </CardContent>
