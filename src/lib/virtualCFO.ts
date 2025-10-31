@@ -234,7 +234,7 @@ export async function checkOverdueTasks(userId: string): Promise<{
  */
 export async function syncEmployeeCount(userId: string): Promise<number> {
   try {
-    // Count active employees
+    // Count active employees from hr_employees table
     const { data: employees, error: employeeError } = await supabase
       .from("hr_employees")
       .select("id")
@@ -243,7 +243,21 @@ export async function syncEmployeeCount(userId: string): Promise<number> {
 
     if (employeeError) throw employeeError;
 
-    const employeeCount = employees?.length || 0;
+    let employeeCount = employees?.length || 0;
+
+    // If no employees in hr_employees, check for hired candidates
+    // (HR Hub might mark candidates as "hired" without creating employees yet)
+    if (employeeCount === 0) {
+      const { data: hiredCandidates, error: candidateError } = await supabase
+        .from("hr_candidates")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("status", "hired");
+
+      if (candidateError) throw candidateError;
+      
+      employeeCount = hiredCandidates?.length || 0;
+    }
 
     // Check if company_info exists
     const { data: companyInfo } = await supabase
