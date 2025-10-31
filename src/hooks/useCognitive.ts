@@ -122,10 +122,10 @@ export function useCognitiveActions(userId?: string | null) {
     const t0 = Date.now();
     let classification = "";
     try {
-      classification = await generateText({ model: TEXT_MODEL_PRIMARY, system: classifyPrompt, prompt: trimText(message, 4000), json: true as any, maxTokens: JSON_TOKENS });
+      classification = (await generateText({ model: TEXT_MODEL_PRIMARY, system: classifyPrompt, prompt: trimText(message, 4000), json: true as any, maxTokens: JSON_TOKENS })).content;
       await logLLM(userId, "chat.classify", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
     } catch {
-      classification = await generateText({ model: TEXT_MODEL_FALLBACK, system: classifyPrompt, prompt: trimText(message, 4000), json: true as any, maxTokens: JSON_TOKENS });
+      classification = (await generateText({ model: TEXT_MODEL_FALLBACK, system: classifyPrompt, prompt: trimText(message, 4000), json: true as any, maxTokens: JSON_TOKENS })).content;
       await logLLM(userId, "chat.classify", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t0 });
     }
     let cls: any = {};
@@ -155,10 +155,10 @@ export function useCognitiveActions(userId?: string | null) {
     const system = `You are Acharya, an operator-mentor. Be concise. Use user's tone if given. If a plan exists, reflect and propose next logical step.`;
     const contextPrompt = await buildContextBudgeted(sessionId, cls?.hub, pinnedPlan);
     const t1 = Date.now();
-    let reply = await generateText({ model: TEXT_MODEL_PRIMARY, system, prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 7000), maxTokens: OUTPUT_TOKENS });
+    let reply = (await generateText({ model: TEXT_MODEL_PRIMARY, system, prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 7000), maxTokens: OUTPUT_TOKENS })).content;
     await logLLM(userId, "chat.reply", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t1 });
     if (!reply) {
-      reply = await generateText({ model: TEXT_MODEL_FALLBACK, system, prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 7000), maxTokens: OUTPUT_TOKENS });
+      reply = (await generateText({ model: TEXT_MODEL_FALLBACK, system, prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 7000), maxTokens: OUTPUT_TOKENS })).content;
       await logLLM(userId, "chat.reply", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
     }
 
@@ -195,23 +195,23 @@ export function useCognitiveActions(userId?: string | null) {
     let ai_summary: string | null = null;
     try {
       const t0 = Date.now();
-      const summary = await generateText({
+      const summary = (await generateText({
         model: TEXT_MODEL_PRIMARY,
         system: sys,
         prompt: trimText(payload.content, 2000),
         maxTokens: 300,
-      });
+      })).content;
       await logLLM(userId, "reflection.summary", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
       ai_summary = summary;
     } catch (e: any) {
       try {
         const t1 = Date.now();
-        const summary2 = await generateText({
+        const summary2 = (await generateText({
           model: TEXT_MODEL_FALLBACK,
           system: sys,
           prompt: trimText(payload.content, 2000),
           maxTokens: 300,
-        });
+        })).content;
         await logLLM(userId, "reflection.summary", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
         ai_summary = summary2;
       } catch (e2: any) {
@@ -225,7 +225,7 @@ export function useCognitiveActions(userId?: string | null) {
     // Lightweight classification for journaling
     try {
       const classifyPrompt = `Classify reflection. Output JSON {intent: journal|insight|plan|issue, hub: marketing|sales|finance|ops|hr|legal|cognitive, subcategories: string[], sentiment: string, tags: string[]}`;
-      let res = await generateText({ model: TEXT_MODEL_PRIMARY, system: classifyPrompt, prompt: trimText(payload.content, 3500), json: true as any, maxTokens: 300 });
+      let res = (await generateText({ model: TEXT_MODEL_PRIMARY, system: classifyPrompt, prompt: trimText(payload.content, 3500), json: true as any, maxTokens: 300 })).content;
       try { const cls = JSON.parse(res);
         await supabase.from("journal_classifications").insert({ user_id: userId, reflection_id: inserted.id, intent: cls?.intent || 'journal', hub: cls?.hub || null, subcategories: Array.isArray(cls?.subcategories)? cls.subcategories:[], sentiment: cls?.sentiment || null, tags: Array.isArray(cls?.tags)? cls.tags: [] });
       } catch {}
@@ -247,24 +247,24 @@ export function useCognitiveActions(userId?: string | null) {
       let jsonText: string | null = null;
       try {
         const t0 = Date.now();
-        jsonText = await generateText({
+        jsonText = (await generateText({
           model: TEXT_MODEL_PRIMARY,
           system: "You output strict JSON with fields: moodAverage, topMoods, themes, insights[3], actions[3].",
           prompt: trimText(prompt, 6000),
           json: true,
           maxTokens: 500,
-        });
+        })).content;
         await logLLM(userId, "weekly.snapshot", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
       } catch {
         try {
           const t1 = Date.now();
-          jsonText = await generateText({
+          jsonText = (await generateText({
             model: TEXT_MODEL_FALLBACK,
             system: "You output strict JSON with fields: moodAverage, topMoods, themes, insights[3], actions[3].",
             prompt: trimText(prompt, 6000),
             json: true,
             maxTokens: 500,
-          });
+          })).content;
           await logLLM(userId, "weekly.snapshot", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
         } catch {}
       }
@@ -294,22 +294,22 @@ export function useCognitiveActions(userId?: string | null) {
     let reply: string | null = null;
     try {
       const t0 = Date.now();
-      reply = await generateText({
+      reply = (await generateText({
         model: TEXT_MODEL_PRIMARY,
         system,
         prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 6000),
         maxTokens: 420,
-      });
+      })).content;
       await logLLM(userId, "chat.reply", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
     } catch {
       try {
         const t1 = Date.now();
-        reply = await generateText({
+        reply = (await generateText({
           model: TEXT_MODEL_FALLBACK,
           system,
           prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 6000),
           maxTokens: 420,
-        });
+        })).content;
         await logLLM(userId, "chat.reply", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
       } catch {}
     }
@@ -337,14 +337,14 @@ export function useCognitiveActions(userId?: string | null) {
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
     try {
       const t0 = Date.now();
-      const json = await generateText({ model: TEXT_MODEL_PRIMARY, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 });
+      const json = (await generateText({ model: TEXT_MODEL_PRIMARY, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
       await logLLM(userId, "ideas.generate", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
       return JSON.parse(json);
     } catch (e: any) {
       const msg = e?.message || "";
       if (msg.includes("429") || msg.includes("rate") || msg.includes("402")) {
         const t1 = Date.now();
-        const json2 = await generateText({ model: TEXT_MODEL_FALLBACK, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 });
+        const json2 = (await generateText({ model: TEXT_MODEL_FALLBACK, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
         await logLLM(userId, "ideas.generate", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
         try { return JSON.parse(json2); } catch { return []; }
       }
@@ -429,11 +429,11 @@ export function useCognitiveActions(userId?: string | null) {
     let res: any;
     try {
       const t0 = Date.now();
-      res = await generateText({ model: TEXT_MODEL_PRIMARY, system: "Summarize reflections into themes and 3 actions. Output JSON.", prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 });
+      res = (await generateText({ model: TEXT_MODEL_PRIMARY, system: "Summarize reflections into themes and 3 actions. Output JSON.", prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
       await logLLM(userId, "range.summary", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
     } catch {
       const t1 = Date.now();
-      res = await generateText({ model: TEXT_MODEL_FALLBACK, system: "Summarize reflections into themes and 3 actions. Output JSON.", prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 });
+      res = (await generateText({ model: TEXT_MODEL_FALLBACK, system: "Summarize reflections into themes and 3 actions. Output JSON.", prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
       await logLLM(userId, "range.summary", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
     }
     try { return JSON.parse(res); } catch { return { raw: res }; }
