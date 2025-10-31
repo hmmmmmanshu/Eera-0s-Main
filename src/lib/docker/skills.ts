@@ -68,10 +68,12 @@ export async function runSkillUnified<T = any>(
   if (!skill) return { status: "error", code: "unknown_skill", message: String(skillId) };
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
   if (!supabaseUrl || !supabaseKey) {
-    return { status: "error", code: "config_missing", message: "Supabase configuration missing" };
+    // Gracefully degrade - don't throw error, just return failure
+    console.warn("[skills] Supabase config missing - Edge Functions unavailable");
+    return { status: "error", code: "config_missing", message: "Edge Functions not available in basic mode" };
   }
 
   const url = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/${skill.edgeFunction}`;
@@ -105,7 +107,7 @@ export async function runSkillUnified<T = any>(
 // Skills status helper used by UI to display availability
 export async function getSkillsStatus(): Promise<SkillStatus> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 
   if (!supabaseUrl || !supabaseKey) {
     return { edgeFunctionsAvailable: false, skills: [] };

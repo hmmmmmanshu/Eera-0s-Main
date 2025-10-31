@@ -68,7 +68,7 @@ export function CognitiveChat({ mode, onModeChange }: CognitiveChatProps) {
             </Badge>
             <Badge variant={orStatus === "ok" ? "default" : "outline"} className="text-xs">
               OpenRouter: {orStatus === "checking" ? "…" : orStatus === "ok" ? "OK" : orStatus === "nocredits" ? "No credits" : "Unavailable"}
-            </Badge>
+          </Badge>
           </div>
         </div>
         

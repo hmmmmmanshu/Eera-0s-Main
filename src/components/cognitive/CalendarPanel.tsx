@@ -50,14 +50,14 @@ export function CalendarPanel() {
               const start = new Date(s.start);
               const label = start.toLocaleString([], { hour: '2-digit', minute: '2-digit', weekday: 'short', month: 'short', day: 'numeric' });
               return (
-                <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                  <div className="flex flex-col items-center">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+            <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+              <div className="flex flex-col items-center">
+                <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground mt-1">{label}</span>
-                  </div>
-                  <div className="flex-1">
+              </div>
+              <div className="flex-1">
                     <p className="text-sm font-medium">Deep Work / Important Task</p>
-                    <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1">
                       <Badge variant="outline" className="text-xs">1h</Badge>
                     </div>
                   </div>

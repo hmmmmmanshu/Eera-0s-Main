@@ -40,7 +40,7 @@ export function OptimizationInsights() {
           ) : insights.map((text, idx) => (
             <div key={idx} className={`p-4 rounded-lg border text-muted-foreground border-accent/20 bg-accent/5 transition-all`}>
               <div className="flex items-start gap-3">
-                <Target className="h-5 w-5 shrink-0 mt-0.5" />
+                  <Target className="h-5 w-5 shrink-0 mt-0.5" />
                 <p className="text-sm">{text}</p>
               </div>
             </div>

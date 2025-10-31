@@ -2,74 +2,143 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar } from "lucide-react";
-import { useState } from "react";
+import { Plus, Calendar, X } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useOpsSkills } from "@/hooks/useOpsSkills";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export function TodoList() {
-  const todos = [
-    { id: 1, text: "Send investor update email", completed: false, dueDate: "Today" },
-    { id: 2, text: "Review legal contracts", completed: false, dueDate: "Tomorrow" },
-    { id: 3, text: "Update team wiki", completed: true, dueDate: "Yesterday" },
-    { id: 4, text: "Schedule marketing campaign review", completed: false, dueDate: "This Week" },
-    { id: 5, text: "Approve expense reports", completed: true, dueDate: "Yesterday" },
-  ];
-
   const { user } = useAuth();
-  const { quickAddTaskFromNote } = useOpsSkills(user?.id);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [todos, setTodos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [newTask, setNewTask] = useState("");
+
+  useEffect(() => {
+    if (user?.id) {
+      loadTodos();
+    }
+  }, [user?.id]);
+
+  const loadTodos = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("ops_tasks")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setTodos(data || []);
+    } catch (e: any) {
+      toast.error("Failed to load todos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addTodo = async () => {
+    if (!newTask.trim() || !user?.id) {
+      toast.error("Enter a task");
+      return;
+    }
+    try {
+      const { error } = await supabase.from("ops_tasks").insert({
+        user_id: user.id,
+        title: newTask.trim(),
+        status: "todo",
+        completed: false,
+        priority: "medium",
+      });
+      if (error) throw error;
+      toast.success("Task added");
+      setNewTask("");
+      loadTodos();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to add task");
+    }
+  };
+
+  const toggleTodo = async (id: string, currentStatus: boolean) => {
+    if (!user?.id) return;
+    try {
+      const { error } = await supabase
+        .from("ops_tasks")
+        .update({ completed: !currentStatus, status: !currentStatus ? "done" : "todo" })
+        .eq("id", id)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      loadTodos();
+    } catch (e: any) {
+      toast.error("Failed to update task");
+    }
+  };
+
+  const deleteTodo = async (id: string) => {
+    if (!user?.id) return;
+    try {
+      const { error } = await supabase.from("ops_tasks").delete().eq("id", id).eq("user_id", user.id);
+      if (error) throw error;
+      toast.success("Task deleted");
+      loadTodos();
+    } catch (e: any) {
+      toast.error("Failed to delete task");
+    }
+  };
 
   return (
     <Card className="border-accent/20">
       <CardHeader>
-        <CardTitle className="text-lg">Quick To-Do List</CardTitle>
+        <CardTitle className="text-lg">To-Do List</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2">
-          <Input 
-            placeholder="Add a task... (natural language supported)" 
+          <Input
+            placeholder="Add a task..."
             className="flex-1"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
+            value={newTask}
+            onChange={(e) => setNewTask(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addTodo();
+            }}
+            disabled={!user}
           />
-          <Button size="icon" disabled={busy} onClick={async () => {
-            if (!note.trim()) { toast.error("Write a note first"); return; }
-            try {
-              setBusy(true);
-              const id = await quickAddTaskFromNote(note.trim());
-              toast.success("Task created");
-              setNote("");
-            } catch (e: any) {
-              toast.error(e?.message || "Failed to create task");
-            } finally { setBusy(false); }
-          }}>
+          <Button size="icon" onClick={addTodo} disabled={!user || !newTask.trim()}>
             <Plus className="h-4 w-4" />
           </Button>
         </div>
 
         <div className="space-y-3 max-h-96 overflow-y-auto">
-          {todos.map((todo) => (
-            <div
-              key={todo.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-background/50 hover:border-accent/40 transition-all ${
-                todo.completed ? "opacity-60" : ""
-              }`}
-            >
-              <Checkbox checked={todo.completed} />
-              <div className="flex-1">
-                <p className={`text-sm ${todo.completed ? "line-through" : ""}`}>
-                  {todo.text}
-                </p>
-                <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  <span>{todo.dueDate}</span>
+          {loading ? (
+            <div className="text-sm text-muted-foreground text-center py-8">Loading...</div>
+          ) : todos.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-8">No tasks yet</div>
+          ) : (
+            todos.map((todo) => (
+              <div
+                key={todo.id}
+                className={`flex items-center gap-3 p-3 rounded-lg border border-accent/20 bg-background/50 hover:border-accent/40 transition-all ${
+                  todo.completed ? "opacity-60" : ""
+                }`}
+              >
+                <Checkbox checked={!!todo.completed} onCheckedChange={() => toggleTodo(todo.id, !!todo.completed)} />
+                <div className="flex-1">
+                  <p className={`text-sm ${todo.completed ? "line-through" : ""}`}>{todo.title}</p>
+                  {todo.due_date && (
+                    <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      <span>{new Date(todo.due_date).toLocaleDateString()}</span>
+                    </div>
+                  )}
                 </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteTodo(todo.id)}>
+                  <X className="h-3 w-3" />
+                </Button>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </CardContent>
     </Card>
