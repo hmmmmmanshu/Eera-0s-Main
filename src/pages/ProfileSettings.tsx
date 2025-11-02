@@ -14,7 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowLeft, CheckCircle2, Building2, DollarSign } from "lucide-react";
 import DashboardTopBar from "@/components/dashboard/DashboardTopBar";
-import { CompanySetup } from "@/components/finance/CompanySetup";
+import { lazy, Suspense } from "react";
+// Lazy load CompanySetup to prevent circular dependency during module initialization
+const CompanySetup = lazy(() => import("@/components/finance/CompanySetup").then(m => ({ default: m.CompanySetup })));
 
 const ProfileSettings = () => {
   const navigate = useNavigate();
@@ -721,7 +723,9 @@ const ProfileSettings = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <CompanySetup />
+                    <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                      <CompanySetup />
+                    </Suspense>
                   </CardContent>
                 </Card>
               </TabsContent>
