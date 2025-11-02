@@ -17,7 +17,7 @@ import { useCashFlow } from "@/hooks/useFinanceData";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { syncCashFlow } from "@/lib/virtualCFO";
+import { syncCashFlow } from "@/lib/syncFinanceData";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";

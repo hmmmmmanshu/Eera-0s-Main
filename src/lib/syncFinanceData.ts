@@ -11,7 +11,6 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { syncCashFlow } from "./virtualCFO";
 
 /**
  * Calculate total monthly burn rate from expenses and payroll
@@ -200,6 +199,169 @@ export async function syncRunway(userId: string, preserveManualValues: boolean =
     }
   } catch (error) {
     console.error("Error syncing runway:", error);
+    throw error;
+  }
+}
+
+/**
+ * Sync cash flow data from invoices, expenses, and income
+ * Updates finance_cash_flow table with aggregated monthly data
+ * Moved here from virtualCFO.ts to break circular dependency
+ */
+export async function syncCashFlow(userId: string, months: number = 6): Promise<void> {
+  try {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
+
+    // Fetch all invoices (paid ones contribute to inflow)
+    const { data: invoices, error: invoiceError } = await supabase
+      .from("finance_invoices")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "paid");
+
+    if (invoiceError) throw invoiceError;
+
+    // Fetch signed sales quotes (also contribute to inflow)
+    const { data: salesQuotes, error: salesError } = await supabase
+      .from("sales_quotes")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "signed");
+
+    if (salesError && salesError.code !== "PGRST116") throw salesError;
+
+    // Fetch all expenses (contribute to outflow)
+    const { data: expenses, error: expenseError } = await supabase
+      .from("finance_expenses")
+      .select("*")
+      .eq("user_id", userId);
+
+    if (expenseError) throw expenseError;
+
+    // Fetch payroll data (contributes to outflow)
+    const { data: payroll, error: payrollError } = await supabase
+      .from("hr_payroll")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "paid");
+
+    if (payrollError && payrollError.code !== "PGRST116") throw payrollError;
+
+    // Fetch all manual income (contributes to inflow)
+    const { data: income, error: incomeError } = await supabase
+      .from("finance_income")
+      .select("*")
+      .eq("user_id", userId);
+
+    if (incomeError) throw incomeError;
+
+    // Group by month (YYYY-MM format)
+    const cashFlowByMonth: Record<string, { inflow: number; outflow: number }> = {};
+
+    // Process invoices (paid ones)
+    invoices?.forEach((inv) => {
+      const paidDate = inv.paid_date ? new Date(inv.paid_date) : new Date(inv.created_at);
+      if (paidDate >= startDate && paidDate <= endDate) {
+        const monthKey = `${paidDate.getFullYear()}-${String(paidDate.getMonth() + 1).padStart(2, "0")}`;
+        if (!cashFlowByMonth[monthKey]) {
+          cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
+        }
+        cashFlowByMonth[monthKey].inflow += Number(inv.amount) || 0;
+      }
+    });
+
+    // Process signed sales quotes
+    salesQuotes?.forEach((quote) => {
+      const signedDate = quote.signed_at ? new Date(quote.signed_at) : new Date(quote.created_at);
+      if (signedDate >= startDate && signedDate <= endDate) {
+        const monthKey = `${signedDate.getFullYear()}-${String(signedDate.getMonth() + 1).padStart(2, "0")}`;
+        if (!cashFlowByMonth[monthKey]) {
+          cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
+        }
+        cashFlowByMonth[monthKey].inflow += Number(quote.value) || 0;
+      }
+    });
+
+    // Process manual income
+    income?.forEach((inc) => {
+      const incomeDate = new Date(inc.income_date);
+      if (incomeDate >= startDate && incomeDate <= endDate) {
+        const monthKey = `${incomeDate.getFullYear()}-${String(incomeDate.getMonth() + 1).padStart(2, "0")}`;
+        if (!cashFlowByMonth[monthKey]) {
+          cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
+        }
+        cashFlowByMonth[monthKey].inflow += Number(inc.amount) || 0;
+      }
+    });
+
+    // Process expenses
+    expenses?.forEach((exp) => {
+      const expenseDate = new Date(exp.expense_date);
+      if (expenseDate >= startDate && expenseDate <= endDate) {
+        const monthKey = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, "0")}`;
+        if (!cashFlowByMonth[monthKey]) {
+          cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
+        }
+        cashFlowByMonth[monthKey].outflow += Number(exp.amount) || 0;
+      }
+    });
+
+    // Process payroll (paid payroll contributes to outflow)
+    payroll?.forEach((pay) => {
+      const payDate = pay.payment_date ? new Date(pay.payment_date) : new Date(pay.created_at);
+      if (payDate >= startDate && payDate <= endDate) {
+        const monthKey = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
+        if (!cashFlowByMonth[monthKey]) {
+          cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
+        }
+        cashFlowByMonth[monthKey].outflow += Number(pay.net_pay || pay.gross_pay || 0);
+      }
+    });
+
+    // Upsert cash flow records
+    for (const [monthKey, values] of Object.entries(cashFlowByMonth)) {
+      const monthDate = `${monthKey}-01`;
+
+      // Check if record exists
+      const { data: existing } = await supabase
+        .from("finance_cash_flow")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("month", monthDate)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from("finance_cash_flow")
+          .update({
+            inflow: values.inflow,
+            outflow: values.outflow,
+            net_cash_flow: values.inflow - values.outflow,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Insert new record
+        const { error: insertError } = await supabase
+          .from("finance_cash_flow")
+          .insert({
+            user_id: userId,
+            month: monthDate,
+            inflow: values.inflow,
+            outflow: values.outflow,
+            net_cash_flow: values.inflow - values.outflow,
+          });
+
+        if (insertError) throw insertError;
+      }
+    }
+  } catch (error) {
+    console.error("Error syncing cash flow:", error);
     throw error;
   }
 }
