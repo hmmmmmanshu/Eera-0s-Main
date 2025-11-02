@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { DynamicAppSidebar } from "@/components/DynamicAppSidebar";
 import { AppTopBar } from "@/components/AppTopBar";
 import { RunwayCard } from "@/components/finance/RunwayCard";
@@ -14,8 +14,9 @@ import { RoleToggle } from "@/components/finance/RoleToggle";
 import { AICFOInsightBox } from "@/components/finance/AICFOInsightBox";
 import { InvoiceGenerator } from "@/components/finance/InvoiceGenerator";
 import { PayrollDashboard } from "@/components/finance/PayrollDashboard";
-import { ComplianceManager } from "@/components/finance/ComplianceManager";
-import { PitchDeckAnalyzer } from "@/components/finance/PitchDeckAnalyzer";
+// Lazy load components that import from virtualCFO to prevent circular dependency issues
+const ComplianceManager = lazy(() => import("@/components/finance/ComplianceManager").then(m => ({ default: m.ComplianceManager })));
+const PitchDeckAnalyzer = lazy(() => import("@/components/finance/PitchDeckAnalyzer").then(m => ({ default: m.PitchDeckAnalyzer })));
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -219,12 +220,16 @@ const FinanceHub = () => {
 
                   {/* Compliance Tab */}
                   <TabsContent value="compliance" className="mt-6">
-                    <ComplianceManager />
+                    <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
+                      <ComplianceManager />
+                    </Suspense>
                   </TabsContent>
 
                   {/* Pitch Analysis Tab */}
                   <TabsContent value="pitch-analysis" className="mt-6">
-                    <PitchDeckAnalyzer />
+                    <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
+                      <PitchDeckAnalyzer />
+                    </Suspense>
                   </TabsContent>
             </Tabs>
           </div>
