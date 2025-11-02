@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Building2, Users, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { syncEmployeeCount, regenerateTasksAfterEmployeeSync } from "@/lib/virtualCFO";
+import { supabase } from "@/integrations/supabase/client";
 
 export function CompanySetup() {
   const { data: companyInfo, isLoading } = useCompanyInfo();
@@ -72,7 +73,7 @@ export function CompanySetup() {
       setSyncing(true);
       const {
         data: { user },
-      } = await import("@/integrations/supabase/client").then((m) => m.supabase.auth.getUser());
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const count = await syncEmployeeCount(user.id);
@@ -96,7 +97,7 @@ export function CompanySetup() {
 
     const {
       data: { user },
-    } = await import("@/integrations/supabase/client").then((m) => m.supabase.auth.getUser());
+    } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Not authenticated");
       return;
@@ -110,24 +111,21 @@ export function CompanySetup() {
       {
         onSuccess: async () => {
           // Mark finance onboarding as completed
-          await import("@/integrations/supabase/client").then((m) =>
-            m.supabase
-              .from("profiles")
-              .update({ finance_onboarding_completed: true })
-              .eq("id", user.id)
-          );
+          await supabase
+            .from("profiles")
+            .update({ finance_onboarding_completed: true })
+            .eq("id", user.id);
 
           // Generate compliance tasks
           const { generateComplianceTasks } = await import("@/lib/virtualCFO");
-          const companyInfo = await import("@/integrations/supabase/client").then((m) =>
-            m.supabase
-              .from("company_info")
-              .select("*")
-              .eq("user_id", user.id)
-              .maybeSingle()
-          );
-          if (companyInfo.data) {
-            await generateComplianceTasks(user.id, companyInfo.data as any);
+          const { data: companyInfoData } = await supabase
+            .from("company_info")
+            .select("*")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          
+          if (companyInfoData) {
+            await generateComplianceTasks(user.id, companyInfoData as any);
           }
         },
       }
