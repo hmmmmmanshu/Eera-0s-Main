@@ -224,7 +224,7 @@ export function CashFlowChart() {
           {/* Main Chart */}
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <ComposedChart data={data} margin={{ top: 20, right: 20, left: 50, bottom: 30 }}>
                 <defs>
                   <linearGradient id="colorInflow" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.3} />
@@ -242,12 +242,15 @@ export function CashFlowChart() {
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
+                  tickMargin={8}
                 />
                 <YAxis
                   stroke="hsl(var(--muted-foreground))"
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
+                  width={50}
+                  tickMargin={8}
                   tickFormatter={(value) => `₹${value}K`}
                 />
                 <Tooltip content={<CustomTooltip />} />
