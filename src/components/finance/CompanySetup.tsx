@@ -15,7 +15,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Building2, Users, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { syncEmployeeCount, regenerateTasksAfterEmployeeSync } from "@/lib/virtualCFO";
-import { useQueryClient } from "@tanstack/react-query";
 
 export function CompanySetup() {
   const { data: companyInfo, isLoading } = useCompanyInfo();
