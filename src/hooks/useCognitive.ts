@@ -38,15 +38,14 @@ export function useCognitiveActions(userId?: string | null) {
 
 TEXT: ${text}`;
       
-      const result = await generateText({
-        model: TEXT_MODEL_PRIMARY,
-        system: "You are a sentiment analyzer. Output strict JSON only. Use this format: {\"score\": number, \"emotions\": [\"string\", \"string\"]}",
-        prompt: trimText(prompt, 3000),
-        json: true,
+      const jsonResponse = await generateChatResponse({
+        systemPrompt: "You are a sentiment analyzer. Output strict JSON only. Use this format: {\"score\": number, \"emotions\": [\"string\", \"string\"]}",
+        messages: [{ role: "user", content: trimText(prompt, 3000) }],
+        jsonMode: true,
         maxTokens: 150,
       });
       
-      const parsed = typeof result.content === "string" ? JSON.parse(result.content) : result.content;
+      const parsed = JSON.parse(jsonResponse);
       return {
         score: typeof parsed.score === "number" ? Math.max(1, Math.min(10, parsed.score)) : 5,
         emotions: Array.isArray(parsed.emotions) ? parsed.emotions.slice(0, 3) : ["neutral"],
@@ -65,15 +64,14 @@ TEXT: ${text}`;
 
 TEXT: ${text}`;
       
-      const result = await generateText({
-        model: TEXT_MODEL_PRIMARY,
-        system: "You are a topic extractor. Output strict JSON only. Use this format: {\"keywords\": [\"string\", \"string\"]}",
-        prompt: trimText(prompt, 3000),
-        json: true,
+      const jsonResponse = await generateChatResponse({
+        systemPrompt: "You are a topic extractor. Output strict JSON only. Use this format: {\"keywords\": [\"string\", \"string\"]}",
+        messages: [{ role: "user", content: trimText(prompt, 3000) }],
+        jsonMode: true,
         maxTokens: 150,
       });
       
-      const parsed = typeof result.content === "string" ? JSON.parse(result.content) : result.content;
+      const parsed = JSON.parse(jsonResponse);
       return {
         keywords: Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 5) : [],
       };
@@ -162,56 +160,154 @@ TEXT: ${text}`;
   const sendChatWithPlanExtract = useCallback(async (message: string) => {
     if (!userId) throw new Error("No user");
     const sessionId = await createOrGetSession();
-    // Save user message
-    await supabase.from("chat_messages").insert({ session_id: sessionId, user_id: userId, role: "user", content: message });
-
-    // Classify hub + subcategories and plan extraction
-    const classifyPrompt = `Classify the user's message. Output strict JSON with fields: {hub: one of marketing|sales|finance|ops|hr|legal|cognitive, subcategories: string[], intent: one of plan|question|journal|issue, plan: {title: string, summary: string, next_step: string} | null}`;
+    
+    // Classify message to determine category and hub
     const t0 = Date.now();
-    let classification = "";
+    let classification: {
+      hub: string | null;
+      category: string;
+      subcategories: string[];
+      intent: string;
+    };
     try {
-      classification = (await generateText({ model: TEXT_MODEL_PRIMARY, system: classifyPrompt, prompt: trimText(message, 4000), json: true as any, maxTokens: JSON_TOKENS })).content;
-      await logLLM(userId, "chat.classify", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
-    } catch {
-      classification = (await generateText({ model: TEXT_MODEL_FALLBACK, system: classifyPrompt, prompt: trimText(message, 4000), json: true as any, maxTokens: JSON_TOKENS })).content;
-      await logLLM(userId, "chat.classify", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t0 });
-    }
-    let cls: any = {};
-    try { cls = JSON.parse(classification); } catch {}
-
-    // Upsert plan if present
-    let pinnedPlan: string | null = null;
-    if (cls?.plan?.title && cls?.hub) {
-      const { data: plan } = await supabase
-        .from("hub_plans")
-        .insert({
-          user_id: userId,
-          hub: cls.hub,
-          subcategories: Array.isArray(cls.subcategories) ? cls.subcategories : [],
-          title: cls.plan.title,
-          summary: cls.plan.summary || null,
-          next_step: cls.plan.next_step || null,
-          last_discussed_at: new Date().toISOString(),
-          source_session_id: sessionId,
-        })
-        .select("id")
-        .single();
-      pinnedPlan = plan?.id || null;
+      classification = await classifyChatMessage(message);
+      await logLLM(userId, "chat.classify", "gemini", "success", { durationMs: Date.now() - t0 });
+    } catch (error) {
+      console.error("Classification error:", error);
+      classification = { hub: null, category: "general", subcategories: [], intent: "question" };
+      await logLLM(userId, "chat.classify", "gemini", "failure", { error: (error as Error)?.message });
     }
 
-    // Compose assistant reply with context
-    const system = `You are Acharya, an operator-mentor. Be concise. Use user's tone if given. If a plan exists, reflect and propose next logical step.`;
-    const contextPrompt = await buildContextBudgeted(sessionId, cls?.hub, pinnedPlan);
+    // Save user message with classification
+    await supabase.from("chat_messages").insert({
+      session_id: sessionId,
+      user_id: userId,
+      role: "user",
+      content: message,
+      hub: classification.hub,
+      category: classification.category,
+      subcategories: classification.subcategories,
+    });
+
+    // Update session with category if not set
+    if (classification.category && classification.category !== "general") {
+      await supabase
+        .from("chat_sessions")
+        .update({ category: classification.category, active_hub: classification.hub })
+        .eq("id", sessionId);
+    }
+
+    // Get recent messages for context (last 10 messages)
+    const { data: recentMessages } = await supabase
+      .from("chat_messages")
+      .select("role, content")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    // Build context for assistant
+    const contextPrompt = await buildContextBudgeted(sessionId, classification.hub || undefined, null);
+    
+    // Build message history for Gemini
+    const chatHistory: ChatMessage[] = [
+      {
+        role: "system",
+        content: `You are Acharya, an operator-mentor. Be concise. Use user's tone if given. Context: ${contextPrompt}`,
+      },
+    ];
+
+    // Add recent conversation history (in chronological order)
+    if (recentMessages && recentMessages.length > 0) {
+      const sortedMessages = [...recentMessages].reverse();
+      for (const msg of sortedMessages.slice(0, 9)) {
+        // Skip the current user message we just added
+        chatHistory.push({
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+        });
+      }
+    }
+
+    // Add current user message
+    chatHistory.push({
+      role: "user",
+      content: message,
+    });
+
+    // Generate reply using Gemini
     const t1 = Date.now();
-    let reply = (await generateText({ model: TEXT_MODEL_PRIMARY, system, prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 7000), maxTokens: OUTPUT_TOKENS })).content;
-    await logLLM(userId, "chat.reply", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t1 });
-    if (!reply) {
-      reply = (await generateText({ model: TEXT_MODEL_FALLBACK, system, prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 7000), maxTokens: OUTPUT_TOKENS })).content;
-      await logLLM(userId, "chat.reply", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
+    let reply: string;
+    try {
+      reply = await generateChatResponse({
+        systemPrompt: `You are Acharya, an operator-mentor helping founders. Be concise, actionable, and empathetic. Context about the user: ${contextPrompt}`,
+        messages: chatHistory,
+        temperature: 0.7,
+        maxTokens: OUTPUT_TOKENS,
+      });
+      await logLLM(userId, "chat.reply", "gemini", "success", { durationMs: Date.now() - t1 });
+    } catch (error) {
+      console.error("Chat generation error:", error);
+      reply = "I'm having trouble processing that right now. Could you try rephrasing?";
+      await logLLM(userId, "chat.reply", "gemini", "failure", { error: (error as Error)?.message });
     }
 
-    await supabase.from("chat_messages").insert({ session_id: sessionId, user_id: userId, role: "assistant", content: reply, hub: cls?.hub || null, subcategories: Array.isArray(cls?.subcategories) ? cls.subcategories : [] });
-    return { reply, sessionId, pinnedPlanId: pinnedPlan, classification: cls };
+    // Save assistant reply with classification
+    await supabase.from("chat_messages").insert({
+      session_id: sessionId,
+      user_id: userId,
+      role: "assistant",
+      content: reply,
+      hub: classification.hub,
+      category: classification.category,
+      subcategories: classification.subcategories,
+    });
+
+    // Check if we should create a plan (if intent is "plan")
+    let pinnedPlan: string | null = null;
+    if (classification.intent === "plan" && classification.hub) {
+      // Try to extract plan details from the conversation
+      try {
+        const planExtractPrompt = `Extract actionable plan details from this conversation. Output JSON: {title: string, summary: string, next_step: string} | null`;
+        const planJson = await generateChatResponse({
+          systemPrompt: planExtractPrompt,
+          messages: chatHistory,
+          jsonMode: true,
+          maxTokens: 200,
+        });
+        const planData = JSON.parse(planJson);
+        
+        if (planData?.title) {
+          const { data: plan } = await supabase
+            .from("hub_plans")
+            .insert({
+              user_id: userId,
+              hub: classification.hub,
+              subcategories: classification.subcategories,
+              title: planData.title,
+              summary: planData.summary || null,
+              next_step: planData.next_step || null,
+              last_discussed_at: new Date().toISOString(),
+              source_session_id: sessionId,
+            })
+            .select("id")
+            .single();
+          pinnedPlan = plan?.id || null;
+          
+          if (pinnedPlan) {
+            await supabase.from("chat_sessions").update({ pinned_plan_id: pinnedPlan }).eq("id", sessionId);
+          }
+        }
+      } catch (error) {
+        console.error("Plan extraction error:", error);
+      }
+    }
+
+    return {
+      reply,
+      sessionId,
+      pinnedPlanId: pinnedPlan,
+      classification,
+    };
   }, [userId, createOrGetSession]);
   const addReflection = useCallback(async (payload: { type: "journal" | "insight" | "goal" | "gratitude"; content: string }) => {
     if (!userId) throw new Error("No user");
@@ -331,7 +427,27 @@ TEXT: ${text}`;
 
   const cognitiveChat = useCallback(async (message: string, persona: Persona = "friend") => {
     if (!userId) throw new Error("No user");
+    
+    // Create or get session for this persona chat
+    const sessionId = await createOrGetSession("cognitive");
+    
+    // Classify the message
+    const classification = await classifyChatMessage(message);
+    
+    // Save user message
+    await supabase.from("chat_messages").insert({
+      session_id: sessionId,
+      user_id: userId,
+      role: "user",
+      content: message,
+      hub: "cognitive",
+      category: classification.category,
+      subcategories: classification.subcategories,
+    });
+    
+    // Also save to sessionStorage for backward compatibility
     saveSessionMessage({ role: "user", content: message, ts: Date.now(), persona });
+    
     const ctx = await assembleCognitiveContext(userId);
     const system = personaSystem(persona, ctx.userProfile.tone);
     const contextPrompt = JSON.stringify({
@@ -339,33 +455,57 @@ TEXT: ${text}`;
       week: ctx.currentWeek,
       snapshot_hint: "Use the latest weekly snapshot if available.",
     });
+    
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
+    
+    // Get recent messages for context
+    const { data: recentMessages } = await supabase
+      .from("chat_messages")
+      .select("role, content")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    
+    // Build chat history
+    const chatHistory: ChatMessage[] = [
+      {
+        role: "system",
+        content: `${system}\n\nContext: ${contextPrompt}`,
+      },
+    ];
+    
+    if (recentMessages && recentMessages.length > 0) {
+      const sortedMessages = [...recentMessages].reverse();
+      for (const msg of sortedMessages.slice(0, 9)) {
+        chatHistory.push({
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+        });
+      }
+    }
+    
+    chatHistory.push({ role: "user", content: message });
+    
     let reply: string | null = null;
     try {
       const t0 = Date.now();
-      reply = (await generateText({
-        model: TEXT_MODEL_PRIMARY,
-        system,
-        prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 6000),
+      reply = await generateChatResponse({
+        systemPrompt: system,
+        messages: chatHistory,
+        temperature: 0.7,
         maxTokens: 420,
-      })).content;
-      await logLLM(userId, "chat.reply", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
-    } catch {
-      try {
-        const t1 = Date.now();
-        reply = (await generateText({
-          model: TEXT_MODEL_FALLBACK,
-          system,
-          prompt: trimText(`CONTEXT=${contextPrompt}\nUSER=${message}`, 6000),
-          maxTokens: 420,
-        })).content;
-        await logLLM(userId, "chat.reply", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
-      } catch {}
+      });
+      await logLLM(userId, "chat.reply", "gemini", "success", { durationMs: Date.now() - t0 });
+    } catch (error) {
+      console.error("Cognitive chat error:", error);
+      await logLLM(userId, "chat.reply", "gemini", "failure", { error: (error as Error)?.message });
     }
+    
     if (!reply) {
       // Local minimal fallback to avoid silent failure
       reply = "I couldn't reach the assistant right now. Based on your recent context, here are next steps: 1) capture a reflection, 2) pick one focus theme this week, 3) schedule a 30-min block.";
     }
+    
     // Simple citation line using tags/date window
     const weekDates = ctx.currentWeek.moods.map(m => m.date);
     const from = weekDates[0] ? new Date(weekDates[0]).toDateString().split(" ").slice(0,3).join(" ") : "recent days";
@@ -373,6 +513,18 @@ TEXT: ${text}`;
     const tag = ctx.currentWeek.topTags?.[0];
     const citation = tag ? `\n\n— Based on entries from ${from}${to?`–${to}`:""} tagged '${tag}'.` : "";
     const finalReply = reply + citation;
+    
+    // Save assistant reply
+    await supabase.from("chat_messages").insert({
+      session_id: sessionId,
+      user_id: userId,
+      role: "assistant",
+      content: finalReply,
+      hub: "cognitive",
+      category: classification.category,
+      subcategories: classification.subcategories,
+    });
+    
     saveSessionMessage({ role: "assistant", content: finalReply, ts: Date.now(), persona });
     return finalReply;
   }, [userId]);
@@ -515,7 +667,14 @@ TEXT: ${text}`;
   }, [userId]);
 
   const preflightLLM = useCallback(async () => {
-    return preflightTextRoute([TEXT_MODEL_PRIMARY, TEXT_MODEL_FALLBACK]);
+    // Check if Gemini API is configured
+    try {
+      const { getGeminiModel } = await import("@/lib/gemini");
+      await getGeminiModel();
+      return { model: "gemini", ok: true };
+    } catch (error) {
+      return { model: null, ok: false, message: (error as Error)?.message || "Gemini not configured" };
+    }
   }, []);
 
   return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, pinPlanToSession };

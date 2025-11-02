@@ -156,3 +156,24 @@ export function useUpdateCandidate() {
   });
 }
 
+// Delete job role
+export function useDeleteRole() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("hr_roles").delete().eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hr-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["hr-candidates"] });
+      toast.success("Position deleted successfully!");
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete position: ${error.message}`);
+    },
+  });
+}
+

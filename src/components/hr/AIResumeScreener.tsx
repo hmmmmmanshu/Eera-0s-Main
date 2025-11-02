@@ -8,10 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Sparkles, CheckCircle2, AlertCircle, UserPlus } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle2, AlertCircle, UserPlus, Upload, FileText } from "lucide-react";
 import { scoreResume } from "@/lib/gemini";
 import { useCreateCandidate, useHRRoles } from "@/hooks/useHRData";
 import { toast } from "sonner";
+import mammoth from "mammoth";
+import { Buffer } from "buffer";
+
+// Make Buffer available globally for pdf-parse
+if (typeof window !== "undefined" && !window.Buffer) {
+  window.Buffer = Buffer;
+}
 
 interface ResumeScore {
   score: number;
@@ -42,9 +49,101 @@ export function AIResumeScreener({
   const [candidateEmail, setCandidateEmail] = useState("");
   const [candidatePhone, setCandidatePhone] = useState("");
   const [selectedRoleId, setSelectedRoleId] = useState<string | undefined>(preselectedRoleId);
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
   
   const { data: roles = [] } = useHRRoles();
   const createCandidate = useCreateCandidate();
+
+  // Extract text from uploaded file
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+      try {
+        const pdfParseModule = await import("pdf-parse");
+        let pdfParse: any;
+        
+        if (pdfParseModule.default && typeof pdfParseModule.default === "function") {
+          pdfParse = pdfParseModule.default;
+        } else if (pdfParseModule.pdfParse && typeof pdfParseModule.pdfParse === "function") {
+          pdfParse = pdfParseModule.pdfParse;
+        } else if (typeof pdfParseModule === "function") {
+          pdfParse = pdfParseModule;
+        } else {
+          const keys = Object.keys(pdfParseModule);
+          const funcKey = keys.find((k) => typeof (pdfParseModule as any)[k] === "function" && k.toLowerCase().includes("parse"));
+          pdfParse = funcKey ? (pdfParseModule as any)[funcKey] : pdfParseModule.default || pdfParseModule;
+        }
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const buffer = Buffer.from(uint8Array);
+        
+        let data;
+        if (typeof pdfParse === "function") {
+          if (pdfParse.prototype && pdfParse.prototype.constructor === pdfParse) {
+            const instance = new pdfParse(buffer);
+            if (typeof instance.parse === "function") {
+              data = await instance.parse();
+            } else if (typeof instance === "object" && instance.text) {
+              data = instance;
+            } else {
+              data = instance;
+            }
+          } else {
+            data = await pdfParse(buffer);
+          }
+        }
+        
+        return data?.text || "";
+      } catch (error: any) {
+        console.error("PDF parsing error:", error);
+        toast.error(`Failed to parse PDF: ${error.message}`);
+        throw error;
+      }
+    } else if (
+      file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      file.name.endsWith(".docx")
+    ) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value || "";
+      } catch (error: any) {
+        console.error("DOCX parsing error:", error);
+        toast.error(`Failed to parse DOCX: ${error.message}`);
+        throw error;
+      }
+    } else if (file.type === "text/plain" || file.name.endsWith(".txt")) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          resolve(event.target?.result as string);
+        };
+        reader.onerror = reject;
+        reader.readAsText(file);
+      });
+    } else {
+      toast.error("Unsupported file type. Please upload PDF, DOCX, or TXT.");
+      throw new Error("Unsupported file type");
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const extractedText = await extractTextFromFile(file);
+      setResumeText(extractedText);
+      setUploadedFileName(file.name);
+      toast.success(`Resume uploaded and extracted (${extractedText.length.toLocaleString()} characters)`);
+    } catch (error) {
+      // Error already handled in extractTextFromFile
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Update selected role when preselectedRoleId changes
   useEffect(() => {
@@ -169,14 +268,54 @@ export function AIResumeScreener({
 
           <div className="space-y-2">
             <Label htmlFor="resume">Resume Content *</Label>
+            <div className="flex items-center gap-2 mb-2">
+              <Input
+                id="file-upload"
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={handleFileUpload}
+                disabled={isScoring || uploading}
+                className="hidden"
+              />
+              <Label htmlFor="file-upload" asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isScoring || uploading}
+                  className="cursor-pointer"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Extracting...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Resume
+                    </>
+                  )}
+                </Button>
+              </Label>
+              {uploadedFileName && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FileText className="h-4 w-4" />
+                  <span className="truncate max-w-[200px]">{uploadedFileName}</span>
+                </div>
+              )}
+            </div>
             <Textarea
               id="resume"
-              placeholder="Paste the candidate's resume content here..."
+              placeholder="Paste the candidate's resume content here, or upload a PDF/DOCX file above..."
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
-              disabled={isScoring}
+              disabled={isScoring || uploading}
               rows={10}
             />
+            <p className="text-xs text-muted-foreground">
+              Supports PDF, DOCX, or TXT files. You can also paste plain text.
+            </p>
           </div>
 
           <Button

@@ -21,7 +21,16 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   const [modelOk, setModelOk] = useState<boolean | null>(null);
   const location = useLocation();
 
-  useState(() => { (async () => { try { const pf = await preflightLLM(); setModelOk(!!pf.model); } catch { setModelOk(false); } })(); });
+  useEffect(() => {
+    (async () => {
+      try {
+        const pf = await preflightLLM();
+        setModelOk(!!pf.model || pf.ok);
+      } catch {
+        setModelOk(false);
+      }
+    })();
+  }, [preflightLLM]);
 
   // If user clicked Continue from plans list, pre-fill a helpful prompt
   useEffect(() => {

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Sparkles, Copy, Check, Download } from "lucide-react";
+import { Loader2, Sparkles, Copy, Check, Download, Mail } from "lucide-react";
 import { generateOfferLetter } from "@/lib/gemini";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function AIOfferLetterGenerator() {
   const { user } = useAuth();
   const [candidateName, setCandidateName] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
   const [role, setRole] = useState("");
   const [salary, setSalary] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -120,6 +121,7 @@ export function AIOfferLetterGenerator() {
 
   const handleReset = () => {
     setCandidateName("");
+    setCandidateEmail("");
     setRole("");
     setSalary("");
     setStartDate("");
@@ -148,6 +150,18 @@ export function AIOfferLetterGenerator() {
                 placeholder="e.g., John Doe"
                 value={candidateName}
                 onChange={(e) => setCandidateName(e.target.value)}
+                disabled={isGenerating}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="candidate-email">Candidate Email</Label>
+              <Input
+                id="candidate-email"
+                type="email"
+                placeholder="e.g., john.doe@example.com"
+                value={candidateEmail}
+                onChange={(e) => setCandidateEmail(e.target.value)}
                 disabled={isGenerating}
               />
             </div>
@@ -242,6 +256,20 @@ export function AIOfferLetterGenerator() {
                   <Download className="h-4 w-4 mr-2" />
                   Download
                 </Button>
+                {candidateEmail && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      const subject = encodeURIComponent(`Job Offer - ${role} at ${companyName}`);
+                      const body = encodeURIComponent(offerLetter);
+                      window.location.href = `mailto:${candidateEmail}?subject=${subject}&body=${body}`;
+                    }}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send Email
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={handleReset}>
                   New Letter
                 </Button>

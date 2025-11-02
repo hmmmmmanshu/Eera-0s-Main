@@ -462,6 +462,17 @@ function OfferLetterForm({ candidate, role, onClose }: { candidate: any; role: a
                 <Download className="h-4 w-4 mr-2" />
                 Download
               </Button>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => {
+                  const subject = encodeURIComponent(`Job Offer - ${role?.title || "Position"} at ${organizationContext?.companyName || "Our Company"}`);
+                  const body = encodeURIComponent(offerLetter);
+                  window.location.href = `mailto:${candidate.email}?subject=${subject}&body=${body}`;
+                }}
+              >
+                📧 Send via Email
+              </Button>
             </div>
           </div>
           <div className="bg-muted/50 rounded-lg p-6 whitespace-pre-wrap font-mono text-sm max-h-96 overflow-y-auto">

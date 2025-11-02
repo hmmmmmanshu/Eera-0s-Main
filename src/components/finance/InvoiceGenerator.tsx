@@ -161,6 +161,64 @@ export function InvoiceGenerator() {
     }, 250);
   };
 
+  const handleDownloadPDF = async () => {
+    if (!previewInvoice) return;
+    
+    try {
+      // Use html2canvas and jsPDF for PDF generation
+      // First, create a temporary element with the invoice content
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body {
+                font-family: system-ui, -apple-system, sans-serif;
+                color: black;
+                background: white;
+                margin: 0;
+                padding: 40px;
+                font-size: 14px;
+                line-height: 1.6;
+              }
+              h1 { font-size: 28px; margin-bottom: 10px; }
+              h2 { font-size: 18px; margin-top: 20px; margin-bottom: 10px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+              th { background-color: #f5f5f5; font-weight: 600; }
+              .text-right { text-align: right; }
+              .text-bold { font-weight: 600; }
+            </style>
+          </head>
+          <body>
+            ${previewInvoice.formattedInvoice.replace(/\n/g, "<br />")}
+          </body>
+        </html>
+      `;
+
+      // Open in new window and trigger browser's print-to-PDF
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        toast.error("Please allow popups to download PDF");
+        return;
+      }
+
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      
+      // Wait for content to load, then trigger save as PDF
+      setTimeout(() => {
+        printWindow.print();
+        // Note: User will need to select "Save as PDF" in print dialog
+        toast.success("Select 'Save as PDF' in the print dialog");
+      }, 500);
+    } catch (error: any) {
+      toast.error(`Failed to generate PDF: ${error.message}`);
+      // Fallback to print
+      handlePrintInvoice();
+    }
+  };
+
   const handleSaveInvoice = async (status: "draft" | "sent" = "draft") => {
     if (!previewInvoice) {
       // Save without AI generation
@@ -288,39 +346,56 @@ export function InvoiceGenerator() {
                 Add Item
               </Button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {formData.lineItems.map((item, index) => (
-                <div key={index} className="flex gap-2 items-start p-3 border rounded-lg">
-                  <div className="flex-1 grid grid-cols-12 gap-2">
-                    <div className="col-span-6">
+                <div key={index} className="flex gap-3 items-start p-4 border-2 rounded-lg bg-muted/30 hover:border-accent/50 transition-colors">
+                  <div className="flex-1 space-y-3">
+                    {/* Description - Full Width */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">Description</Label>
                       <Input
-                        placeholder="Description"
+                        placeholder="Item description or service name"
                         value={item.description}
                         onChange={(e) => updateLineItem(index, "description", e.target.value)}
+                        className="w-full"
                       />
                     </div>
-                    <div className="col-span-2">
-                      <Input
-                        type="number"
-                        placeholder="Qty"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          updateLineItem(index, "quantity", parseInt(e.target.value) || 0)
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Input
-                        type="number"
-                        placeholder="Rate"
-                        value={item.rate}
-                        onChange={(e) =>
-                          updateLineItem(index, "rate", parseFloat(e.target.value) || 0)
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2 flex items-center">
-                      <span className="text-sm font-semibold">₹{item.amount.toFixed(2)}</span>
+                    {/* Quantity, Rate, Amount - Side by Side */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Quantity</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="1"
+                          placeholder="Qty"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            updateLineItem(index, "quantity", parseInt(e.target.value) || 0)
+                          }
+                          className="w-full text-base"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Rate (₹)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Rate per unit"
+                          value={item.rate}
+                          onChange={(e) =>
+                            updateLineItem(index, "rate", parseFloat(e.target.value) || 0)
+                          }
+                          className="w-full text-base"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Amount (₹)</Label>
+                        <div className="flex items-center h-10 px-3 bg-background border border-input rounded-md text-base font-semibold">
+                          ₹{item.amount.toFixed(2)}
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <Button
@@ -329,6 +404,7 @@ export function InvoiceGenerator() {
                     size="sm"
                     onClick={() => removeLineItem(index)}
                     disabled={formData.lineItems.length === 1}
+                    className="mt-7"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -392,18 +468,97 @@ export function InvoiceGenerator() {
         <CardContent>
           {previewInvoice ? (
             <div className="space-y-4">
-              {/* Screen preview */}
-              <div className="prose prose-sm max-w-none border rounded-lg p-6 bg-white">
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: previewInvoice.formattedInvoice.replace(/\n/g, "<br />"),
-                  }}
-                />
+              {/* Enhanced Visual Preview */}
+              <div className="border-2 border-accent/20 rounded-lg p-8 bg-gradient-to-br from-white to-accent/5 shadow-lg">
+                <div className="prose prose-sm max-w-none">
+                  {/* Invoice Header */}
+                  <div className="border-b-2 border-accent/30 pb-4 mb-6">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h1 className="text-3xl font-bold text-accent mb-2">INVOICE</h1>
+                        {companyInfo && (
+                          <div className="space-y-1 text-sm">
+                            <p className="font-semibold">{companyInfo.company_name}</p>
+                            {companyInfo.gst_number && <p>GST: {companyInfo.gst_number}</p>}
+                            {companyInfo.pan_number && <p>PAN: {companyInfo.pan_number}</p>}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right text-sm">
+                        <p className="font-semibold mb-1">Invoice #{previewInvoice.invoiceNumber || 'DRAFT'}</p>
+                        <p>Date: {format(new Date(formData.invoiceDate), "MMM dd, yyyy")}</p>
+                        <p>Due: {format(new Date(formData.dueDate), "MMM dd, yyyy")}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Client Details */}
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-lg mb-2">Bill To:</h3>
+                    <div className="bg-muted/30 p-3 rounded-md">
+                      <p className="font-semibold">{formData.clientName}</p>
+                      {formData.clientEmail && <p className="text-sm text-muted-foreground">{formData.clientEmail}</p>}
+                      {formData.clientPhone && <p className="text-sm text-muted-foreground">{formData.clientPhone}</p>}
+                    </div>
+                  </div>
+
+                  {/* Line Items Table */}
+                  <div className="mb-6">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-accent/10 border-b-2 border-accent/30">
+                          <th className="text-left p-3 font-semibold">Description</th>
+                          <th className="text-center p-3 font-semibold">Qty</th>
+                          <th className="text-right p-3 font-semibold">Rate</th>
+                          <th className="text-right p-3 font-semibold">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formData.lineItems.map((item, idx) => (
+                          <tr key={idx} className="border-b border-border">
+                            <td className="p-3">{item.description || "Item description"}</td>
+                            <td className="p-3 text-center">{item.quantity}</td>
+                            <td className="p-3 text-right">₹{item.rate.toFixed(2)}</td>
+                            <td className="p-3 text-right font-semibold">₹{item.amount.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Totals */}
+                  <div className="flex justify-end">
+                    <div className="w-64 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Subtotal:</span>
+                        <span className="font-semibold">₹{subtotal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>GST ({formData.gstPercentage}%):</span>
+                        <span className="font-semibold">₹{gstAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="border-t-2 border-accent/30 pt-2 flex justify-between text-lg font-bold">
+                        <span>Total:</span>
+                        <span className="text-accent">₹{totalAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Terms */}
+                  <div className="mt-8 pt-4 border-t border-border text-xs text-muted-foreground">
+                    <p className="font-semibold mb-1">Payment Terms:</p>
+                    <p>Payment is due within 30 days. Thank you for your business!</p>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button onClick={handlePrintInvoice}>
+              
+              <div className="flex gap-2 flex-wrap">
+                <Button onClick={handleDownloadPDF} variant="default">
                   <Download className="h-4 w-4 mr-2" />
-                  Print / Save PDF
+                  Download PDF
+                </Button>
+                <Button onClick={handlePrintInvoice} variant="outline">
+                  Print
                 </Button>
                 <Button variant="outline" onClick={() => handleSaveInvoice("sent")}>
                   Mark as Sent

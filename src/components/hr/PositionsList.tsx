@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, Plus, Users, Eye } from "lucide-react";
-import { useHRRoles, useHRCandidates } from "@/hooks/useHRData";
+import { Briefcase, Plus, Users, Eye, Trash2 } from "lucide-react";
+import { useHRRoles, useHRCandidates, useDeleteRole } from "@/hooks/useHRData";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -13,8 +13,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useState } from "react";
 import { AddCandidateDialog } from "./AddCandidateDialog";
+import { toast } from "sonner";
 
 export function PositionsList() {
   const { data: roles = [], isLoading } = useHRRoles();
@@ -80,6 +91,22 @@ export function PositionsList() {
 function PositionCard({ role, candidateCount }: { role: any; candidateCount: number }) {
   const [showDetails, setShowDetails] = useState(false);
   const [showAddCandidate, setShowAddCandidate] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const deleteRole = useDeleteRole();
+
+  const handleDelete = async () => {
+    if (candidateCount > 0) {
+      toast.error("Cannot delete position with candidates. Please reassign or remove candidates first.");
+      return;
+    }
+    
+    try {
+      await deleteRole.mutateAsync(role.id);
+      setShowDeleteDialog(false);
+    } catch (error) {
+      // Error already handled by mutation
+    }
+  };
 
   return (
     <div className="p-4 rounded-lg border border-accent/20 hover:border-accent/40 transition-all bg-background/50">
@@ -162,6 +189,9 @@ function PositionCard({ role, candidateCount }: { role: any; candidateCount: num
             <Plus className="h-4 w-4 mr-2" />
             Add Candidate
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowDeleteDialog(true)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
       
@@ -173,6 +203,32 @@ function PositionCard({ role, candidateCount }: { role: any; candidateCount: num
           // Invalidate queries will automatically refresh the candidate count
         }}
       />
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the "{role.title}" position. This action cannot be undone.
+              {candidateCount > 0 && (
+                <span className="block mt-2 text-destructive font-medium">
+                  ⚠️ This position has {candidateCount} candidate(s). You cannot delete it.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={candidateCount > 0 || deleteRole.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteRole.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

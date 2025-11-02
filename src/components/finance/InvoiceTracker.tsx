@@ -1,18 +1,29 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Clock, CheckCircle, AlertCircle, Loader2, Eye } from "lucide-react";
+import { FileText, Clock, CheckCircle, AlertCircle, Loader2, Eye, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useInvoices } from "@/hooks/useFinanceData";
+import { useInvoices, useUpdateInvoice, useDeleteInvoice } from "@/hooks/useFinanceData";
 import { format, isPast, isToday } from "date-fns";
 import { useEffect, useState } from "react";
-import { useUpdateInvoice } from "@/hooks/useFinanceData";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function InvoiceTracker() {
   const { data: invoices = [], isLoading } = useInvoices();
   const updateInvoiceMutation = useUpdateInvoice();
+  const deleteInvoiceMutation = useDeleteInvoice();
   const [selectedDraft, setSelectedDraft] = useState<any>(null);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Auto-update overdue invoices
@@ -134,17 +145,32 @@ export function InvoiceTracker() {
                   <p className="font-semibold text-sm">₹{invoice.amount.toLocaleString()}</p>
                   {getStatusBadge(invoice.status)}
                   {invoice.status === "draft" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate("/finance?tab=invoices&edit=" + invoice.id);
-                      }}
-                      className="h-6 px-2"
-                    >
-                      <Eye className="h-3 w-3" />
-                    </Button>
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate("/finance?tab=invoices&edit=" + invoice.id);
+                        }}
+                        className="h-6 px-2"
+                        title="Edit Invoice"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInvoiceToDelete(invoice.id);
+                        }}
+                        className="h-6 px-2 text-destructive hover:text-destructive"
+                        title="Delete Invoice"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -202,6 +228,32 @@ export function InvoiceTracker() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!invoiceToDelete} onOpenChange={(open) => !open && setInvoiceToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Draft Invoice?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the draft invoice.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (invoiceToDelete) {
+                  deleteInvoiceMutation.mutate(invoiceToDelete);
+                  setInvoiceToDelete(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

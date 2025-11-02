@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Briefcase, Calendar, DollarSign, FileText, Eye } from "lucide-react";
+import { Users, Briefcase, Calendar, DollarSign, FileText, Eye, Mail } from "lucide-react";
 import { useHRCandidates, useHRRoles } from "@/hooks/useHRData";
 import { format } from "date-fns";
 import {
@@ -43,6 +43,17 @@ export function Workforce() {
     );
   }
 
+  // Group employees by department/role for org chart
+  const employeesByDepartment = hiredCandidates.reduce((acc: any, employee) => {
+    const role = roles.find((r) => r.id === employee.role_id);
+    const dept = role?.department || "Other";
+    if (!acc[dept]) {
+      acc[dept] = [];
+    }
+    acc[dept].push(employee);
+    return acc;
+  }, {});
+
   if (hiredCandidates.length === 0) {
     return (
       <Card>
@@ -66,15 +77,64 @@ export function Workforce() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-accent" />
-          Current Workforce ({hiredCandidates.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="space-y-6">
+      {/* Organization Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Briefcase className="h-5 w-5 text-accent" />
+            Organization Chart
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hiredCandidates.length > 0 ? (
+            <div className="space-y-6">
+              {Object.entries(employeesByDepartment).map(([dept, employees]: [string, any]) => (
+                <div key={dept} className="border rounded-lg p-4 bg-muted/20">
+                  <h3 className="font-semibold text-lg mb-4 text-accent">{dept}</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {employees.map((employee: any) => {
+                      const role = roles.find((r) => r.id === employee.role_id);
+                      return (
+                        <div
+                          key={employee.id}
+                          className="bg-background rounded-lg p-3 border border-accent/20 hover:border-accent/40 transition-all"
+                        >
+                          <div className="text-center">
+                            <div className="h-12 w-12 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-2">
+                              <Users className="h-6 w-6 text-accent" />
+                            </div>
+                            <h4 className="font-semibold text-sm">{employee.name}</h4>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {role?.title || "No Position"}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No organization chart data available</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Employee Directory */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-accent" />
+            Employee Directory ({hiredCandidates.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {hiredCandidates.map((employee) => {
             const role = roles.find((r) => r.id === employee.role_id);
             return (
@@ -202,6 +262,19 @@ export function Workforce() {
               >
                 Download
               </Button>
+              {selectedEmployee.email && (
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    const subject = encodeURIComponent(`Job Offer - ${getRoleTitle(selectedEmployee.role_id)}`);
+                    const body = encodeURIComponent(selectedEmployee.offer_letter || "");
+                    window.location.href = `mailto:${selectedEmployee.email}?subject=${subject}&body=${body}`;
+                  }}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Email
+                </Button>
+              )}
               <Button variant="outline" onClick={() => setShowOfferLetter(false)}>
                 Close
               </Button>
@@ -210,6 +283,7 @@ export function Workforce() {
         </Dialog>
       )}
     </Card>
+    </div>
   );
 }
 

@@ -3,27 +3,49 @@ CREATE TABLE IF NOT EXISTS public.chat_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT DEFAULT 'Session',
-  active_hub TEXT CHECK (active_hub IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive')),
+  active_hub TEXT,
   pinned_plan_id UUID,
-  category TEXT CHECK (category IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive', 'general')),
+  category TEXT DEFAULT 'general',
   subcategories TEXT[] DEFAULT '[]'::text[],
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
+
+-- Add check constraints after table creation
+ALTER TABLE public.chat_sessions 
+  ADD CONSTRAINT chat_sessions_active_hub_check 
+  CHECK (active_hub IS NULL OR active_hub IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive'));
+
+ALTER TABLE public.chat_sessions 
+  ADD CONSTRAINT chat_sessions_category_check 
+  CHECK (category IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive', 'general'));
 
 -- Create chat_messages table for storing all chat messages
 CREATE TABLE IF NOT EXISTS public.chat_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+  role TEXT NOT NULL,
   content TEXT NOT NULL,
-  hub TEXT CHECK (hub IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive')),
+  hub TEXT,
   subcategories TEXT[] DEFAULT '[]'::text[],
-  category TEXT CHECK (category IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive', 'general')),
+  category TEXT DEFAULT 'general',
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
+
+-- Add check constraints after table creation
+ALTER TABLE public.chat_messages 
+  ADD CONSTRAINT chat_messages_role_check 
+  CHECK (role IN ('user', 'assistant', 'system'));
+
+ALTER TABLE public.chat_messages 
+  ADD CONSTRAINT chat_messages_hub_check 
+  CHECK (hub IS NULL OR hub IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive'));
+
+ALTER TABLE public.chat_messages 
+  ADD CONSTRAINT chat_messages_category_check 
+  CHECK (category IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive', 'general'));
 
 -- Enable RLS
 ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;

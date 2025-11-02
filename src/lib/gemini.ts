@@ -95,29 +95,24 @@ export async function generateChatResponse(options: ChatOptions): Promise<string
     // Build prompt with system message if provided
     let fullPrompt = "";
     if (systemPrompt) {
-      fullPrompt += `SYSTEM: ${systemPrompt}\n\n`;
+      fullPrompt += `${systemPrompt}\n\n`;
     }
 
-    // Add conversation history
+    // Add conversation history (excluding system messages from history as they're already in systemPrompt)
     for (const msg of messages) {
       if (msg.role === "system") {
-        fullPrompt += `SYSTEM: ${msg.content}\n\n`;
+        // System messages in history are added to prompt
+        fullPrompt += `${msg.content}\n\n`;
       } else if (msg.role === "user") {
-        fullPrompt += `USER: ${msg.content}\n\n`;
+        fullPrompt += `User: ${msg.content}\n\n`;
       } else if (msg.role === "assistant") {
-        fullPrompt += `ASSISTANT: ${msg.content}\n\n`;
+        fullPrompt += `Assistant: ${msg.content}\n\n`;
       }
     }
 
     // Add instruction for JSON mode if needed
     if (jsonMode) {
-      fullPrompt += "Respond with valid JSON only, no additional text.\n\n";
-    }
-
-    // Add the last user message to make it clear what to respond to
-    const lastUserMessage = messages.filter(m => m.role === "user").slice(-1)[0];
-    if (lastUserMessage) {
-      fullPrompt += `USER: ${lastUserMessage.content}`;
+      fullPrompt += "Respond with valid JSON only, no additional text or explanation.\n\n";
     }
 
     const generationConfig: any = {
@@ -126,7 +121,7 @@ export async function generateChatResponse(options: ChatOptions): Promise<string
     };
 
     if (jsonMode) {
-      // Try to use responseMimeType for JSON if supported
+      // Try to use responseMimeType for JSON if supported (Gemini 2.0+)
       try {
         generationConfig.responseMimeType = "application/json";
       } catch {
@@ -134,8 +129,7 @@ export async function generateChatResponse(options: ChatOptions): Promise<string
       }
     }
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+    const result = await model.generateContent(fullPrompt, {
       generationConfig,
     });
 

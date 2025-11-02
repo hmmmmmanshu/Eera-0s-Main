@@ -1149,6 +1149,29 @@ export function useUpdateInvoice() {
   });
 }
 
+export function useDeleteInvoice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("finance_invoices")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success("Invoice deleted!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete invoice: ${error.message}`);
+    },
+  });
+}
+
 // ========================================
 // EXPENSE HOOKS
 // ========================================
