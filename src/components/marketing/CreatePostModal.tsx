@@ -58,6 +58,7 @@ import {
   IMAGE_MODELS,
   type ImageGenerationOptions
 } from "@/lib/openrouter";
+import { linkPromptToPostFromImageUrl } from "@/lib/promptLearning";
 
 // Image Type System
 import type { ImageType } from "@/types/imageTypes";
@@ -85,6 +86,15 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
   // Step management (always start at Step 1 to avoid unintended resume)
   const [step, setStep] = useState(1);
+  
+  // Account Type (NEW - First Question)
+  const [accountType, setAccountType] = useState<"personal" | "company" | null>(savedDraft?.accountType || null);
+  
+  // Color Selection (NEW)
+  const [colorMode, setColorMode] = useState<"brand" | "custom" | "mood">(savedDraft?.colorMode || "brand");
+  const [customColors, setCustomColors] = useState<{ primary: string; accent: string } | null>(
+    savedDraft?.customColors || null
+  );
   
   // Form data with auto-restore
   const [platform, setPlatform] = useState<"linkedin" | "instagram">(savedDraft?.platform || "linkedin");
@@ -133,6 +143,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   useEffect(() => {
     if (open) {
       const draftData = {
+        accountType,
+        colorMode,
+        customColors,
         platform,
         contentType,
         imageType,
@@ -144,7 +157,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       };
       localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(draftData));
     }
-  }, [open, platform, contentType, imageType, headline, keyPoints, tone, objective]);
+  }, [open, accountType, colorMode, customColors, platform, contentType, imageType, headline, keyPoints, tone, objective]);
 
   // Auto-select model, aspect ratio, and negative prompt based on image type
   useEffect(() => {
@@ -379,9 +392,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     },
   };
 
-  // Auto-trigger generation when reaching step 4
+  // Auto-trigger generation when reaching step 5
   useEffect(() => {
-    if (step === 4 && !generatedContent && !isGenerating) {
+    if (step === 5 && !generatedContent && !isGenerating) {
       handleGeneration();
     }
   }, [step]);
@@ -434,6 +447,20 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         } else {
           console.log("[CreatePostModal] Starting AI image generation");
           const imagePrompt = `${headline}. ${keyPoints || ""}`;
+          
+          // Get colors based on color mode
+          let colorConfig: { mode: "brand" | "custom" | "mood"; primary?: string; accent?: string } = {
+            mode: colorMode,
+          };
+          
+          if (colorMode === "custom" && customColors) {
+            colorConfig.primary = customColors.primary;
+            colorConfig.accent = customColors.accent;
+          } else if (colorMode === "brand" && profile?.color_palette) {
+            colorConfig.primary = (profile.color_palette as any)?.primary;
+            colorConfig.accent = (profile.color_palette as any)?.secondary;
+          }
+          
           const imageResult = await generateImageWithFallback({
             model: selectedModel,
             prompt: imagePrompt,
@@ -441,6 +468,10 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             aspectRatio: aspectRatio,
             negativePrompt: negativePrompt || undefined,
             imageType: imageType || undefined,
+            accountType: accountType || undefined,
+            colorConfig,
+            objective,
+            tone,
           });
           imageUrl = imageResult.url;
           setGeneratedImageUrl(imageUrl);
@@ -572,6 +603,25 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       const result = await createPostMutation.mutateAsync(postData);
       
       console.log("[Save Draft] Save successful:", result);
+      
+      // Link prompt performance to post by matching image URL
+      if (result?.id) {
+        // Try to link from any generated image URLs
+        const allImageUrls = slides.length > 0 
+          ? slides.map(s => s.url).filter(Boolean)
+          : generatedImageUrl 
+            ? [generatedImageUrl] 
+            : [];
+        
+        for (const imageUrl of allImageUrls) {
+          if (imageUrl) {
+            linkPromptToPostFromImageUrl(result.id, imageUrl).catch(err => {
+              console.warn("[Save Draft] Failed to link prompt performance:", err);
+            });
+          }
+        }
+      }
+      
       toast.success("Draft saved successfully!");
       resetAndClose();
     } catch (error) {
@@ -586,19 +636,72 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         <DialogHeader>
           <DialogTitle>Create New Post</DialogTitle>
           <DialogDescription>
-            Step {step} of {contentType === "text" ? 4 : 5}: {
-              step === 1 ? "Choose Platform" :
-              step === 2 ? "Select Format" :
-              step === 3 ? "Add Content" :
-              step === 3.5 ? "Choose AI Model" :
-              step === 4 ? "Generate" :
+            Step {step} of {contentType === "text" ? 6 : (contentType === "image" || contentType === "carousel") ? 7 : 6}: {
+              step === 1 ? "Account Type" :
+              step === 2 ? "Choose Platform" :
+              step === 3 ? "Select Format" :
+              step === 3.5 ? "Choose Image Type" :
+              step === 4 ? "Add Content" :
+              step === 4.5 ? "Choose AI Model" :
+              step === 5 ? "Generate" :
               "Preview & Schedule"
             }
           </DialogDescription>
         </DialogHeader>
 
-        {/* Step 1: Platform */}
+        {/* Step 1: Account Type Selection (NEW - First Question) */}
         {step === 1 && (
+          <div className="space-y-4">
+            <div>
+              <Label>Who is this post for?</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                This helps us personalize the content and tone for your audience
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Card 
+                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                  accountType === "personal" ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border"
+                }`}
+                onClick={() => setAccountType("personal")}
+              >
+                <CardContent className="p-6 text-center space-y-2">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                    <Settings className="w-6 h-6 text-primary" />
+                  </div>
+                  <p className="font-semibold">Personal Account</p>
+                  <p className="text-xs text-muted-foreground">Founder's personal brand</p>
+                  <Badge variant="secondary" className="text-xs mt-2">Authentic • Human • First-Person</Badge>
+                </CardContent>
+              </Card>
+              <Card 
+                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                  accountType === "company" ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border"
+                }`}
+                onClick={() => setAccountType("company")}
+              >
+                <CardContent className="p-6 text-center space-y-2">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-primary" />
+                  </div>
+                  <p className="font-semibold">Company Account</p>
+                  <p className="text-xs text-muted-foreground">Official brand voice</p>
+                  <Badge variant="secondary" className="text-xs mt-2">Professional • Corporate • "We"</Badge>
+                </CardContent>
+              </Card>
+            </div>
+            <Button 
+              className="w-full" 
+              onClick={() => setStep(2)}
+              disabled={!accountType}
+            >
+              Continue
+            </Button>
+          </div>
+        )}
+
+        {/* Step 2: Platform */}
+        {step === 2 && (
           <div className="space-y-4">
             <Label>Choose Platform</Label>
             <div className="grid grid-cols-2 gap-4">
@@ -627,14 +730,19 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 </CardContent>
               </Card>
             </div>
-            <Button className="w-full" onClick={() => setStep(2)}>
-              Continue
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>
+                Back
+              </Button>
+              <Button className="flex-1" onClick={() => setStep(3)}>
+                Continue
+              </Button>
+            </div>
           </div>
         )}
 
-        {/* Step 2: Content Type */}
-        {step === 2 && (
+        {/* Step 3: Content Type */}
+        {step === 3 && (
           <div className="space-y-4">
             <Label>Select Content Type</Label>
             <div className="grid grid-cols-2 gap-4">
@@ -659,15 +767,15 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 })}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>
                 Back
               </Button>
               <Button className="flex-1" onClick={() => {
                 // If image or carousel, go to image type selection. Otherwise go to content input.
                 if (contentType === "image" || contentType === "carousel") {
-                  setStep(2.5);
+                  setStep(3.5);
                 } else {
-                  setStep(3);
+                  setStep(4);
                 }
               }}>
                 Continue
@@ -716,12 +824,12 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 })}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(3)}>
                 Back
               </Button>
               <Button 
                 className="flex-1" 
-                onClick={() => setStep(3)}
+                onClick={() => setStep(4)}
                 disabled={!imageType}
               >
                 Continue
@@ -730,8 +838,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           </div>
         )}
 
-        {/* Step 3: Content Input / Builder */}
-        {step === 3 && (
+        {/* Step 4: Content Input / Builder */}
+        {step === 4 && (
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="headline">Headline / Hook *</Label>
@@ -819,13 +927,138 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               </div>
             </div>
 
+            {/* Color Selection (NEW - only for image/carousel) */}
+            {(contentType === "image" || contentType === "carousel") && (
+              <div className="space-y-4 border-t pt-4">
+                <div className="space-y-2">
+                  <Label>Image Colors</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Choose how colors should be applied to this image
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="color-brand"
+                      name="colorMode"
+                      value="brand"
+                      checked={colorMode === "brand"}
+                      onChange={(e) => setColorMode("brand")}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="color-brand" className="flex-1 cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Use Brand Colors</span>
+                        {profile?.color_palette && (
+                          <div className="flex gap-1">
+                            <div 
+                              className="w-6 h-6 rounded border"
+                              style={{ backgroundColor: (profile.color_palette as any)?.primary || "#3B82F6" }}
+                              title={(profile.color_palette as any)?.primary || "#3B82F6"}
+                            />
+                            <div 
+                              className="w-6 h-6 rounded border"
+                              style={{ backgroundColor: (profile.color_palette as any)?.secondary || "#8B5CF6" }}
+                              title={(profile.color_palette as any)?.secondary || "#8B5CF6"}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Your brand's color palette</p>
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="color-custom"
+                      name="colorMode"
+                      value="custom"
+                      checked={colorMode === "custom"}
+                      onChange={(e) => setColorMode("custom")}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="color-custom" className="flex-1 cursor-pointer">
+                      <span className="font-medium">Custom Colors</span>
+                      <p className="text-xs text-muted-foreground">Choose specific colors for this post</p>
+                    </label>
+                  </div>
+                  {colorMode === "custom" && (
+                    <div className="ml-6 space-y-2 p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs w-20">Primary:</Label>
+                        <input
+                          type="color"
+                          value={customColors?.primary || "#3B82F6"}
+                          onChange={(e) => setCustomColors({ 
+                            primary: e.target.value, 
+                            accent: customColors?.accent || "#8B5CF6" 
+                          })}
+                          className="w-12 h-8 rounded border"
+                        />
+                        <Input
+                          type="text"
+                          value={customColors?.primary || "#3B82F6"}
+                          onChange={(e) => setCustomColors({ 
+                            primary: e.target.value, 
+                            accent: customColors?.accent || "#8B5CF6" 
+                          })}
+                          className="w-24 h-8 text-xs"
+                          placeholder="#3B82F6"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs w-20">Accent:</Label>
+                        <input
+                          type="color"
+                          value={customColors?.accent || "#8B5CF6"}
+                          onChange={(e) => setCustomColors({ 
+                            primary: customColors?.primary || "#3B82F6", 
+                            accent: e.target.value 
+                          })}
+                          className="w-12 h-8 rounded border"
+                        />
+                        <Input
+                          type="text"
+                          value={customColors?.accent || "#8B5CF6"}
+                          onChange={(e) => setCustomColors({ 
+                            primary: customColors?.primary || "#3B82F6", 
+                            accent: e.target.value 
+                          })}
+                          className="w-24 h-8 text-xs"
+                          placeholder="#8B5CF6"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="color-mood"
+                      name="colorMode"
+                      value="mood"
+                      checked={colorMode === "mood"}
+                      onChange={(e) => setColorMode("mood")}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="color-mood" className="flex-1 cursor-pointer">
+                      <span className="font-medium">Match Content Mood</span>
+                      <p className="text-xs text-muted-foreground">AI suggests colors based on post intent</p>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => {
                 // If image/carousel, go back to image type selection. Otherwise go to content type.
                 if (contentType === "image" || contentType === "carousel") {
-                  setStep(2.5);
+                  setStep(3.5);
                 } else {
-                  setStep(2);
+                  setStep(3);
                 }
               }}>
                 Back
@@ -834,9 +1067,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 className="flex-1 gap-2" 
                 onClick={() => {
                   if (contentType === "image" || contentType === "carousel" || contentType === "video") {
-                    setStep(3.5); // Go to model selection
+                    setStep(4.5); // Go to model selection (now step 4.5)
                   } else {
-                    setStep(4); // Text goes directly to generation
+                    setStep(5); // Text goes directly to generation
                   }
                 }}
               >
@@ -847,8 +1080,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           </div>
         )}
 
-        {/* Step 3.5: Model Selection (for image/video content) */}
-        {step === 3.5 && (contentType === "image" || contentType === "carousel" || contentType === "video") && (
+        {/* Step 4.5: Model Selection (for image/video content) */}
+        {step === 4.5 && (contentType === "image" || contentType === "carousel" || contentType === "video") && (
           <div className="space-y-4">
             <div>
               <Label>Choose AI Model</Label>
@@ -937,10 +1170,10 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             </Accordion>
 
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(3)}>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(4)}>
                 Back
               </Button>
-              <Button className="flex-1 gap-2" onClick={() => setStep(4)}>
+              <Button className="flex-1 gap-2" onClick={() => setStep(5)}>
                 <Zap className="w-4 h-4" />
                 Generate Content
               </Button>
@@ -948,8 +1181,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           </div>
         )}
 
-        {/* Step 4: Generation */}
-        {step === 4 && (
+        {/* Step 5: Generation */}
+        {step === 5 && (
           <div className="space-y-6 py-8">
             {isGenerating ? (
               <>
@@ -1018,7 +1251,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setStep((contentType === "image" || contentType === "carousel" || contentType === "video") ? 3.5 : 3)}
+                onClick={() => setStep((contentType === "image" || contentType === "carousel" || contentType === "video") ? 4.5 : 4)}
                 disabled={isGenerating}
               >
                 Back
@@ -1235,10 +1468,10 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             )}
 
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(4)}>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(5)}>
                 Back
               </Button>
-              <Button variant="outline" className="flex-1" onClick={() => setStep(3)}>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(4)}>
                 Edit
               </Button>
               <Button 

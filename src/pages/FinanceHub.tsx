@@ -114,14 +114,14 @@ const FinanceHub = () => {
 
                   {/* Overview Tab */}
                   <TabsContent value="overview" className="space-y-6 mt-6">
-                    <AICFOInsightBox role={role} />
+                <AICFOInsightBox role={role} />
 
-                    {role === "all" && (
+                {role === "all" && (
                   <>
                     {/* Top Row - Critical Metrics */}
                     <div className="grid lg:grid-cols-3 gap-6">
                       <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
-                        <RunwayCard />
+                      <RunwayCard />
                       </Suspense>
                       <FundingPipeline />
                       <CapTable />
@@ -132,7 +132,7 @@ const FinanceHub = () => {
 
                     {/* Cash Flow Chart */}
                     <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
-                      <CashFlowChart />
+                    <CashFlowChart />
                     </Suspense>
 
                     {/* Operations Row */}
@@ -161,7 +161,7 @@ const FinanceHub = () => {
 
                     {/* Cash Flow Chart */}
                     <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
-                      <CashFlowChart />
+                    <CashFlowChart />
                     </Suspense>
                   </>
                 )}
@@ -171,7 +171,7 @@ const FinanceHub = () => {
                     {/* CFO Focus: Strategy First */}
                     <div className="grid lg:grid-cols-3 gap-6">
                       <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
-                        <RunwayCard />
+                      <RunwayCard />
                       </Suspense>
                       <FundingPipeline />
                       <CapTable />
@@ -179,7 +179,7 @@ const FinanceHub = () => {
 
                     {/* Cash Flow Chart */}
                     <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
-                      <CashFlowChart />
+                    <CashFlowChart />
                     </Suspense>
 
                     {/* Financial Metrics Grid */}
@@ -187,8 +187,8 @@ const FinanceHub = () => {
 
                     {/* Virtual CFO Insights */}
                     <VirtualCFOInsights />
-                    </>
-                    )}
+                  </>
+                )}
 
                     {/* Show empty state if no role matches */}
                     {role !== "all" && role !== "accountant" && role !== "cfo" && (

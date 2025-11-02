@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,15 +16,10 @@ import {
   Eye,
   Download,
   Save,
-  Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ZohoConnection } from "./ZohoConnection";
-import { getZohoTokens, createZohoInvoice } from "@/lib/zohoInvoice";
-import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function InvoiceGenerator() {
   const { data: companyInfo } = useCompanyInfo();
@@ -32,26 +27,6 @@ export function InvoiceGenerator() {
   const [showPreview, setShowPreview] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<any>(null);
-  const [isZohoConnected, setIsZohoConnected] = useState(false);
-  const [creatingInZoho, setCreatingInZoho] = useState(false);
-
-  useEffect(() => {
-    checkZohoConnection();
-  }, []);
-
-  const checkZohoConnection = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const tokens = await getZohoTokens(user.id);
-      setIsZohoConnected(!!tokens);
-    } catch (error) {
-      console.error("Error checking Zoho connection:", error);
-    }
-  };
 
   const [formData, setFormData] = useState({
     clientName: "",
@@ -279,116 +254,10 @@ export function InvoiceGenerator() {
     setPreviewInvoice(null);
   };
 
-  const handleCreateInZoho = async () => {
-    if (!isZohoConnected) {
-      toast.error("Please connect Zoho Invoice first");
-      return;
-    }
-
-    if (!formData.clientName || formData.lineItems.length === 0) {
-      toast.error("Please fill in client name and line items");
-      return;
-    }
-
-    try {
-      setCreatingInZoho(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Convert line items to Zoho format
-      const zohoLineItems = formData.lineItems
-        .filter((item) => item.description && item.rate > 0)
-        .map((item) => ({
-          name: item.description,
-          rate: item.rate,
-          quantity: item.quantity,
-          item_total: item.amount,
-        }));
-
-      if (zohoLineItems.length === 0) {
-        toast.error("Please add at least one valid line item");
-        return;
-      }
-
-      // Get currency from profile
-      const currency = companyInfo?.gst_number ? "INR" : "USD"; // Default based on GST presence
-
-      const zohoInvoice = {
-        customer_name: formData.clientName,
-        date: formData.invoiceDate,
-        due_date: formData.dueDate,
-        payment_terms: Math.ceil(
-          (new Date(formData.dueDate).getTime() - new Date(formData.invoiceDate).getTime()) /
-            (1000 * 60 * 60 * 24)
-        ),
-        currency_code: currency,
-        line_items: zohoLineItems,
-        notes: formData.clientEmail
-          ? `Client Email: ${formData.clientEmail}\nClient Phone: ${formData.clientPhone || "N/A"}`
-          : undefined,
-      };
-
-      const response = await createZohoInvoice(user.id, zohoInvoice);
-
-      if (response.invoice) {
-        toast.success(
-          `Invoice created in Zoho! Invoice #${response.invoice.invoice_number}`
-        );
-        
-        // Also save to local database
-        await createInvoiceMutation.mutateAsync({
-          client_name: formData.clientName,
-          client_email: formData.clientEmail || undefined,
-          amount: totalAmount,
-          status: "sent", // Mark as sent since it's created in Zoho
-          due_date: formData.dueDate,
-        });
-
-        // Reset form
-        setFormData({
-          clientName: "",
-          clientEmail: "",
-          clientPhone: "",
-          invoiceDate: format(new Date(), "yyyy-MM-dd"),
-          dueDate: format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-          gstPercentage: 18,
-          lineItems: [{ description: "", quantity: 1, rate: 0, amount: 0 }],
-        });
-        setPreviewInvoice(null);
-      } else {
-        throw new Error(response.message || "Failed to create invoice in Zoho");
-      }
-    } catch (error: any) {
-      toast.error(`Failed to create invoice in Zoho: ${error.message}`);
-    } finally {
-      setCreatingInZoho(false);
-    }
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Zoho Connection Card */}
-      {!isZohoConnected && (
-        <ZohoConnection
-          onConnected={() => {
-            setIsZohoConnected(true);
-            checkZohoConnection();
-          }}
-        />
-      )}
-
-      <Tabs defaultValue="create" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="create">Create Invoice</TabsTrigger>
-          <TabsTrigger value="zoho">Zoho Integration</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="create" className="space-y-6">
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Form */}
-            <Card>
+    <div className="grid lg:grid-cols-2 gap-6">
+      {/* Form */}
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -561,54 +430,32 @@ export function InvoiceGenerator() {
           </div>
 
           {/* Actions */}
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <Button
-                onClick={handleGenerateWithAI}
-                disabled={generating || !companyInfo}
-                className="flex-1"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate with AI
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleSaveInvoice("draft")}
-                disabled={createInvoiceMutation.isPending}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save Draft
-              </Button>
-            </div>
-            {isZohoConnected && (
-              <Button
-                onClick={handleCreateInZoho}
-                disabled={creatingInZoho || !formData.clientName || formData.lineItems.length === 0}
-                variant="default"
-                className="w-full"
-              >
-                {creatingInZoho ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating in Zoho...
-                  </>
-                ) : (
-                  <>
-                    <Link2 className="h-4 w-4 mr-2" />
-                    Create in Zoho Invoice
-                  </>
-                )}
-              </Button>
-            )}
+          <div className="flex gap-2">
+            <Button
+              onClick={handleGenerateWithAI}
+              disabled={generating || !companyInfo}
+              className="flex-1"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate with AI
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleSaveInvoice("draft")}
+              disabled={createInvoiceMutation.isPending}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Draft
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -726,18 +573,6 @@ export function InvoiceGenerator() {
           )}
         </CardContent>
       </Card>
-      </div>
-      </TabsContent>
-
-      <TabsContent value="zoho">
-        <ZohoConnection
-          onConnected={() => {
-            setIsZohoConnected(true);
-            checkZohoConnection();
-          }}
-        />
-      </TabsContent>
-    </Tabs>
     </div>
   );
 }

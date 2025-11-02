@@ -28,6 +28,14 @@ export interface ImageGenerationOptions {
   brandContext?: BrandContext;
   negativePrompt?: string;
   imageType?: string | null;
+  accountType?: "personal" | "company";
+  colorConfig?: {
+    mode: "brand" | "custom" | "mood";
+    primary?: string;
+    accent?: string;
+  };
+  objective?: "awareness" | "leads" | "engagement" | "recruitment";
+  tone?: string;
 }
 
 export interface GeneratedText {
@@ -39,8 +47,13 @@ export interface GeneratedText {
 
 export interface GeneratedImage {
   url: string; // Supabase Storage URL
+  prompt?: string; // Enhanced/amplified prompt used
   model: string;
   generationTime: number;
+  metadata?: {
+    aspectRatio?: string;
+    generationTimeMs?: number;
+  };
 }
 
 // ========================================
@@ -111,14 +124,24 @@ async function enhancePromptWithBrand(
   prompt: string,
   brandContext?: BrandContext,
   platform: "linkedin" | "instagram" = "linkedin",
-  imageType?: string | null
+  imageType?: string | null,
+  amplificationContext?: {
+    accountType?: "personal" | "company";
+    colorConfig?: {
+      mode: "brand" | "custom" | "mood";
+      primary?: string;
+      accent?: string;
+    };
+    objective?: "awareness" | "leads" | "engagement" | "recruitment";
+    tone?: string;
+  }
 ): Promise<string> {
   if (!brandContext) return prompt;
 
-  // Use Gemini enhanceImagePrompt for better results
+  // Use Gemini enhanceImagePrompt with 10x amplification
   try {
     const { enhanceImagePrompt } = await import("./gemini");
-    return await enhanceImagePrompt(prompt, brandContext, platform, imageType);
+    return await enhanceImagePrompt(prompt, brandContext, platform, imageType, amplificationContext);
   } catch (e) {
     console.warn("Gemini prompt enhancement failed, using fallback", e);
     
@@ -132,8 +155,11 @@ async function enhancePromptWithBrand(
     }
 
     // Add brand colors
-    if (visual?.colors?.primary && visual?.colors?.secondary) {
-      enhanced += `, brand colors ${visual.colors.primary} and ${visual.colors.secondary}`;
+    const primaryColor = amplificationContext?.colorConfig?.primary || visual?.colors?.primary;
+    const accentColor = amplificationContext?.colorConfig?.accent || visual?.colors?.secondary;
+    
+    if (primaryColor && accentColor) {
+      enhanced += `, brand colors ${primaryColor} and ${accentColor}`;
     }
 
     // Add mood/tone
@@ -303,17 +329,28 @@ export async function generateText(
 export async function generateImage(
   options: ImageGenerationOptions
 ): Promise<GeneratedImage> {
-  const { model, prompt, aspectRatio = "1:1", brandContext, imageType } = options;
+  const { model, prompt, aspectRatio = "1:1", brandContext, imageType, accountType, colorConfig, objective, tone } = options;
 
-  console.log("[OpenRouter Image] Starting generation:", { model, prompt, aspectRatio, imageType });
+  console.log("[OpenRouter Image] Starting generation:", { model, prompt, aspectRatio, imageType, accountType, colorConfig });
 
   const startTime = Date.now();
   const apiKey = getOpenRouterKey();
 
-  // Enhance prompt with brand context and image type
+  // Enhance prompt with 10x amplification engine
   const platform = "linkedin"; // Default, could be derived from context
-  const enhancedPrompt = await enhancePromptWithBrand(prompt, brandContext, platform, imageType);
-  console.log("[OpenRouter Image] Enhanced prompt:", enhancedPrompt);
+  const enhancedPrompt = await enhancePromptWithBrand(
+    prompt, 
+    brandContext, 
+    platform, 
+    imageType,
+    {
+      accountType,
+      colorConfig,
+      objective,
+      tone,
+    }
+  );
+  console.log("[OpenRouter Image] Enhanced prompt (10x amplified):", enhancedPrompt);
 
   try {
     // Use /chat/completions endpoint with modalities parameter
@@ -416,10 +453,38 @@ export async function generateImage(
       time: generationTime,
     });
 
+    // Record prompt generation for learning (async, don't await)
+    // Try to get metadata from enhanced prompt if it was stored
+    const metadata = (enhancedPrompt as any).__metadata;
+    
+    recordPromptGenerationForLearning({
+      originalPrompt: prompt,
+      amplifiedPrompt: typeof enhancedPrompt === 'string' ? enhancedPrompt : (enhancedPrompt as any).prompt || enhancedPrompt,
+      modelUsed: model,
+      generationTimeMs: generationTime,
+      success: true,
+      imageUrl: publicUrl,
+      aspectRatio: aspectRatio || undefined,
+      accountType,
+      colorConfig,
+      objective,
+      tone,
+      imageType: imageType || undefined,
+      platform,
+      metadata,
+    }).catch(err => {
+      console.warn("[OpenRouter] Failed to record prompt learning:", err);
+    });
+
     return {
       url: publicUrl,
+      prompt: enhancedPrompt,
       model,
       generationTime,
+      metadata: {
+        aspectRatio: aspectRatio,
+        generationTimeMs: generationTime,
+      },
     };
   } catch (error) {
     console.error("[OpenRouter Image] Generation failed:", error);
@@ -451,6 +516,11 @@ export async function generateImageWithFallback(
         console.log(`[OpenRouter Fallback] Success with fallback model: ${currentModel}`);
       }
 
+      // Ensure result has prompt field for compatibility
+      if (!result.prompt) {
+        result.prompt = options.prompt;
+      }
+
       return result;
     } catch (error) {
       console.error(`[OpenRouter Fallback] Model ${currentModel} failed:`, error);
@@ -467,5 +537,68 @@ export async function generateImageWithFallback(
 
   // This should never be reached, but TypeScript needs it
   throw new Error("All fallback attempts failed");
+}
+
+/**
+ * Record prompt generation for learning system (async helper)
+ */
+async function recordPromptGenerationForLearning(params: {
+  originalPrompt: string;
+  amplifiedPrompt: string;
+  modelUsed: string;
+  generationTimeMs: number;
+  success: boolean;
+  imageUrl: string;
+  aspectRatio?: string;
+  accountType?: "personal" | "company";
+  colorConfig?: {
+    mode: "brand" | "custom" | "mood";
+    primary?: string;
+    accent?: string;
+  };
+  objective?: "awareness" | "leads" | "engagement" | "recruitment";
+  tone?: string;
+  imageType?: string;
+  platform?: "linkedin" | "instagram";
+  metadata?: {
+    intent?: string;
+    visualCues?: string[];
+    mood?: string;
+  };
+}): Promise<void> {
+  try {
+    const { recordPromptGeneration } = await import("./promptLearning");
+    
+    // Use metadata if available, otherwise try basic extraction
+    const intent = params.metadata?.intent || 
+      params.amplifiedPrompt.match(/intent[:\s]+(\w+)/i)?.[1];
+    
+    const visualCues = params.metadata?.visualCues || 
+      (params.amplifiedPrompt.match(/visual cues?:?\s*([^.]*)/i)?.[1]
+        ?.split(",").map(c => c.trim()).filter(Boolean));
+
+    await recordPromptGeneration({
+      original_prompt: params.originalPrompt,
+      amplified_prompt: params.amplifiedPrompt,
+      model_used: params.modelUsed,
+      generation_time_ms: params.generationTimeMs,
+      success: params.success,
+      image_url: params.imageUrl,
+      aspect_ratio: params.aspectRatio,
+      account_type: params.accountType,
+      image_type: params.imageType,
+      color_mode: params.colorConfig?.mode,
+      color_primary: params.colorConfig?.primary,
+      color_accent: params.colorConfig?.accent,
+      objective: params.objective,
+      tone: params.tone,
+      platform: params.platform,
+      intent_detected: intent,
+      visual_cues: visualCues,
+    });
+  } catch (error) {
+    // Fail silently - learning is optional
+    console.warn("[OpenRouter] Learning system error:", error);
+  }
 }
 

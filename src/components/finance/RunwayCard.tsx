@@ -255,33 +255,33 @@ export function RunwayCard() {
           </div>
         ) : (
           <>
-            <div>
-              <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-4xl font-bold">{runwayMonths}</span>
-                <span className="text-xl text-muted-foreground">months</span>
-              </div>
-              <Progress value={runwayPercentage} className="h-2" />
-            </div>
+        <div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <span className="text-4xl font-bold">{runwayMonths}</span>
+            <span className="text-xl text-muted-foreground">months</span>
+          </div>
+          <Progress value={runwayPercentage} className="h-2" />
+        </div>
 
-            <div className="space-y-2 pt-2 border-t border-border">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Cash Balance</span>
+        <div className="space-y-2 pt-2 border-t border-border">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Cash Balance</span>
                 <span className="font-semibold">₹{cashBalance.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Monthly Burn</span>
-                <span className="font-semibold flex items-center gap-1">
-                  <TrendingDown className="h-3 w-3 text-red-500" />
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Monthly Burn</span>
+            <span className="font-semibold flex items-center gap-1">
+              <TrendingDown className="h-3 w-3 text-red-500" />
                   ₹{burnRate.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Projected Depletion</span>
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Projected Depletion</span>
                 <span className="font-semibold">
                   {projectedDate ? format(projectedDate, "MMM yyyy") : "N/A"}
                 </span>
-              </div>
-            </div>
+          </div>
+        </div>
           </>
         )}
       </CardContent>
