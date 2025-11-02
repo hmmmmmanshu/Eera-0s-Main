@@ -351,11 +351,10 @@ export async function regenerateTasksAfterEmployeeSync(userId: string): Promise<
 
 /**
  * NOTE: syncCashFlow has been moved to @/lib/syncFinanceData to break circular dependency.
- * Import from there instead: import { syncCashFlow } from "@/lib/syncFinanceData";
+ * Import directly from there: import { syncCashFlow } from "@/lib/syncFinanceData";
  * 
- * Keeping a static re-export here for backwards compatibility (no dynamic imports to avoid initialization issues)
+ * DO NOT re-export from here - it creates circular dependency issues during module initialization.
  */
-export { syncCashFlow } from "@/lib/syncFinanceData";
 
 /*
 export async function syncCashFlow_OLD(userId: string, months: number = 6): Promise<void> {
