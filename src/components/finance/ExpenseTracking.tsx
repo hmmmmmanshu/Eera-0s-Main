@@ -265,7 +265,7 @@ export function ExpenseTracking() {
             <CardTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-accent" />
               Balance Sheet (Current Month)
-            </CardTitle>
+        </CardTitle>
             <CardDescription>
               {format(currentMonthStart, "MMM dd")} - {format(currentMonthEnd, "MMM dd, yyyy")}
             </CardDescription>
@@ -550,7 +550,7 @@ export function ExpenseTracking() {
                       </Badge>
                       <span className="text-sm font-medium">
                         {transaction.type === "income" ? transaction.description : transaction.vendor}
-                      </span>
+                  </span>
                       {transaction.type === "income" && transaction.isAuto && (
                         <Badge variant="outline" className="text-xs">Auto</Badge>
                       )}
@@ -562,15 +562,15 @@ export function ExpenseTracking() {
                       {" • "}
                       {format(parseISO(transaction.income_date || transaction.expense_date || transaction.created_at), "MMM dd, yyyy")}
                     </p>
-                  </div>
-                  <div className="flex items-center gap-2">
+                </div>
+                <div className="flex items-center gap-2">
                     <span
                       className={`text-lg font-bold ${
                         transaction.type === "income" ? "text-green-500" : "text-red-500"
                       }`}
                     >
                       {transaction.type === "income" ? "+" : "-"}₹{Number(transaction.amount).toLocaleString()}
-                    </span>
+                  </span>
                     {transaction.type === "expense" && (
                       <div className="flex gap-1">
                         <Button

@@ -144,7 +144,7 @@ export function CapTable() {
         <CardTitle className="flex items-center justify-between">
           <span className="text-lg">Ownership</span>
           <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-accent" />
+          <Users className="h-5 w-5 text-accent" />
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
               if (!open) {

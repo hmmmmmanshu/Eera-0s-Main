@@ -1,10 +1,12 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { DynamicAppSidebar } from "@/components/DynamicAppSidebar";
 import { AppTopBar } from "@/components/AppTopBar";
-import { RunwayCard } from "@/components/finance/RunwayCard";
+// Lazy load components that import from syncFinanceData to prevent circular dependency during module initialization
+const RunwayCard = lazy(() => import("@/components/finance/RunwayCard").then(m => ({ default: m.RunwayCard })));
+const CashFlowChart = lazy(() => import("@/components/finance/CashFlowChart").then(m => ({ default: m.CashFlowChart })));
+// Static imports for components that only use useFinanceData (no direct syncFinanceData import)
 import { FundingPipeline } from "@/components/finance/FundingPipeline";
 import { CapTable } from "@/components/finance/CapTable";
-import { CashFlowChart } from "@/components/finance/CashFlowChart";
 import { FinancialMetricsGrid } from "@/components/finance/FinancialMetricsGrid";
 import { InvoiceTracker } from "@/components/finance/InvoiceTracker";
 import { PayrollOverview } from "@/components/finance/PayrollOverview";
@@ -118,7 +120,9 @@ const FinanceHub = () => {
                   <>
                     {/* Top Row - Critical Metrics */}
                     <div className="grid lg:grid-cols-3 gap-6">
-                      <RunwayCard />
+                      <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
+                        <RunwayCard />
+                      </Suspense>
                       <FundingPipeline />
                       <CapTable />
                     </div>
@@ -127,7 +131,9 @@ const FinanceHub = () => {
                     <FinancialMetricsGrid />
 
                     {/* Cash Flow Chart */}
-                    <CashFlowChart />
+                    <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
+                      <CashFlowChart />
+                    </Suspense>
 
                     {/* Operations Row */}
                     <div className="grid lg:grid-cols-3 gap-6">
@@ -154,7 +160,9 @@ const FinanceHub = () => {
                     <FinancialMetricsGrid />
 
                     {/* Cash Flow Chart */}
-                    <CashFlowChart />
+                    <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
+                      <CashFlowChart />
+                    </Suspense>
                   </>
                 )}
 
@@ -162,13 +170,17 @@ const FinanceHub = () => {
                   <>
                     {/* CFO Focus: Strategy First */}
                     <div className="grid lg:grid-cols-3 gap-6">
-                      <RunwayCard />
+                      <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
+                        <RunwayCard />
+                      </Suspense>
                       <FundingPipeline />
                       <CapTable />
                     </div>
 
                     {/* Cash Flow Chart */}
-                    <CashFlowChart />
+                    <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
+                      <CashFlowChart />
+                    </Suspense>
 
                     {/* Financial Metrics Grid */}
                     <FinancialMetricsGrid />
@@ -210,9 +222,13 @@ const FinanceHub = () => {
 
                   {/* Cash Flow Tab */}
                   <TabsContent value="cash-flow" className="mt-6 space-y-6">
-                    <CashFlowChart />
+                    <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
+                      <CashFlowChart />
+                    </Suspense>
                     <div className="grid lg:grid-cols-3 gap-6">
-                      <RunwayCard />
+                      <Suspense fallback={<div className="flex items-center justify-center p-8"><div className="text-muted-foreground">Loading...</div></div>}>
+                        <RunwayCard />
+                      </Suspense>
                       <FundingPipeline />
                       <CapTable />
                     </div>
