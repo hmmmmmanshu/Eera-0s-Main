@@ -60,6 +60,164 @@ export function getGeminiModel() {
   return resolvedModelPromise;
 }
 
+// ========================================
+// COGNITIVE HUB CHAT FUNCTIONS
+// ========================================
+
+export interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export interface ChatOptions {
+  systemPrompt?: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  jsonMode?: boolean;
+}
+
+/**
+ * Generate chat response using Gemini API directly
+ * Optimized for low latency in Cognitive Hub
+ */
+export async function generateChatResponse(options: ChatOptions): Promise<string> {
+  const model = await getGeminiModel();
+  const {
+    systemPrompt,
+    messages,
+    temperature = 0.7,
+    maxTokens = 1000,
+    jsonMode = false,
+  } = options;
+
+  try {
+    // Build prompt with system message if provided
+    let fullPrompt = "";
+    if (systemPrompt) {
+      fullPrompt += `SYSTEM: ${systemPrompt}\n\n`;
+    }
+
+    // Add conversation history
+    for (const msg of messages) {
+      if (msg.role === "system") {
+        fullPrompt += `SYSTEM: ${msg.content}\n\n`;
+      } else if (msg.role === "user") {
+        fullPrompt += `USER: ${msg.content}\n\n`;
+      } else if (msg.role === "assistant") {
+        fullPrompt += `ASSISTANT: ${msg.content}\n\n`;
+      }
+    }
+
+    // Add instruction for JSON mode if needed
+    if (jsonMode) {
+      fullPrompt += "Respond with valid JSON only, no additional text.\n\n";
+    }
+
+    // Add the last user message to make it clear what to respond to
+    const lastUserMessage = messages.filter(m => m.role === "user").slice(-1)[0];
+    if (lastUserMessage) {
+      fullPrompt += `USER: ${lastUserMessage.content}`;
+    }
+
+    const generationConfig: any = {
+      temperature,
+      maxOutputTokens: maxTokens,
+    };
+
+    if (jsonMode) {
+      // Try to use responseMimeType for JSON if supported
+      try {
+        generationConfig.responseMimeType = "application/json";
+      } catch {
+        // Fallback: just rely on prompt instruction
+      }
+    }
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+      generationConfig,
+    });
+
+    const response = await result.response;
+    let text = response.text();
+
+    // If JSON mode, try to extract JSON from response
+    if (jsonMode) {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return jsonMatch[0];
+      }
+    }
+
+    return text;
+  } catch (error: any) {
+    console.error("[Gemini Chat] Generation failed:", error);
+    throw new Error(`Gemini API error: ${error?.message || "Unknown error"}`);
+  }
+}
+
+/**
+ * Classify chat message to determine category and hub
+ */
+export async function classifyChatMessage(
+  message: string
+): Promise<{
+  hub: string | null;
+  category: string;
+  subcategories: string[];
+  intent: string;
+}> {
+  const model = await getGeminiModel();
+
+  const prompt = `Analyze this message and classify it. Output JSON with this exact structure:
+{
+  "hub": one of "marketing"|"sales"|"finance"|"ops"|"hr"|"legal"|"cognitive"|null,
+  "category": one of "marketing"|"sales"|"finance"|"ops"|"hr"|"legal"|"cognitive"|"general",
+  "subcategories": ["string1", "string2"],
+  "intent": one of "plan"|"question"|"journal"|"issue"|"discussion"|"action"
+}
+
+Message: "${message}"
+
+Return only valid JSON, no additional text.`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Extract JSON
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        hub: parsed.hub || null,
+        category: parsed.category || "general",
+        subcategories: Array.isArray(parsed.subcategories) ? parsed.subcategories : [],
+        intent: parsed.intent || "question",
+      };
+    }
+
+    // Fallback
+    return {
+      hub: null,
+      category: "general",
+      subcategories: [],
+      intent: "question",
+    };
+  } catch (error) {
+    console.error("[Gemini Chat] Classification failed:", error);
+    // Fallback classification
+    return {
+      hub: null,
+      category: "general",
+      subcategories: [],
+      intent: "question",
+    };
+  }
+}
+
 // Helper function to generate job description
 export async function generateJobDescription(
   title: string,

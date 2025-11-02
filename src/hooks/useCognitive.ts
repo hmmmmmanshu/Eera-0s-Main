@@ -2,13 +2,10 @@ import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { assembleCognitiveContext } from "@/lib/cognitive/context";
 import { getOrCreateWeeklySnapshot, saveSessionMessage, type Persona } from "@/lib/cognitive/memory";
-import { generateText, preflightTextRoute, LIGHT_TEXT_PRIMARY, LIGHT_TEXT_FALLBACK } from "@/lib/openrouter";
+import { generateChatResponse, classifyChatMessage, type ChatMessage } from "@/lib/gemini";
 import { logLLM } from "@/lib/cognitive/telemetry";
 
-const TEXT_MODEL_PRIMARY = LIGHT_TEXT_PRIMARY;
-const TEXT_MODEL_FALLBACK = LIGHT_TEXT_FALLBACK;
 const OUTPUT_TOKENS = 450; // max tokens per assistant reply
-const JSON_TOKENS = 480;   // classification JSON budget
 const CONTEXT_BUDGET = 9000; // ~9KB context budget
 
 export function useCognitiveActions(userId?: string | null) {

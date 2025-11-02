@@ -95,6 +95,15 @@ export async function calculateCashBalance(userId: string): Promise<number> {
 
     if (invoiceError && invoiceError.code !== "PGRST116") throw invoiceError;
 
+    // Get signed sales quotes (inflow)
+    const { data: salesQuotes, error: salesError } = await supabase
+      .from("sales_quotes")
+      .select("value")
+      .eq("user_id", userId)
+      .eq("status", "signed");
+
+    if (salesError && salesError.code !== "PGRST116") throw salesError;
+
     // Get all manual income (inflow)
     const { data: income, error: incomeError } = await supabase
       .from("finance_income")
@@ -122,12 +131,13 @@ export async function calculateCashBalance(userId: string): Promise<number> {
 
     // Calculate totals
     const invoiceTotal = invoices?.reduce((sum, inv) => sum + Number(inv.amount || 0), 0) || 0;
+    const salesTotal = salesQuotes?.reduce((sum, q) => sum + Number(q.value || 0), 0) || 0;
     const incomeTotal = income?.reduce((sum, inc) => sum + Number(inc.amount || 0), 0) || 0;
     const expenseTotal = expenses?.reduce((sum, exp) => sum + Number(exp.amount || 0), 0) || 0;
     const payrollTotal = payroll?.reduce((sum, pay) => sum + Number(pay.net_pay || pay.gross_pay || 0), 0) || 0;
 
     // Cash balance = Inflows - Outflows
-    const cashBalance = invoiceTotal + incomeTotal - expenseTotal - payrollTotal;
+    const cashBalance = invoiceTotal + salesTotal + incomeTotal - expenseTotal - payrollTotal;
 
     return Math.max(0, cashBalance); // Don't go negative
   } catch (error) {
@@ -138,41 +148,55 @@ export async function calculateCashBalance(userId: string): Promise<number> {
 
 /**
  * Sync runway data (cash balance + burn rate)
+ * Only updates if calculated value is non-zero, preserving manual entries
  */
-export async function syncRunway(userId: string): Promise<void> {
+export async function syncRunway(userId: string, preserveManualValues: boolean = true): Promise<void> {
   try {
-    const cashBalance = await calculateCashBalance(userId);
-    const monthlyBurnRate = await calculateMonthlyBurnRate(userId);
+    const calculatedCashBalance = await calculateCashBalance(userId);
+    const calculatedBurnRate = await calculateMonthlyBurnRate(userId);
 
     // Check if runway exists
     const { data: existing } = await supabase
       .from("finance_runway")
-      .select("id")
+      .select("*")
       .eq("user_id", userId)
       .maybeSingle();
 
     if (existing) {
-      // Update existing
-      const { error } = await supabase
-        .from("finance_runway")
-        .update({
-          cash_balance: cashBalance,
-          monthly_burn_rate: monthlyBurnRate,
-        })
-        .eq("id", existing.id);
+      // If preserving manual values, only update if:
+      // 1. Calculated value is > 0 AND existing value is 0 (first time sync)
+      // 2. OR if preserveManualValues is false (force sync)
+      const shouldUpdateCashBalance = !preserveManualValues || 
+        (calculatedCashBalance > 0 && (!existing.cash_balance || Number(existing.cash_balance) === 0));
+      
+      const shouldUpdateBurnRate = !preserveManualValues || 
+        (calculatedBurnRate > 0 && (!existing.monthly_burn_rate || Number(existing.monthly_burn_rate) === 0));
 
-      if (error) throw error;
+      if (shouldUpdateCashBalance || shouldUpdateBurnRate) {
+        const updateData: any = {};
+        if (shouldUpdateCashBalance) updateData.cash_balance = calculatedCashBalance;
+        if (shouldUpdateBurnRate) updateData.monthly_burn_rate = calculatedBurnRate;
+
+        const { error } = await supabase
+          .from("finance_runway")
+          .update(updateData)
+          .eq("id", existing.id);
+
+        if (error) throw error;
+      }
     } else {
-      // Create new
-      const { error } = await supabase
-        .from("finance_runway")
-        .insert({
-          user_id: userId,
-          cash_balance: cashBalance,
-          monthly_burn_rate: monthlyBurnRate,
-        });
+      // Create new only if we have calculated values
+      if (calculatedCashBalance > 0 || calculatedBurnRate > 0) {
+        const { error } = await supabase
+          .from("finance_runway")
+          .insert({
+            user_id: userId,
+            cash_balance: calculatedCashBalance || 0,
+            monthly_burn_rate: calculatedBurnRate || 0,
+          });
 
-      if (error) throw error;
+        if (error) throw error;
+      }
     }
   } catch (error) {
     console.error("Error syncing runway:", error);

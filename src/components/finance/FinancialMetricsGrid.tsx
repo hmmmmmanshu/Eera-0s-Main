@@ -20,6 +20,26 @@ export function FinancialMetricsGrid() {
   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const { data: payrollSummary } = usePayrollSummary(currentMonthStr);
 
+  // Fetch signed sales quotes for revenue
+  const { data: salesQuotes = [] } = useQuery({
+    queryKey: ["sales-quotes-revenue"],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("sales_quotes")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "signed");
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   // Fetch current month cash flow
   const { data: cashFlow = [] } = useQuery({
     queryKey: ["cash-flow-current"],
@@ -42,8 +62,8 @@ export function FinancialMetricsGrid() {
   });
 
   const metrics = useMemo(() => {
-    // Current month revenue (paid invoices)
-    const currentMonthRevenue = invoices
+    // Current month revenue (paid invoices + signed sales quotes)
+    const currentMonthInvoiceRevenue = invoices
       .filter((inv) => {
         if (inv.status !== "paid") return false;
         const paidDate = inv.paid_date ? parseISO(inv.paid_date) : parseISO(inv.created_at);
@@ -51,14 +71,32 @@ export function FinancialMetricsGrid() {
       })
       .reduce((sum, inv) => sum + inv.amount, 0);
 
+    const currentMonthSalesRevenue = salesQuotes
+      .filter((quote) => {
+        const signedDate = quote.signed_at ? parseISO(quote.signed_at) : parseISO(quote.created_at);
+        return isWithinInterval(signedDate, { start: currentMonthStart, end: currentMonthEnd });
+      })
+      .reduce((sum, quote) => sum + (Number(quote.value) || 0), 0);
+
+    const currentMonthRevenue = currentMonthInvoiceRevenue + currentMonthSalesRevenue;
+
     // Last month revenue
-    const lastMonthRevenue = invoices
+    const lastMonthInvoiceRevenue = invoices
       .filter((inv) => {
         if (inv.status !== "paid") return false;
         const paidDate = inv.paid_date ? parseISO(inv.paid_date) : parseISO(inv.created_at);
         return isWithinInterval(paidDate, { start: lastMonthStart, end: lastMonthEnd });
       })
       .reduce((sum, inv) => sum + inv.amount, 0);
+
+    const lastMonthSalesRevenue = salesQuotes
+      .filter((quote) => {
+        const signedDate = quote.signed_at ? parseISO(quote.signed_at) : parseISO(quote.created_at);
+        return isWithinInterval(signedDate, { start: lastMonthStart, end: lastMonthEnd });
+      })
+      .reduce((sum, quote) => sum + (Number(quote.value) || 0), 0);
+
+    const lastMonthRevenue = lastMonthInvoiceRevenue + lastMonthSalesRevenue;
 
     // Current month expenses
     const currentMonthExpenses = expenses

@@ -338,6 +338,15 @@ export async function syncCashFlow(userId: string, months: number = 6): Promise<
 
     if (invoiceError) throw invoiceError;
 
+    // Fetch signed sales quotes (also contribute to inflow)
+    const { data: salesQuotes, error: salesError } = await supabase
+      .from("sales_quotes")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("status", "signed");
+
+    if (salesError && salesError.code !== "PGRST116") throw salesError;
+
     // Fetch all expenses (contribute to outflow)
     const { data: expenses, error: expenseError } = await supabase
       .from("finance_expenses")
@@ -375,6 +384,18 @@ export async function syncCashFlow(userId: string, months: number = 6): Promise<
           cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
         }
         cashFlowByMonth[monthKey].inflow += Number(inv.amount) || 0;
+      }
+    });
+
+    // Process signed sales quotes
+    salesQuotes?.forEach((quote) => {
+      const signedDate = quote.signed_at ? new Date(quote.signed_at) : new Date(quote.created_at);
+      if (signedDate >= startDate && signedDate <= endDate) {
+        const monthKey = `${signedDate.getFullYear()}-${String(signedDate.getMonth() + 1).padStart(2, "0")}`;
+        if (!cashFlowByMonth[monthKey]) {
+          cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
+        }
+        cashFlowByMonth[monthKey].inflow += Number(quote.value) || 0;
       }
     });
 

@@ -24,7 +24,7 @@ export function RunwayCard() {
     monthly_burn_rate: runway?.monthly_burn_rate?.toString() || "",
   });
 
-  // Auto-sync runway on mount and when data changes
+  // Auto-sync runway on mount and when data changes (preserving manual values)
   useEffect(() => {
     const autoSync = async () => {
       try {
@@ -33,7 +33,8 @@ export function RunwayCard() {
         } = await supabase.auth.getUser();
         if (!user) return;
 
-        await syncRunway(user.id);
+        // Preserve manual values during auto-sync
+        await syncRunway(user.id, true);
         await queryClient.invalidateQueries({ queryKey: ["runway"] });
         await refetch();
       } catch (error: any) {
@@ -41,8 +42,10 @@ export function RunwayCard() {
       }
     };
 
-    // Sync on mount
-    autoSync();
+    // Sync on mount only if no existing runway data
+    if (!runway || (cashBalance === 0 && burnRate === 0)) {
+      autoSync();
+    }
 
     // Listen for changes to invoices, expenses, income, and payroll
     const channels = [
@@ -75,7 +78,7 @@ export function RunwayCard() {
     return () => {
       channels.forEach((channel) => channel.unsubscribe());
     };
-  }, [queryClient, refetch]);
+  }, [queryClient, refetch, runway, cashBalance, burnRate]);
 
   const handleAutoSync = async () => {
     try {
@@ -85,7 +88,8 @@ export function RunwayCard() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      await syncRunway(user.id);
+      // Force sync (overwrite manual values)
+      await syncRunway(user.id, false);
       await queryClient.invalidateQueries({ queryKey: ["runway"] });
       await refetch();
       toast.success("Runway synced from balance sheet and payroll!");
