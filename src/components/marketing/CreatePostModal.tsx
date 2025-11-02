@@ -784,8 +784,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           </div>
         )}
 
-        {/* Step 2.5: Image Type Selection (only for image/carousel) */}
-        {step === 2.5 && (contentType === "image" || contentType === "carousel") && (
+        {/* Step 3.5: Image Type Selection (only for image/carousel) */}
+        {step === 3.5 && (contentType === "image" || contentType === "carousel") && (
           <div className="space-y-4">
             <div>
               <Label>Choose Image Type</Label>
