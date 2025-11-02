@@ -49,7 +49,7 @@ export function ComplianceManager() {
     const checkOverdue = async () => {
       const {
         data: { user },
-      } = await import("@/integrations/supabase/client").then((m) => m.supabase.auth.getUser());
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       try {
@@ -75,7 +75,7 @@ export function ComplianceManager() {
       setGenerating(true);
       const {
         data: { user },
-      } = await import("@/integrations/supabase/client").then((m) => m.supabase.auth.getUser());
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const createdTasks = await generateComplianceTasks(user.id, companyInfo);
