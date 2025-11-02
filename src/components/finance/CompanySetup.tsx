@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCompanyInfo, useUpdateCompanyInfo, type CompanyType } from "@/hooks/useFinanceData";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Building2, Users, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { syncEmployeeCount, regenerateTasksAfterEmployeeSync } from "@/lib/virtualCFO";
