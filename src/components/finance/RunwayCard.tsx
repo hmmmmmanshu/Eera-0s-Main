@@ -25,6 +25,10 @@ export function RunwayCard() {
     monthly_burn_rate: runway?.monthly_burn_rate?.toString() || "",
   });
 
+  // Calculate derived values BEFORE useEffect to prevent reference errors
+  const burnRate = runway?.monthly_burn_rate ? Number(runway.monthly_burn_rate) : 0;
+  const cashBalance = runway?.cash_balance ? Number(runway.cash_balance) : 0;
+
   // Auto-sync runway on mount and when data changes (preserving manual values)
   useEffect(() => {
     const autoSync = async () => {
@@ -82,7 +86,7 @@ export function RunwayCard() {
     return () => {
       channels.forEach((channel) => channel.unsubscribe());
     };
-  }, [queryClient, refetch, runway, cashBalance, burnRate]);
+  }, [queryClient, refetch, runway]);
 
   const handleAutoSync = async () => {
     try {
@@ -127,8 +131,6 @@ export function RunwayCard() {
   };
 
   const runwayMonths = runway?.runway_months ? Number(runway.runway_months) : 0;
-  const burnRate = runway?.monthly_burn_rate ? Number(runway.monthly_burn_rate) : 0;
-  const cashBalance = runway?.cash_balance ? Number(runway.cash_balance) : 0;
   const runwayPercentage = (runwayMonths / 24) * 100; // Assuming 24 months is healthy
 
   // Calculate projected depletion date

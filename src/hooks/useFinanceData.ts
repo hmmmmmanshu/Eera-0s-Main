@@ -2,12 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useEffect } from "react";
-import {
-  syncOnInvoicePaid,
-  syncOnIncomeAdded,
-  syncOnExpenseAdded,
-  syncAllFinanceData,
-} from "@/lib/syncFinanceData";
+// CRITICAL: Use dynamic imports for syncFinanceData to prevent circular dependency
+// These functions are only called in onSuccess callbacks (async contexts)
+// Dynamic import prevents module initialization conflicts when components lazy-load
 
 // ========================================
 // TYPES
@@ -1090,6 +1087,7 @@ export function useCreateInvoice() {
         } = await supabase.auth.getUser();
         if (user) {
           try {
+            const { syncOnInvoicePaid } = await import("@/lib/syncFinanceData");
             await syncOnInvoicePaid(user.id);
             queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
           } catch (error) {
@@ -1135,6 +1133,7 @@ export function useUpdateInvoice() {
         } = await supabase.auth.getUser();
         if (user) {
           try {
+            const { syncOnInvoicePaid } = await import("@/lib/syncFinanceData");
             await syncOnInvoicePaid(user.id);
             queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
           } catch (error) {
