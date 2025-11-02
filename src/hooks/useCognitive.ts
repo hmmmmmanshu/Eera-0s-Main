@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { assembleCognitiveContext } from "@/lib/cognitive/context";
 import { getOrCreateWeeklySnapshot, saveSessionMessage, type Persona } from "@/lib/cognitive/memory";
-import { generateChatResponse, classifyChatMessage, type ChatMessage } from "@/lib/gemini";
+import { generateChatResponse, generateChatResponseStreaming, classifyChatMessage, type ChatMessage } from "@/lib/gemini";
 import { logLLM } from "@/lib/cognitive/telemetry";
 
 const OUTPUT_TOKENS = 450; // max tokens per assistant reply
@@ -197,13 +197,13 @@ TEXT: ${text}`;
         .eq("id", sessionId);
     }
 
-    // Get recent messages for context (last 10 messages)
+    // Get recent messages for context (reduced to 5 for faster loading)
     const { data: recentMessages } = await supabase
       .from("chat_messages")
       .select("role, content")
       .eq("session_id", sessionId)
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(5);
 
     // Build context for assistant
     const contextPrompt = await buildContextBudgeted(sessionId, classification.hub || undefined, null);
@@ -216,11 +216,10 @@ TEXT: ${text}`;
       },
     ];
 
-    // Add recent conversation history (in chronological order)
+    // Add recent conversation history (in chronological order, limit to last 4)
     if (recentMessages && recentMessages.length > 0) {
       const sortedMessages = [...recentMessages].reverse();
-      for (const msg of sortedMessages.slice(0, 9)) {
-        // Skip the current user message we just added
+      for (const msg of sortedMessages.slice(0, 4)) {
         chatHistory.push({
           role: msg.role as "user" | "assistant",
           content: msg.content,
@@ -677,7 +676,149 @@ TEXT: ${text}`;
     }
   }, []);
 
-  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, pinPlanToSession };
+  // Streaming version of sendChatWithPlanExtract
+  const sendChatWithPlanExtractStreaming = useCallback(async function* (
+    message: string
+  ): AsyncGenerator<{ chunk?: string; complete?: { reply: string; sessionId: string; pinnedPlanId: string | null; classification: any } }, void, unknown> {
+    if (!userId) throw new Error("No user");
+    const sessionId = await createOrGetSession();
+    
+    // Start classification and context loading in parallel for faster response
+    const classificationPromise = classifyChatMessage(message).catch(() => ({ 
+      hub: null, category: "general", subcategories: [], intent: "question" 
+    }));
+    const recentMessagesPromise = supabase
+      .from("chat_messages")
+      .select("role, content")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    const contextPromise = buildContextBudgeted(sessionId, undefined, null);
+
+    // Wait for classification (faster)
+    const classification = await classificationPromise;
+
+    // Save user message immediately (optimistic)
+    await supabase.from("chat_messages").insert({
+      session_id: sessionId,
+      user_id: userId,
+      role: "user",
+      content: message,
+      hub: classification.hub,
+      category: classification.category,
+      subcategories: classification.subcategories,
+    });
+
+    // Get messages and context in parallel
+    const { data: recentMessages } = await recentMessagesPromise;
+    const contextPrompt = await contextPromise;
+
+    // Build chat history (reduced context)
+    const chatHistory: ChatMessage[] = [{
+      role: "system",
+      content: `You are Acharya, an operator-mentor. Be concise. Context: ${contextPrompt}`,
+    }];
+
+    if (recentMessages && recentMessages.length > 0) {
+      const sortedMessages = [...recentMessages].reverse().slice(0, 4);
+      for (const msg of sortedMessages) {
+        chatHistory.push({
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+        });
+      }
+    }
+
+    chatHistory.push({ role: "user", content: message });
+
+    // Stream response
+    let fullReply = "";
+    try {
+      const stream = generateChatResponseStreaming({
+        systemPrompt: `You are Acharya, an operator-mentor helping founders. Be concise, actionable, and empathetic. Context: ${contextPrompt}`,
+        messages: chatHistory,
+        temperature: 0.7,
+        maxTokens: OUTPUT_TOKENS,
+      });
+
+      for await (const chunk of stream) {
+        fullReply += chunk;
+        yield { chunk };
+      }
+
+      // Save complete reply
+      await supabase.from("chat_messages").insert({
+        session_id: sessionId,
+        user_id: userId,
+        role: "assistant",
+        content: fullReply,
+        hub: classification.hub,
+        category: classification.category,
+        subcategories: classification.subcategories,
+      });
+
+      // Extract plan in background (don't wait)
+      let pinnedPlan: string | null = null;
+      if (classification.intent === "plan" && classification.hub) {
+        // Do this async, don't block
+        (async () => {
+          try {
+            const planJson = await generateChatResponse({
+              systemPrompt: `Extract actionable plan details. Output JSON: {title: string, summary: string, next_step: string} | null`,
+              messages: chatHistory,
+              jsonMode: true,
+              maxTokens: 200,
+            });
+            const planData = JSON.parse(planJson);
+            if (planData?.title) {
+              const { data: plan } = await supabase
+                .from("hub_plans")
+                .insert({
+                  user_id: userId,
+                  hub: classification.hub,
+                  subcategories: classification.subcategories,
+                  title: planData.title,
+                  summary: planData.summary || null,
+                  next_step: planData.next_step || null,
+                  last_discussed_at: new Date().toISOString(),
+                  source_session_id: sessionId,
+                })
+                .select("id")
+                .single();
+              if (plan?.id) {
+                await supabase.from("chat_sessions").update({ pinned_plan_id: plan.id }).eq("id", sessionId);
+              }
+            }
+          } catch (error) {
+            console.error("Plan extraction error:", error);
+          }
+        })();
+      }
+
+      yield { 
+        complete: { 
+          reply: fullReply, 
+          sessionId, 
+          pinnedPlanId: pinnedPlan, 
+          classification 
+        } 
+      };
+    } catch (error) {
+      console.error("Chat streaming error:", error);
+      const errorReply = "I'm having trouble processing that right now. Could you try rephrasing?";
+      yield { chunk: errorReply };
+      yield { 
+        complete: { 
+          reply: errorReply, 
+          sessionId, 
+          pinnedPlanId: null, 
+          classification 
+        } 
+      };
+    }
+  }, [userId, createOrGetSession]);
+
+  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, sendChatWithPlanExtractStreaming, pinPlanToSession };
 }
 
 function personaSystem(persona: Persona, tone?: string) {

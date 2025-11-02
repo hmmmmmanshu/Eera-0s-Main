@@ -4,22 +4,23 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCognitiveActions } from "@/hooks/useCognitive";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 
 export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?: string | null) => void }) {
   const { user } = useAuth();
   const { preflightLLM } = useCognitiveActions(user?.id);
-  const { sendChatWithPlanExtract } = useCognitiveActions(user?.id) as any;
-  const { } = useCognitiveActions(user?.id) as any;
-  const [messages, setMessages] = useState<{ role: "user"|"assistant", text: string }[]>([
+  const { sendChatWithPlanExtractStreaming } = useCognitiveActions(user?.id) as any;
+  const [messages, setMessages] = useState<{ role: "user"|"assistant", text: string; streaming?: boolean }[]>([
     { role: "assistant", text: "Hi! What should we work on today?" }
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [modelOk, setModelOk] = useState<boolean | null>(null);
   const location = useLocation();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -32,6 +33,11 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
     })();
   }, [preflightLLM]);
 
+  // Auto-scroll to bottom when messages update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   // If user clicked Continue from plans list, pre-fill a helpful prompt
   useEffect(() => {
     const sp = new URLSearchParams(location.search);
@@ -40,6 +46,79 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
       setMessages((h) => [...h, { role: "assistant", text: "Continuing the selected plan. Share your next detail or ask to generate steps." }]);
     }
   }, [location.search]);
+
+  const handleSend = async () => {
+    if (!input.trim() || busy || !modelOk) return;
+    
+    const msg = input.trim();
+    setInput("");
+    setBusy(true);
+
+    // Optimistic UI: Add user message immediately
+    setMessages((h) => [...h, { role: "user", text: msg }]);
+    
+    // Add typing indicator
+    setMessages((h) => [...h, { role: "assistant", text: "", streaming: true }]);
+
+    try {
+      let fullReply = "";
+      const stream = sendChatWithPlanExtractStreaming(msg);
+
+      for await (const item of stream) {
+        if (item.chunk) {
+          fullReply += item.chunk;
+          // Update the last message with streaming content
+          setMessages((h) => {
+            const newMessages = [...h];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg && lastMsg.role === "assistant") {
+              lastMsg.text = fullReply;
+              lastMsg.streaming = true;
+            }
+            return newMessages;
+          });
+        }
+
+        if (item.complete) {
+          // Finalize the message
+          setMessages((h) => {
+            const newMessages = [...h];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg && lastMsg.role === "assistant") {
+              lastMsg.text = item.complete.reply;
+              lastMsg.streaming = false;
+            }
+            return newMessages;
+          });
+          
+          onPlanCreated?.(item.complete.pinnedPlanId);
+          break; // Exit loop once complete
+        }
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Chat failed");
+      // Remove the streaming message on error
+      setMessages((h) => {
+        const filtered = h.filter((msg, idx) => {
+          // Remove the last assistant message if it's empty/streaming
+          if (idx === h.length - 1 && msg.role === "assistant" && !msg.text) {
+            return false;
+          }
+          return true;
+        });
+        return filtered;
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <Card className="border-accent/30">
@@ -53,29 +132,34 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
         <div className="space-y-2 max-h-80 overflow-y-auto">
           {messages.map((m, idx) => (
             <div key={idx} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[85%] p-3 rounded-lg text-sm ${m.role === "user" ? "bg-accent text-accent-foreground" : "bg-muted border"}`}>{m.text}</div>
+              <div className={`max-w-[85%] p-3 rounded-lg text-sm relative ${
+                m.role === "user" 
+                  ? "bg-accent text-accent-foreground" 
+                  : "bg-muted border"
+              }`}>
+                {m.text || (m.streaming && <span className="text-muted-foreground">Thinking...</span>)}
+                {m.streaming && (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-2 inline" />
+                )}
+              </div>
             </div>
           ))}
+          <div ref={messagesEndRef} />
         </div>
         <div className="flex gap-2">
-          <Input placeholder="Chat with Acharya…" value={input} onChange={(e) => setInput(e.target.value)} />
-          <Button disabled={busy || !modelOk} onClick={async () => {
-            if (!input.trim()) return;
-            try {
-              setBusy(true);
-              const msg = input.trim();
-              setMessages((h) => [...h, { role: "user", text: msg }]);
-              setInput("");
-              const res = await sendChatWithPlanExtract(msg);
-              if (res?.classification?.hub) {
-                // show classification chip above reply
-              }
-              setMessages((h) => [...h, { role: "assistant", text: res.reply }]);
-              onPlanCreated?.(res?.pinnedPlanId);
-            } catch (e: any) {
-              toast.error(e?.message || "Chat failed");
-            } finally { setBusy(false); }
-          }}>Send</Button>
+          <Input 
+            placeholder="Chat with Acharya… (Press Enter to send)" 
+            value={input} 
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={busy || !modelOk}
+          />
+          <Button 
+            disabled={busy || !modelOk || !input.trim()} 
+            onClick={handleSend}
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
+          </Button>
         </div>
       </CardContent>
     </Card>

@@ -152,6 +152,104 @@ export async function generateChatResponse(options: ChatOptions): Promise<string
 }
 
 /**
+ * Generate chat response with streaming support
+ * Returns an async generator that yields chunks of text as they arrive
+ */
+export async function* generateChatResponseStreaming(options: ChatOptions): AsyncGenerator<string, void, unknown> {
+  const model = await getGeminiModel();
+  const {
+    systemPrompt,
+    messages,
+    temperature = 0.7,
+    maxTokens = 1000,
+    jsonMode = false,
+  } = options;
+
+  try {
+    // Build prompt with system message if provided
+    let fullPrompt = "";
+    if (systemPrompt) {
+      fullPrompt += `${systemPrompt}\n\n`;
+    }
+
+    // Add conversation history
+    for (const msg of messages) {
+      if (msg.role === "system") {
+        fullPrompt += `${msg.content}\n\n`;
+      } else if (msg.role === "user") {
+        fullPrompt += `User: ${msg.content}\n\n`;
+      } else if (msg.role === "assistant") {
+        fullPrompt += `Assistant: ${msg.content}\n\n`;
+      }
+    }
+
+    if (jsonMode) {
+      fullPrompt += "Respond with valid JSON only, no additional text or explanation.\n\n";
+    }
+
+    const generationConfig: any = {
+      temperature,
+      maxOutputTokens: maxTokens,
+    };
+
+    if (jsonMode) {
+      try {
+        generationConfig.responseMimeType = "application/json";
+      } catch {
+        // Fallback
+      }
+    }
+
+    // Use streaming API - Gemini SDK uses generateContentStream method
+    let fullText = "";
+    try {
+      const result = await model.generateContentStream(fullPrompt, {
+        generationConfig,
+      });
+
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        if (chunkText) {
+          fullText += chunkText;
+          yield chunkText;
+        }
+      }
+    } catch (streamError) {
+      // Fallback to non-streaming if streaming fails
+      console.warn("Streaming not available, using fallback:", streamError);
+      const result = await model.generateContent(fullPrompt, {
+        generationConfig,
+      });
+      const response = await result.response;
+      const text = response.text();
+      fullText = text;
+      
+      // Simulate streaming by yielding in word chunks for better UX
+      const words = text.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        const chunk = (i === 0 ? '' : ' ') + words[i];
+        yield chunk;
+        // Small delay to simulate streaming
+        if (i % 3 === 0 && i < words.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 15));
+        }
+      }
+    }
+
+    // If JSON mode, try to extract JSON from full response
+    if (jsonMode && fullText) {
+      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        yield jsonMatch[0];
+      }
+    }
+  } catch (error: any) {
+    console.error("[Gemini Chat] Streaming failed:", error);
+    throw new Error(`Gemini API error: ${error?.message || "Unknown error"}`);
+  }
+}
+
+/**
  * Classify chat message to determine category and hub
  */
 export async function classifyChatMessage(
@@ -669,14 +767,66 @@ Return as JSON array: ["hashtag1", "hashtag2", ...]`;
 }
 
 /**
- * Enhance user's prompt for image generation with brand context and image type
+ * Enhance user's prompt for image generation using 10x amplification engine
+ * This now uses the new amplification system instead of basic enhancement
  */
 export async function enhanceImagePrompt(
   userPrompt: string,
   brandContext: BrandContext,
   platform: "linkedin" | "instagram",
-  imageType?: string | null
+  imageType?: string | null,
+  amplificationContext?: {
+    accountType?: "personal" | "company";
+    colorConfig?: {
+      mode: "brand" | "custom" | "mood";
+      primary?: string;
+      accent?: string;
+    };
+    objective?: "awareness" | "leads" | "engagement" | "recruitment";
+    tone?: string;
+  }
 ): Promise<string> {
+  // Use new 10x amplification engine if we have the context
+  if (amplificationContext && imageType) {
+    try {
+      const { amplifyPromptForNanoBanana } = await import("./promptAmplification");
+      
+      // Extract headline and key points from userPrompt
+      const parts = userPrompt.split(/\n|\. /);
+      const headline = parts[0] || userPrompt;
+      const keyPoints = parts.slice(1).join("\n") || "";
+
+      const amplified = await amplifyPromptForNanoBanana({
+        accountType: amplificationContext.accountType || "company",
+        platform,
+        imageType: imageType as any,
+        userInput: {
+          headline,
+          keyPoints,
+        },
+        brandContext,
+        colorConfig: amplificationContext.colorConfig || {
+          mode: "brand",
+        },
+        objective: amplificationContext.objective,
+        tone: amplificationContext.tone,
+      });
+
+      // Store metadata for learning system
+      (amplified as any).__metadata = {
+        intent: amplified.intent,
+        visualCues: amplified.visualCues,
+        mood: amplified.mood,
+      };
+
+      return amplified.prompt;
+    } catch (e) {
+      console.warn("Amplification engine failed, falling back to basic enhancement", e);
+      // Fall through to basic enhancement
+    }
+  }
+
+  // Fallback: Basic enhancement (for backward compatibility)
   const model = await getGeminiModel();
 
   // Import image type presets if imageType is provided
