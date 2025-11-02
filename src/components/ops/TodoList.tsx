@@ -2,17 +2,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, X } from "lucide-react";
+import { Plus, Calendar, X, LayoutDashboard } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { syncOpsTaskToDashboard } from "@/lib/syncOpsTasks";
 
 export function TodoList() {
   const { user } = useAuth();
   const [todos, setTodos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [newTask, setNewTask] = useState("");
+  const [syncToDashboard, setSyncToDashboard] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -45,15 +47,28 @@ export function TodoList() {
       return;
     }
     try {
-      const { error } = await supabase.from("ops_tasks").insert({
+      const { data, error } = await supabase.from("ops_tasks").insert({
         user_id: user.id,
         title: newTask.trim(),
         status: "todo",
         priority: "medium",
-      });
+        sync_to_dashboard: syncToDashboard,
+      }).select().single();
       if (error) throw error;
+      
+      // Sync to dashboard if enabled
+      if (syncToDashboard && data) {
+        try {
+          await syncOpsTaskToDashboard(data.id, user.id);
+        } catch (syncError: any) {
+          console.error("Failed to sync task to dashboard:", syncError);
+          toast.warning("Task added but failed to sync to dashboard");
+        }
+      }
+      
       toast.success("Task added");
       setNewTask("");
+      setSyncToDashboard(false);
       loadTodos();
     } catch (e: any) {
       toast.error(e?.message || "Failed to add task");
@@ -70,9 +85,55 @@ export function TodoList() {
         .eq("id", id)
         .eq("user_id", user.id);
       if (error) throw error;
+      
+      // Sync to dashboard if enabled
+      const todo = todos.find(t => t.id === id);
+      if (todo?.sync_to_dashboard) {
+        try {
+          await syncOpsTaskToDashboard(id, user.id);
+        } catch (syncError: any) {
+          console.error("Failed to sync task update to dashboard:", syncError);
+        }
+      }
+      
       loadTodos();
     } catch (e: any) {
       toast.error("Failed to update task");
+    }
+  };
+  
+  const toggleSyncToDashboard = async (todoId: string, currentSyncState: boolean) => {
+    if (!user?.id) return;
+    try {
+      const { error } = await supabase
+        .from("ops_tasks")
+        .update({ sync_to_dashboard: !currentSyncState })
+        .eq("id", todoId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      
+      // Sync to dashboard or remove based on new state
+      if (!currentSyncState) {
+        // Enable sync - add to dashboard
+        try {
+          await syncOpsTaskToDashboard(todoId, user.id);
+          toast.success("Task synced to dashboard");
+        } catch (syncError: any) {
+          toast.error("Failed to sync task to dashboard");
+        }
+      } else {
+        // Disable sync - this will remove from dashboard via sync function
+        try {
+          await syncOpsTaskToDashboard(todoId, user.id);
+          toast.success("Task removed from dashboard");
+        } catch (syncError: any) {
+          console.error("Failed to remove task from dashboard:", syncError);
+        }
+      }
+      
+      loadTodos();
+    } catch (e: any) {
+      toast.error("Failed to update sync setting");
     }
   };
 
@@ -109,6 +170,20 @@ export function TodoList() {
             <Plus className="h-4 w-4" />
           </Button>
         </div>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="sync-todo"
+            checked={syncToDashboard}
+            onCheckedChange={(checked) => setSyncToDashboard(checked === true)}
+          />
+          <label
+            htmlFor="sync-todo"
+            className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1"
+          >
+            <LayoutDashboard className="h-3 w-3" />
+            Sync new tasks to Dashboard
+          </label>
+        </div>
 
         <div className="space-y-3 max-h-96 overflow-y-auto">
           {loading ? (
@@ -135,9 +210,20 @@ export function TodoList() {
                       </div>
                     )}
                   </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteTodo(todo.id)}>
-                    <X className="h-3 w-3" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      title={todo.sync_to_dashboard ? "Synced to dashboard" : "Sync to dashboard"}
+                      onClick={() => toggleSyncToDashboard(todo.id, todo.sync_to_dashboard || false)}
+                    >
+                      <LayoutDashboard className={`h-3 w-3 ${todo.sync_to_dashboard ? "text-accent" : "text-muted-foreground"}`} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteTodo(todo.id)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               );
             })

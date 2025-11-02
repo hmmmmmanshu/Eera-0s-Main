@@ -40,6 +40,25 @@ export function FinancialMetricsGrid() {
     },
   });
 
+  // Fetch manual income entries for revenue (to match Balance Sheet)
+  const { data: manualIncome = [] } = useQuery({
+    queryKey: ["manual-income-revenue"],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase
+        .from("finance_income")
+        .select("*")
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   // Fetch current month cash flow
   const { data: cashFlow = [] } = useQuery({
     queryKey: ["cash-flow-current"],
@@ -62,7 +81,7 @@ export function FinancialMetricsGrid() {
   });
 
   const metrics = useMemo(() => {
-    // Current month revenue (paid invoices + signed sales quotes)
+    // Current month revenue (paid invoices + signed sales quotes + manual income)
     const currentMonthInvoiceRevenue = invoices
       .filter((inv) => {
         if (inv.status !== "paid") return false;
@@ -78,7 +97,14 @@ export function FinancialMetricsGrid() {
       })
       .reduce((sum, quote) => sum + (Number(quote.value) || 0), 0);
 
-    const currentMonthRevenue = currentMonthInvoiceRevenue + currentMonthSalesRevenue;
+    const currentMonthManualIncome = manualIncome
+      .filter((inc) => {
+        const incomeDate = parseISO(inc.income_date);
+        return isWithinInterval(incomeDate, { start: currentMonthStart, end: currentMonthEnd });
+      })
+      .reduce((sum, inc) => sum + Number(inc.amount || 0), 0);
+
+    const currentMonthRevenue = currentMonthInvoiceRevenue + currentMonthSalesRevenue + currentMonthManualIncome;
 
     // Last month revenue
     const lastMonthInvoiceRevenue = invoices
@@ -96,7 +122,14 @@ export function FinancialMetricsGrid() {
       })
       .reduce((sum, quote) => sum + (Number(quote.value) || 0), 0);
 
-    const lastMonthRevenue = lastMonthInvoiceRevenue + lastMonthSalesRevenue;
+    const lastMonthManualIncome = manualIncome
+      .filter((inc) => {
+        const incomeDate = parseISO(inc.income_date);
+        return isWithinInterval(incomeDate, { start: lastMonthStart, end: lastMonthEnd });
+      })
+      .reduce((sum, inc) => sum + Number(inc.amount || 0), 0);
+
+    const lastMonthRevenue = lastMonthInvoiceRevenue + lastMonthSalesRevenue + lastMonthManualIncome;
 
     // Current month expenses
     const currentMonthExpenses = expenses
@@ -189,7 +222,7 @@ export function FinancialMetricsGrid() {
       color: "text-accent"
     }
   ];
-  }, [invoices, expenses, payrollSummary, currentMonthStart, currentMonthEnd, lastMonthStart, lastMonthEnd]);
+  }, [invoices, expenses, payrollSummary, salesQuotes, manualIncome, currentMonthStart, currentMonthEnd, lastMonthStart, lastMonthEnd]);
 
   if (!metrics || metrics.length === 0) {
     return (

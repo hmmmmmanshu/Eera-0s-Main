@@ -2,11 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, X, LayoutDashboard } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { syncOpsTaskToDashboard } from "@/lib/syncOpsTasks";
 
 export function KanbanBoard() {
   const { user } = useAuth();
@@ -15,6 +17,7 @@ export function KanbanBoard() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [activeColumn, setActiveColumn] = useState<"todo" | "progress" | "done">("todo");
+  const [syncToDashboard, setSyncToDashboard] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -56,12 +59,25 @@ export function KanbanBoard() {
           title: newTaskTitle.trim(),
           status: statusMap[activeColumn] || "todo",
           priority: "medium",
+          sync_to_dashboard: syncToDashboard,
         })
         .select()
         .single();
       if (error) throw error;
+      
+      // Sync to dashboard if enabled
+      if (syncToDashboard && data) {
+        try {
+          await syncOpsTaskToDashboard(data.id, user.id);
+        } catch (syncError: any) {
+          console.error("Failed to sync task to dashboard:", syncError);
+          toast.warning("Task added but failed to sync to dashboard");
+        }
+      }
+      
       toast.success("Task added");
       setNewTaskTitle("");
+      setSyncToDashboard(false);
       setShowAddForm(false);
       loadTasks();
     } catch (e: any) {
@@ -84,9 +100,55 @@ export function KanbanBoard() {
         .eq("id", taskId)
         .eq("user_id", user.id);
       if (error) throw error;
+      
+      // Sync to dashboard if enabled
+      const task = tasks.find(t => t.id === taskId);
+      if (task?.sync_to_dashboard) {
+        try {
+          await syncOpsTaskToDashboard(taskId, user.id);
+        } catch (syncError: any) {
+          console.error("Failed to sync task update to dashboard:", syncError);
+        }
+      }
+      
       loadTasks();
     } catch (e: any) {
       toast.error("Failed to move task");
+    }
+  };
+  
+  const toggleSyncToDashboard = async (taskId: string, currentSyncState: boolean) => {
+    if (!user?.id) return;
+    try {
+      const { error } = await supabase
+        .from("ops_tasks")
+        .update({ sync_to_dashboard: !currentSyncState })
+        .eq("id", taskId)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      
+      // Sync to dashboard or remove based on new state
+      if (!currentSyncState) {
+        // Enable sync - add to dashboard
+        try {
+          await syncOpsTaskToDashboard(taskId, user.id);
+          toast.success("Task synced to dashboard");
+        } catch (syncError: any) {
+          toast.error("Failed to sync task to dashboard");
+        }
+      } else {
+        // Disable sync - this will remove from dashboard via sync function
+        try {
+          await syncOpsTaskToDashboard(taskId, user.id);
+          toast.success("Task removed from dashboard");
+        } catch (syncError: any) {
+          console.error("Failed to remove task from dashboard:", syncError);
+        }
+      }
+      
+      loadTasks();
+    } catch (e: any) {
+      toast.error("Failed to update sync setting");
     }
   };
 
@@ -165,24 +227,35 @@ export function KanbanBoard() {
                     <Badge variant={getPriorityColor(task.priority || "medium")} className="text-xs">
                       {task.priority || "medium"}
                     </Badge>
-                    {column.id !== "done" && (
+                    <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
-                        size="sm"
-                        className="text-xs"
-                        onClick={() => {
-                          const nextStatus =
-                            column.id === "todo"
-                              ? "progress"
-                              : column.id === "progress"
-                              ? "done"
-                              : "done";
-                          moveTask(task.id, nextStatus);
-                        }}
+                        size="icon"
+                        className="h-6 w-6"
+                        title={task.sync_to_dashboard ? "Synced to dashboard" : "Sync to dashboard"}
+                        onClick={() => toggleSyncToDashboard(task.id, task.sync_to_dashboard || false)}
                       >
-                        Move →
+                        <LayoutDashboard className={`h-3 w-3 ${task.sync_to_dashboard ? "text-accent" : "text-muted-foreground"}`} />
                       </Button>
-                    )}
+                      {column.id !== "done" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => {
+                            const nextStatus =
+                              column.id === "todo"
+                                ? "progress"
+                                : column.id === "progress"
+                                ? "done"
+                                : "done";
+                            moveTask(task.id, nextStatus);
+                          }}
+                        >
+                          Move →
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
@@ -199,9 +272,24 @@ export function KanbanBoard() {
                     if (e.key === "Escape") {
                       setShowAddForm(false);
                       setNewTaskTitle("");
+                      setSyncToDashboard(false);
                     }
                   }}
                 />
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id={`sync-${column.id}`}
+                    checked={syncToDashboard}
+                    onCheckedChange={(checked) => setSyncToDashboard(checked === true)}
+                  />
+                  <label
+                    htmlFor={`sync-${column.id}`}
+                    className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1"
+                  >
+                    <LayoutDashboard className="h-3 w-3" />
+                    Sync to Dashboard
+                  </label>
+                </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={addTask} disabled={!newTaskTitle.trim()}>
                     Add
@@ -212,6 +300,7 @@ export function KanbanBoard() {
                     onClick={() => {
                       setShowAddForm(false);
                       setNewTaskTitle("");
+                      setSyncToDashboard(false);
                     }}
                   >
                     Cancel

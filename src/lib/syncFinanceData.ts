@@ -211,6 +211,8 @@ export async function syncRunway(userId: string, preserveManualValues: boolean =
 export async function syncCashFlow(userId: string, months: number = 6): Promise<void> {
   try {
     const endDate = new Date();
+    // Include current month and 1 month in future to capture scheduled expenses/income
+    endDate.setMonth(endDate.getMonth() + 1);
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - months);
 
@@ -299,6 +301,7 @@ export async function syncCashFlow(userId: string, months: number = 6): Promise<
     // Process expenses
     expenses?.forEach((exp) => {
       const expenseDate = new Date(exp.expense_date);
+      // Include expenses within the date range (including future months for forecasting)
       if (expenseDate >= startDate && expenseDate <= endDate) {
         const monthKey = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, "0")}`;
         if (!cashFlowByMonth[monthKey]) {
