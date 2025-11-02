@@ -11,7 +11,8 @@ import { format, addMonths } from "date-fns";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { syncRunway, syncAllFinanceData } from "@/lib/syncFinanceData";
+// Dynamic import to avoid circular dependency during module initialization
+// Do NOT import syncFinanceData statically - use dynamic import instead
 
 export function RunwayCard() {
   const { data: runway, isLoading, refetch } = useRunway();
@@ -33,6 +34,9 @@ export function RunwayCard() {
         } = await supabase.auth.getUser();
         if (!user) return;
 
+        // Dynamic import to avoid circular dependency
+        const { syncRunway } = await import("@/lib/syncFinanceData");
+        
         // Preserve manual values during auto-sync
         await syncRunway(user.id, true);
         await queryClient.invalidateQueries({ queryKey: ["runway"] });
@@ -88,6 +92,9 @@ export function RunwayCard() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Dynamic import to avoid circular dependency
+      const { syncRunway } = await import("@/lib/syncFinanceData");
+      
       // Force sync (overwrite manual values)
       await syncRunway(user.id, false);
       await queryClient.invalidateQueries({ queryKey: ["runway"] });

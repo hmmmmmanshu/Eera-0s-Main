@@ -17,7 +17,8 @@ import { useCashFlow } from "@/hooks/useFinanceData";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { syncCashFlow } from "@/lib/syncFinanceData";
+// Dynamic import to avoid circular dependency during module initialization
+// Do NOT import syncFinanceData statically - use dynamic import instead
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,9 @@ export function CashFlowChart() {
         } = await supabase.auth.getUser();
         if (!user) return;
 
+        // Dynamic import to avoid circular dependency
+        const { syncCashFlow } = await import("@/lib/syncFinanceData");
+        
         await syncCashFlow(user.id, 6);
         await queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
         await refetch();
@@ -88,6 +92,9 @@ export function CashFlowChart() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Dynamic import to avoid circular dependency
+      const { syncCashFlow } = await import("@/lib/syncFinanceData");
+      
       await syncCashFlow(user.id, 6);
       await queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
       await refetch();
