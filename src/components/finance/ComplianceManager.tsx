@@ -26,6 +26,7 @@ import {
 import { format, differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import { generateComplianceTasks, checkOverdueTasks } from "@/lib/virtualCFO";
+import { supabase } from "@/integrations/supabase/client";
 import { generateComplianceReminder } from "@/lib/gemini";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";

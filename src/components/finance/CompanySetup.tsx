@@ -14,7 +14,7 @@ import { useCompanyInfo, useUpdateCompanyInfo, type CompanyType } from "@/hooks/
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Building2, Users, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { syncEmployeeCount, regenerateTasksAfterEmployeeSync } from "@/lib/virtualCFO";
+import { syncEmployeeCount, regenerateTasksAfterEmployeeSync, generateComplianceTasks } from "@/lib/virtualCFO";
 import { supabase } from "@/integrations/supabase/client";
 
 export function CompanySetup() {
@@ -117,7 +117,6 @@ export function CompanySetup() {
             .eq("id", user.id);
 
           // Generate compliance tasks
-          const { generateComplianceTasks } = await import("@/lib/virtualCFO");
           const { data: companyInfoData } = await supabase
             .from("company_info")
             .select("*")
