@@ -12,7 +12,6 @@ import { ExpenseTracking } from "@/components/finance/ExpenseTracking";
 import { VirtualCFOInsights } from "@/components/finance/VirtualCFOInsights";
 import { RoleToggle } from "@/components/finance/RoleToggle";
 import { AICFOInsightBox } from "@/components/finance/AICFOInsightBox";
-import { CompanySetup } from "@/components/finance/CompanySetup";
 import { InvoiceGenerator } from "@/components/finance/InvoiceGenerator";
 import { PayrollDashboard } from "@/components/finance/PayrollDashboard";
 import { ComplianceManager } from "@/components/finance/ComplianceManager";
@@ -54,7 +53,6 @@ const FinanceHub = () => {
   const getTabsForRole = () => {
     const allTabs = [
       { value: "overview", label: "Overview", icon: DollarSign, availableFor: ["all", "accountant", "cfo"] },
-      { value: "company-setup", label: "Company Setup", icon: Building2, availableFor: ["all", "accountant", "cfo"] },
       { value: "invoices", label: "Invoices", icon: FileText, availableFor: ["all", "accountant"] },
       { value: "payroll", label: "Payroll", icon: Users, availableFor: ["all", "accountant"] },
       { value: "expenses", label: "Expenses", icon: ShoppingCart, availableFor: ["all", "accountant"] },
@@ -186,11 +184,6 @@ const FinanceHub = () => {
                         <p>Please select a role to view the overview</p>
                       </div>
                     )}
-                  </TabsContent>
-
-                  {/* Company Setup Tab */}
-                  <TabsContent value="company-setup" className="mt-6">
-                    <CompanySetup />
                   </TabsContent>
 
                   {/* Invoices Tab */}

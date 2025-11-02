@@ -34,18 +34,42 @@ CREATE TABLE IF NOT EXISTS public.chat_messages (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Add check constraints after table creation
-ALTER TABLE public.chat_messages 
-  ADD CONSTRAINT chat_messages_role_check 
-  CHECK (role IN ('user', 'assistant', 'system'));
+-- Add check constraints after table creation (only if column exists)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'chat_messages' AND column_name = 'role'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chat_messages_role_check'
+  ) THEN
+    ALTER TABLE public.chat_messages 
+      ADD CONSTRAINT chat_messages_role_check 
+      CHECK (role IN ('user', 'assistant', 'system'));
+  END IF;
 
-ALTER TABLE public.chat_messages 
-  ADD CONSTRAINT chat_messages_hub_check 
-  CHECK (hub IS NULL OR hub IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive'));
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'chat_messages' AND column_name = 'hub'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chat_messages_hub_check'
+  ) THEN
+    ALTER TABLE public.chat_messages 
+      ADD CONSTRAINT chat_messages_hub_check 
+      CHECK (hub IS NULL OR hub IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive'));
+  END IF;
 
-ALTER TABLE public.chat_messages 
-  ADD CONSTRAINT chat_messages_category_check 
-  CHECK (category IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive', 'general'));
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'chat_messages' AND column_name = 'category'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chat_messages_category_check'
+  ) THEN
+    ALTER TABLE public.chat_messages 
+      ADD CONSTRAINT chat_messages_category_check 
+      CHECK (category IN ('marketing', 'sales', 'finance', 'ops', 'hr', 'legal', 'cognitive', 'general'));
+  END IF;
+END $$;
 
 -- Enable RLS
 ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;

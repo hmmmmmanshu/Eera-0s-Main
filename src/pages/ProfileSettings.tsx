@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle2, Building2, DollarSign } from "lucide-react";
 import DashboardTopBar from "@/components/dashboard/DashboardTopBar";
+import { CompanySetup } from "@/components/finance/CompanySetup";
 
 const ProfileSettings = () => {
   const navigate = useNavigate();
@@ -48,6 +49,8 @@ const ProfileSettings = () => {
       assistant_name: "",
       assistant_style: "",
       notification_frequency: "",
+      currency: "",
+      country: "",
     },
   });
 
@@ -93,6 +96,8 @@ const ProfileSettings = () => {
           assistant_name: data.assistant_name || "",
           assistant_style: data.assistant_style || "",
           notification_frequency: data.notification_frequency || "",
+          currency: data.currency || "INR",
+          country: data.country || "India",
         });
 
         setCompletionPercentage(data.profile_completion_percentage || 0);
@@ -196,11 +201,12 @@ const ProfileSettings = () => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <Tabs defaultValue="basic" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="basic">Basic Info</TabsTrigger>
                 <TabsTrigger value="brand">Brand Voice</TabsTrigger>
                 <TabsTrigger value="marketing">Marketing</TabsTrigger>
                 <TabsTrigger value="assistant">Assistant</TabsTrigger>
+                <TabsTrigger value="finance">Company & Finance</TabsTrigger>
               </TabsList>
 
               <TabsContent value="basic" className="space-y-6">
@@ -624,6 +630,98 @@ const ProfileSettings = () => {
                         </FormItem>
                       )}
                     />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="finance" className="space-y-6">
+                {/* Currency and Country Settings */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5" />
+                      Currency & Location
+                    </CardTitle>
+                    <CardDescription>Set your preferred currency and country for financial calculations</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="currency"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Currency</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "INR"}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select currency" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="INR">₹ INR (Indian Rupee)</SelectItem>
+                              <SelectItem value="USD">$ USD (US Dollar)</SelectItem>
+                              <SelectItem value="EUR">€ EUR (Euro)</SelectItem>
+                              <SelectItem value="GBP">£ GBP (British Pound)</SelectItem>
+                              <SelectItem value="SGD">S$ SGD (Singapore Dollar)</SelectItem>
+                              <SelectItem value="AED">د.إ AED (UAE Dirham)</SelectItem>
+                              <SelectItem value="JPY">¥ JPY (Japanese Yen)</SelectItem>
+                              <SelectItem value="AUD">A$ AUD (Australian Dollar)</SelectItem>
+                              <SelectItem value="CAD">C$ CAD (Canadian Dollar)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="country"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Country</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "India"}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select country" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="India">India</SelectItem>
+                              <SelectItem value="United States">United States</SelectItem>
+                              <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                              <SelectItem value="Singapore">Singapore</SelectItem>
+                              <SelectItem value="United Arab Emirates">United Arab Emirates</SelectItem>
+                              <SelectItem value="Australia">Australia</SelectItem>
+                              <SelectItem value="Canada">Canada</SelectItem>
+                              <SelectItem value="Germany">Germany</SelectItem>
+                              <SelectItem value="France">France</SelectItem>
+                              <SelectItem value="Japan">Japan</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Country selection determines compliance requirements and tax calculations
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Company Setup */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5" />
+                      Company Registration
+                    </CardTitle>
+                    <CardDescription>
+                      Configure your company details for compliance tracking and invoicing
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <CompanySetup />
                   </CardContent>
                 </Card>
               </TabsContent>
