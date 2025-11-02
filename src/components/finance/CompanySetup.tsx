@@ -14,7 +14,8 @@ import { useCompanyInfo, useUpdateCompanyInfo, type CompanyType } from "@/hooks/
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Building2, Users, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { syncEmployeeCount, regenerateTasksAfterEmployeeSync, generateComplianceTasks } from "@/lib/virtualCFO";
+// Dynamic import to avoid circular dependency during module initialization
+// Do NOT import virtualCFO statically - use dynamic import instead
 import { supabase } from "@/integrations/supabase/client";
 
 export function CompanySetup() {
@@ -76,6 +77,9 @@ export function CompanySetup() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Dynamic import to avoid circular dependency
+      const { syncEmployeeCount, regenerateTasksAfterEmployeeSync } = await import("@/lib/virtualCFO");
+      
       const count = await syncEmployeeCount(user.id);
       
       // Invalidate and refetch company info to show updated employee count
@@ -116,7 +120,9 @@ export function CompanySetup() {
             .update({ finance_onboarding_completed: true })
             .eq("id", user.id);
 
-          // Generate compliance tasks
+          // Generate compliance tasks (dynamic import to avoid circular dependency)
+          const { generateComplianceTasks } = await import("@/lib/virtualCFO");
+          
           const { data: companyInfoData } = await supabase
             .from("company_info")
             .select("*")
