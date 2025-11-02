@@ -1,12 +1,42 @@
 import { supabase } from "@/integrations/supabase/client";
-import type {
-  CompanyInfo,
-  CompanyType,
-  ComplianceRequirement,
-  ComplianceTask,
-  ComplianceTaskPriority,
-} from "@/hooks/useFinanceData";
 import { format, addMonths, addDays, startOfMonth, getDaysInMonth } from "date-fns";
+
+// Types (local definitions to avoid circular dependency)
+type CompanyType = "private_limited" | "llp" | "opc" | "partnership" | "sole_proprietorship";
+type ComplianceTaskPriority = "low" | "medium" | "high" | "urgent";
+
+interface CompanyInfo {
+  id: string;
+  user_id: string;
+  company_name: string;
+  company_type: CompanyType;
+  number_of_employees: number;
+  [key: string]: any;
+}
+
+interface ComplianceRequirement {
+  id: string;
+  compliance_name: string;
+  compliance_type: string;
+  applicable_company_types: CompanyType[];
+  frequency: "monthly" | "quarterly" | "annual" | "one_time" | "event_based";
+  due_date_rule: { day: number; month_offset: number };
+  employee_threshold?: number;
+  turnover_threshold?: number;
+  [key: string]: any;
+}
+
+interface ComplianceTask {
+  id: string;
+  user_id: string;
+  compliance_requirement_id: string;
+  title: string;
+  description?: string;
+  due_date: string;
+  status: "upcoming" | "overdue" | "completed" | "not_applicable";
+  priority: ComplianceTaskPriority;
+  [key: string]: any;
+}
 
 /**
  * Calculate next due date based on due_date_rule
