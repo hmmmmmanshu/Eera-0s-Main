@@ -1264,6 +1264,7 @@ export function useCreateExpense() {
       } = await supabase.auth.getUser();
       if (user) {
         try {
+          const { syncOnExpenseAdded } = await import("@/lib/syncFinanceData");
           await syncOnExpenseAdded(user.id);
           queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
         } catch (error) {
@@ -1301,6 +1302,7 @@ export function useUpdateExpense() {
       } = await supabase.auth.getUser();
       if (user) {
         try {
+          const { syncOnExpenseAdded } = await import("@/lib/syncFinanceData");
           await syncOnExpenseAdded(user.id);
           queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
         } catch (error) {
@@ -1335,6 +1337,7 @@ export function useDeleteExpense() {
       } = await supabase.auth.getUser();
       if (user) {
         try {
+          const { syncOnExpenseAdded } = await import("@/lib/syncFinanceData");
           await syncOnExpenseAdded(user.id);
           queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
         } catch (error) {
@@ -1441,6 +1444,7 @@ export function useCreateIncome() {
       } = await supabase.auth.getUser();
       if (user) {
         try {
+          const { syncOnIncomeAdded } = await import("@/lib/syncFinanceData");
           await syncOnIncomeAdded(user.id);
           queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
         } catch (error) {
@@ -1478,6 +1482,7 @@ export function useUpdateIncome() {
       } = await supabase.auth.getUser();
       if (user) {
         try {
+          const { syncOnIncomeAdded } = await import("@/lib/syncFinanceData");
           await syncOnIncomeAdded(user.id);
           queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
         } catch (error) {
@@ -1512,6 +1517,7 @@ export function useDeleteIncome() {
       } = await supabase.auth.getUser();
       if (user) {
         try {
+          const { syncOnIncomeAdded } = await import("@/lib/syncFinanceData");
           await syncOnIncomeAdded(user.id);
           queryClient.invalidateQueries({ queryKey: ["runway", "cash-flow"] });
         } catch (error) {
