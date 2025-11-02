@@ -350,10 +350,15 @@ export async function regenerateTasksAfterEmployeeSync(userId: string): Promise<
 }
 
 /**
- * Sync cash flow data from invoices, expenses, and income
- * Updates finance_cash_flow table with aggregated monthly data
+ * NOTE: syncCashFlow has been moved to @/lib/syncFinanceData to break circular dependency.
+ * Import from there instead: import { syncCashFlow } from "@/lib/syncFinanceData";
+ * 
+ * Keeping a static re-export here for backwards compatibility (no dynamic imports to avoid initialization issues)
  */
-export async function syncCashFlow(userId: string, months: number = 6): Promise<void> {
+export { syncCashFlow } from "@/lib/syncFinanceData";
+
+/*
+export async function syncCashFlow_OLD(userId: string, months: number = 6): Promise<void> {
   try {
     const endDate = new Date();
     const startDate = new Date();
@@ -507,3 +512,4 @@ export async function syncCashFlow(userId: string, months: number = 6): Promise<
     throw error;
   }
 }
+*/
