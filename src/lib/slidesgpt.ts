@@ -61,28 +61,47 @@ export async function generatePresentation(
       
       // Handle different response formats
       // The edge function returns the raw SlidesGPT response which might be parsed or not
+      let parsedData: any;
+      
       if (typeof data === 'string') {
         // If it's a string, parse it
-        const parsed = JSON.parse(data);
-        return parsed as SlidesGPTGenerateResponse;
+        parsedData = JSON.parse(data);
+      } else {
+        parsedData = data;
       }
       
-      // If it's already an object, check if it has presentation property
-      if (data && typeof data === 'object') {
-        // SlidesGPT API returns { presentation: {...} }
-        if (data.presentation) {
-          return data as SlidesGPTGenerateResponse;
-        }
-        // If the response is wrapped differently, handle it
-        if (data.data && data.data.presentation) {
-          return data.data as SlidesGPTGenerateResponse;
-        }
-        // If data itself is the presentation object, wrap it
-        return { presentation: data } as SlidesGPTGenerateResponse;
+      // SlidesGPT API returns: { id, embed, download } directly OR wrapped as { presentation: {...} }
+      let presentation: any = null;
+      
+      if (parsedData.presentation) {
+        // If wrapped in presentation object
+        presentation = parsedData.presentation;
+      } else if (parsedData.id || parsedData.embed || parsedData.download) {
+        // If response is the presentation object directly (most common case)
+        presentation = parsedData;
+      } else if (parsedData.data) {
+        presentation = parsedData.data;
       }
       
-      // Normalize to expected shape
-      return data as SlidesGPTGenerateResponse;
+      if (!presentation) {
+        throw new Error("Invalid response format from SlidesGPT API");
+      }
+      
+      // Map SlidesGPT field names to our expected format
+      // SlidesGPT uses: embed, download
+      // We expect: embed_url, download_url
+      const normalizedPresentation: SlidesGPTPresentation = {
+        id: presentation.id,
+        embed_url: presentation.embed || presentation.embed_url,
+        download_url: presentation.download || presentation.download_url,
+        title: presentation.title,
+        created_at: presentation.created_at,
+      };
+      
+      return {
+        presentation: normalizedPresentation,
+        message: parsedData.message,
+      } as SlidesGPTGenerateResponse;
     } else {
       const url = `${SLIDESGPT_API_BASE}/presentations/generate`;
       const headers: Record<string, string> = {
