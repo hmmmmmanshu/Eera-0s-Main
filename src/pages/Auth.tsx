@@ -270,10 +270,11 @@ const Auth = () => {
           <div className="mt-6">
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               className="w-full"
               disabled={loading}
               onClick={handleGoogleAuth}
+              aria-label="Continue with Google"
             >
               {/* Simple Google "G" mark */}
               <svg
