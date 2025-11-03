@@ -12,7 +12,7 @@ import { Loader2, Maximize2, Minimize2 } from "lucide-react";
 export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?: string | null) => void }) {
   const { user } = useAuth();
   const { preflightLLM } = useCognitiveActions(user?.id);
-  const { sendChatWithPlanExtractStreaming, listSessions, listRecentMessages, createOrGetSession, renameSession } = useCognitiveActions(user?.id) as any;
+  const { sendChatWithPlanExtractStreaming, listSessions, listRecentMessages, createOrGetSession, renameSession, topicOfTheDay } = useCognitiveActions(user?.id) as any;
   const [messages, setMessages] = useState<{ role: "user"|"assistant", text: string; streaming?: boolean }[]>([
     { role: "assistant", text: "Hi! What should we work on today?" }
   ]);
@@ -26,6 +26,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [persona, setPersona] = useState<"friend"|"guide"|"mentor"|"ea">("friend");
+  const [dailyTopic, setDailyTopic] = useState<string>("");
 
   useEffect(() => {
     (async () => {
@@ -35,8 +36,12 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
       } catch {
         setModelOk(false);
       }
+      try {
+        const t = await topicOfTheDay();
+        setDailyTopic(t);
+      } catch {}
     })();
-  }, [preflightLLM]);
+  }, [preflightLLM, topicOfTheDay]);
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -99,7 +104,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
             const newMessages = [...h];
             const lastMsg = newMessages[newMessages.length - 1];
             if (lastMsg && lastMsg.role === "assistant") {
-              lastMsg.text = fullReply;
+              lastMsg.text = sanitizeAssistant(fullReply);
               lastMsg.streaming = true;
             }
             return newMessages;
@@ -112,7 +117,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
             const newMessages = [...h];
             const lastMsg = newMessages[newMessages.length - 1];
             if (lastMsg && lastMsg.role === "assistant") {
-              lastMsg.text = item.complete.reply;
+              lastMsg.text = sanitizeAssistant(item.complete.reply);
               lastMsg.streaming = false;
             }
             return newMessages;
@@ -200,7 +205,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
       <CardContent className="space-y-3">
         {/* Topic of the Day and Quick Actions */}
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setInput((v) => (v ? v : "Suggest a focus topic for today based on my context."))}>Topic of the Day</Button>
+          <Button size="sm" variant="secondary" onClick={() => setInput((v) => (v ? v : (dailyTopic || "Suggest a focus topic for today based on my context.")))}>{dailyTopic ? `Topic: ${dailyTopic}` : "Topic of the Day"}</Button>
           <Button size="sm" variant="outline" onClick={() => handleQuick("Generate exactly 5 startup ideas with title, category, rationale, nextStep as compact bullets.")}>Generate 5 ideas</Button>
           <Button size="sm" variant="outline" onClick={() => handleQuick("Summarize our last session into Summary, Recommendations, Next steps.")}>Summarize last session</Button>
           <Button size="sm" variant="outline" onClick={() => handleQuick("Continue the pinned plan. Propose the next 3 concrete steps.")}>Continue plan</Button>
@@ -252,4 +257,10 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   );
 }
 
-
+function sanitizeAssistant(text: string) {
+  if (!text) return text;
+  // Remove markdown asterisks and hashes, compress whitespace
+  let s = text.replace(/\*\*/g, "").replace(/\*/g, "").replace(/^#+\s*/gm, "");
+  s = s.replace(/\n{3,}/g, "\n\n");
+  return s;
+}

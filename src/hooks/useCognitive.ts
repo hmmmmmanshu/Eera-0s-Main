@@ -777,6 +777,20 @@ TEXT: ${text}`;
     if (error) throw error;
   }, []);
 
+  // Topic of the day (cached per-day)
+  const topicOfTheDay = useCallback(async () => {
+    if (!userId) throw new Error("No user");
+    const key = `cog_topic_${new Date().toISOString().slice(0,10)}`;
+    const cached = localStorage.getItem(key);
+    if (cached) return cached;
+    const ctx = await assembleCognitiveContext(userId);
+    const sys = "Generate one short, specific topic for today based on user context. Return only the title, no bullets, no quotes.";
+    const text = await generateChatResponse({ systemPrompt: sys, messages: [{ role: "user", content: JSON.stringify(ctx).slice(0, 3500) }], maxTokens: 40 });
+    const topic = (text || "Focus for today").split("\n")[0].trim();
+    localStorage.setItem(key, topic);
+    return topic;
+  }, [userId]);
+
   // Utility: list recent messages for a session
   const listRecentMessages = useCallback(async (sessionId: string, limit = 20) => {
     const { data, error } = await supabase
@@ -788,7 +802,7 @@ TEXT: ${text}`;
     if (error) throw error; return data || [];
   }, []);
 
-  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, sendChatWithPlanExtractStreaming, pinPlanToSession, listRecentMessages, createOrGetSession, listSessions, renameSession };
+  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, sendChatWithPlanExtractStreaming, pinPlanToSession, listRecentMessages, createOrGetSession, listSessions, renameSession, topicOfTheDay };
 }
 
 function personaSystem(persona: Persona, tone?: string) {
