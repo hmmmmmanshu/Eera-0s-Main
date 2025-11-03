@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { DynamicAppSidebar } from "@/components/DynamicAppSidebar";
 import { AppTopBar } from "@/components/AppTopBar";
 import { KPIStrip } from "@/components/marketing/KPIStrip";
@@ -20,10 +21,13 @@ import {
 } from "@/components/ui/dialog";
 import { Zap, Plus, Palette } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 
 type Platform = "all" | "linkedin" | "instagram";
 
 const MarketingHub = () => {
+  const location = useLocation();
+  const { logActivity } = useActivityLogger();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isBrandSettingsOpen, setIsBrandSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -34,6 +38,10 @@ const MarketingHub = () => {
   useEffect(() => {
     localStorage.setItem("marketingPlatform", platform);
   }, [platform]);
+
+  useEffect(() => {
+    logActivity(location.pathname, "visit");
+  }, [location.pathname, logActivity]);
 
   return (
     <div className="flex min-h-screen w-full">

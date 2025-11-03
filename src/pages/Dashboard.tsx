@@ -8,6 +8,7 @@ import HubsGrid from "@/components/dashboard/HubsGrid";
 import ActivityFeed from "@/components/dashboard/ActivityFeed";
 import { FinanceWidget } from "@/components/dashboard/FinanceWidget";
 import { IncompleteProfileBanner } from "@/components/IncompleteProfileBanner";
+import { DataPromptBanner } from "@/components/dashboard/DataPromptBanner";
 
 const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -22,6 +23,7 @@ const Dashboard = () => {
           <div className="space-y-8 pb-12">
             <div className="container mx-auto px-6">
               <IncompleteProfileBanner />
+              <DataPromptBanner />
               <div className="grid lg:grid-cols-3 gap-6">
                 <ActivityHeatmap />
                 <UpcomingCalendar />

@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { DynamicAppSidebar } from "@/components/DynamicAppSidebar";
 import { AppTopBar } from "@/components/AppTopBar";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Zap, Clock } from "lucide-react";
@@ -17,10 +19,16 @@ type TimeRange = "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
 type BusinessMode = "all" | "b2b" | "b2c" | "b2b2b";
 
 const SalesHub = () => {
+  const location = useLocation();
+  const { logActivity } = useActivityLogger();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>("monthly");
   const [businessMode, setBusinessMode] = useState<BusinessMode>("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    logActivity(location.pathname, "visit");
+  }, [location.pathname, logActivity]);
 
   return (
     <div className="flex min-h-screen w-full">

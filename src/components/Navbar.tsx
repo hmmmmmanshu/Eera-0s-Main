@@ -7,10 +7,9 @@ const Navbar = () => {
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <img src="/logo.webp" alt="EERA OS Logo" className="w-8 h-8 object-contain" />
-            <span className="text-xl font-bold">EERA OS</span>
-          </div>
+          <Link to="/" className="flex items-center gap-2">
+            <img src="/logo.webp" alt="Acharya Ventures OS Logo" className="w-8 h-8 object-contain" />
+          </Link>
 
           {/* CTA */}
           <div className="flex items-center gap-3">

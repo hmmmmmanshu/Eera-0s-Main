@@ -136,7 +136,7 @@ const FAQ = () => {
                           onClick={() => toggleQuestion(faq.question)}
                           className="w-full p-6 pl-20 flex items-center justify-between hover:bg-muted/30 transition-colors text-left"
                         >
-                          <span className="font-medium pr-4">{faq.question}</span>
+                          <span className="font-medium pr-4">{`${faqIndex + 1}. ${faq.question}`}</span>
                           <div className={cn(
                             "transition-transform duration-200 flex-shrink-0",
                             openQuestion === faq.question && "rotate-180"

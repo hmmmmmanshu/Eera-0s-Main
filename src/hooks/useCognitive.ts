@@ -320,11 +320,11 @@ TEXT: ${text}`;
     // AI-powered sentiment and topic extraction
     const startSenti = Date.now();
     const senti = await analyzeSentiment(payload.content);
-    await logLLM(userId, "reflection.sentiment", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - startSenti });
+    await logLLM(userId, "reflection.sentiment", "gemini", "success", { durationMs: Date.now() - startSenti });
 
     const startTopics = Date.now();
     const topics = await extractTopics(payload.content);
-    await logLLM(userId, "reflection.topics", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - startTopics });
+    await logLLM(userId, "reflection.topics", "gemini", "success", { durationMs: Date.now() - startTopics });
 
     const tags = Array.from(new Set([...(topics?.keywords || []), ...(senti?.emotions || [])])).slice(0, 10);
     const sentiment_score = typeof senti?.score === "number" ? senti.score : null;

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { DynamicAppSidebar } from "@/components/DynamicAppSidebar";
 import { AppTopBar } from "@/components/AppTopBar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,10 +8,17 @@ import { KanbanBoard } from "@/components/ops/KanbanBoard";
 import { TodoList } from "@/components/ops/TodoList";
 import { SOPLibrary } from "@/components/ops/SOPLibrary";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 
 const OpsHub = () => {
+  const location = useLocation();
+  const { logActivity } = useActivityLogger();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuth();
+
+  useEffect(() => {
+    logActivity(location.pathname, "visit");
+  }, [location.pathname, logActivity]);
 
   return (
     <div className="flex min-h-screen w-full">

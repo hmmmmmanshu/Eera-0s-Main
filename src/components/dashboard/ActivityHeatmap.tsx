@@ -14,10 +14,6 @@ const ActivityHeatmap = () => {
   const [activityData, setActivityData] = useState<ActivityData[]>([]);
   const [streak, setStreak] = useState(0);
 
-  useEffect(() => {
-    fetchActivityData();
-  }, []);
-
   const fetchActivityData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -37,6 +33,20 @@ const ActivityHeatmap = () => {
       calculateStreak(data);
     }
   };
+
+  useEffect(() => {
+    fetchActivityData();
+    // Refresh every 30 seconds to catch new activity
+    const interval = setInterval(fetchActivityData, 30000);
+    // Also refresh when window regains focus
+    const handleFocus = () => fetchActivityData();
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const calculateStreak = (data: ActivityData[]) => {
     // Simple streak calculation - count consecutive days with activity

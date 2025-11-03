@@ -1,6 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from "react";
+import { useLocation } from "react-router-dom";
 import { DynamicAppSidebar } from "@/components/DynamicAppSidebar";
 import { AppTopBar } from "@/components/AppTopBar";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 // Lazy load components that import from syncFinanceData to prevent circular dependency during module initialization
 const RunwayCard = lazy(() => import("@/components/finance/RunwayCard").then(m => ({ default: m.RunwayCard })));
 const CashFlowChart = lazy(() => import("@/components/finance/CashFlowChart").then(m => ({ default: m.CashFlowChart })));
@@ -35,6 +37,8 @@ import { toast } from "sonner";
 type FinanceRole = "all" | "accountant" | "cfo";
 
 const FinanceHub = () => {
+  const location = useLocation();
+  const { logActivity } = useActivityLogger();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [role, setRole] = useState<FinanceRole>(() => {
     return (localStorage.getItem("financeRole") as FinanceRole) || "all";
@@ -42,6 +46,10 @@ const FinanceHub = () => {
   const [activeTab, setActiveTab] = useState<string>(() => {
     return localStorage.getItem("financeTab") || "overview";
   });
+
+  useEffect(() => {
+    logActivity(location.pathname, "visit");
+  }, [location.pathname, logActivity]);
 
   useEffect(() => {
     localStorage.setItem("financeRole", role);

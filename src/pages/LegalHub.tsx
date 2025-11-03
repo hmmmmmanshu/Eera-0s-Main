@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { DynamicAppSidebar } from "@/components/DynamicAppSidebar";
 import { AppTopBar } from "@/components/AppTopBar";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Scale, Upload, FileText, Clock } from "lucide-react";
@@ -13,8 +15,14 @@ import { LegalAIAssistant } from "@/components/legal/LegalAIAssistant";
 import { motion } from "framer-motion";
 
 const LegalHub = () => {
+  const location = useLocation();
+  const { logActivity } = useActivityLogger();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+
+  useEffect(() => {
+    logActivity(location.pathname, "visit");
+  }, [location.pathname, logActivity]);
 
   return (
     <div className="flex min-h-screen w-full">
