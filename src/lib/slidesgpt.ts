@@ -7,6 +7,8 @@
 
 const SLIDESGPT_API_KEY = import.meta.env.VITE_SLIDESGPT_API_KEY;
 const SLIDESGPT_API_BASE = "https://api.slidesgpt.com/v1";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const USE_PROXY = true; // Route through Supabase Edge Function to avoid CORS
 
 if (!SLIDESGPT_API_KEY) {
   console.warn("SlidesGPT API key not found. Pitch deck generation will be disabled.");
@@ -37,19 +39,28 @@ export interface SlidesGPTGenerateResponse {
 export async function generatePresentation(
   request: SlidesGPTGenerateRequest
 ): Promise<SlidesGPTGenerateResponse> {
-  if (!SLIDESGPT_API_KEY) {
-    throw new Error(
-      "SlidesGPT API key not configured. Please add VITE_SLIDESGPT_API_KEY to your .env.local file."
-    );
-  }
-
   try {
-    const response = await fetch(`${SLIDESGPT_API_BASE}/presentations/generate`, {
+    // Prefer proxy to avoid CORS and keep key server-side
+    const useProxy = USE_PROXY && SUPABASE_URL;
+    const url = useProxy
+      ? `${SUPABASE_URL}/functions/v1/slidesgpt-generate`
+      : `${SLIDESGPT_API_BASE}/presentations/generate`;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (!useProxy) {
+      if (!SLIDESGPT_API_KEY) {
+        throw new Error(
+          "SlidesGPT API key not configured. Add VITE_SLIDESGPT_API_KEY to .env.local or enable proxy."
+        );
+      }
+      headers["Authorization"] = `Bearer ${SLIDESGPT_API_KEY}`;
+    }
+
+    const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SLIDESGPT_API_KEY}`,
-      },
+      headers,
       body: JSON.stringify({
         prompt: request.prompt,
         theme: request.theme || "professional",

@@ -110,7 +110,7 @@ const FAQ = () => {
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center">
                       <span className="text-background font-bold text-sm">
-                        {category.questions.length}
+                        {categoryIndex + 1}
                       </span>
                     </div>
                     <span className="text-xl font-semibold text-left">{category.category}</span>
