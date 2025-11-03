@@ -58,6 +58,29 @@ export async function generatePresentation(
       if (error) {
         throw new Error(error.message || "Supabase function error");
       }
+      
+      // Handle different response formats
+      // The edge function returns the raw SlidesGPT response which might be parsed or not
+      if (typeof data === 'string') {
+        // If it's a string, parse it
+        const parsed = JSON.parse(data);
+        return parsed as SlidesGPTGenerateResponse;
+      }
+      
+      // If it's already an object, check if it has presentation property
+      if (data && typeof data === 'object') {
+        // SlidesGPT API returns { presentation: {...} }
+        if (data.presentation) {
+          return data as SlidesGPTGenerateResponse;
+        }
+        // If the response is wrapped differently, handle it
+        if (data.data && data.data.presentation) {
+          return data.data as SlidesGPTGenerateResponse;
+        }
+        // If data itself is the presentation object, wrap it
+        return { presentation: data } as SlidesGPTGenerateResponse;
+      }
+      
       // Normalize to expected shape
       return data as SlidesGPTGenerateResponse;
     } else {
