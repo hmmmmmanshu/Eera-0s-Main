@@ -26,9 +26,21 @@ interface Meeting {
   location?: string;
 }
 
+type GoogleEvent = {
+  id: string;
+  summary: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+  hangoutLink?: string;
+  location?: string;
+};
+
 const UpcomingCalendar = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [googleEvents, setGoogleEvents] = useState<GoogleEvent[]>([]);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showAddMeeting, setShowAddMeeting] = useState(false);
   const [view, setView] = useState<'all' | 'tasks' | 'meetings'>('all');
@@ -37,6 +49,7 @@ const UpcomingCalendar = () => {
   useEffect(() => {
     fetchTasks();
     fetchMeetings();
+    checkGoogleConnection();
   }, []);
 
   const fetchTasks = async () => {
@@ -53,6 +66,46 @@ const UpcomingCalendar = () => {
 
     if (data && !error) {
       setTasks(data as Task[]);
+    }
+  };
+
+  const checkGoogleConnection = async () => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.provider_token;
+    if (token) {
+      setGoogleConnected(true);
+      fetchGoogleEvents(token);
+    } else {
+      setGoogleConnected(false);
+    }
+  };
+
+  const connectGoogle = async () => {
+    try {
+      setGoogleLoading(true);
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly openid email profile',
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const fetchGoogleEvents = async (accessToken: string) => {
+    try {
+      const nowIso = new Date().toISOString();
+      const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(nowIso)}&singleEvents=true&orderBy=startTime&maxResults=10`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      setGoogleEvents((json.items || []) as GoogleEvent[]);
+    } catch (e) {
+      // Silent fail; show connect state
     }
   };
 
@@ -235,11 +288,51 @@ const UpcomingCalendar = () => {
             )}
           </div>
 
-          {/* Google Calendar Sync Info */}
-          <div className="pt-4 border-t border-border">
-            <p className="text-xs text-muted-foreground text-center">
-              Google Calendar sync available in settings
-            </p>
+          {/* Google Calendar Section */}
+          <div className="pt-4 border-t border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Google Calendar</p>
+              {!googleConnected && (
+                <Button size="sm" onClick={connectGoogle} disabled={googleLoading}>
+                  {googleLoading ? 'Connecting…' : 'Connect Google'}
+                </Button>
+              )}
+            </div>
+            {googleConnected && googleEvents.length === 0 && (
+              <p className="text-xs text-muted-foreground">No upcoming Google events.</p>
+            )}
+            {googleConnected && googleEvents.length > 0 && (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {googleEvents.map(ev => {
+                  const start = ev.start?.dateTime || ev.start?.date || '';
+                  const end = ev.end?.dateTime || ev.end?.date || '';
+                  const startDate = start ? new Date(start) : null;
+                  const endDate = end ? new Date(end) : null;
+                  return (
+                    <div key={ev.id} className="p-3 rounded-lg bg-secondary/50">
+                      <div className="font-medium text-sm">{ev.summary || 'Untitled event'}</div>
+                      {startDate && (
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <CalendarIcon className="h-3 w-3" />
+                          <span>{getDateLabel(startDate.toISOString())}</span>
+                          {endDate && (
+                            <span>
+                              {format(startDate, 'h:mm a')} - {format(endDate, 'h:mm a')}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {ev.location && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <MapPin className="h-3 w-3" />
+                          <span>{ev.location}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </Card>
