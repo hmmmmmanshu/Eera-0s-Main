@@ -16,6 +16,7 @@ export function JournalPanel() {
   const [view, setView] = useState<"calendar">("calendar");
   const [items, setItems] = useState<any[]>([]);
   const [monthMatrix, setMonthMatrix] = useState<{ date: Date; count: number }[][]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -58,7 +59,7 @@ export function JournalPanel() {
         setMonthMatrix(matrix);
       }
     })();
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
 
   return (
     <Card className="border-accent/30">
@@ -74,7 +75,7 @@ export function JournalPanel() {
               toast.success("Saved");
               setText("");
               // Refresh calendar immediately
-              setView("calendar");
+              setRefreshKey((k) => k + 1);
             } catch (e: any) { toast.error(e?.message || "Failed"); } finally { setBusy(false); }
           }}>Save</Button>
         </div>
