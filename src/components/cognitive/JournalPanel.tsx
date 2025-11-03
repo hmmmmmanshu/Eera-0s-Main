@@ -12,22 +12,16 @@ export function JournalPanel() {
   const { addReflection } = useCognitiveActions(user?.id);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-  const [view, setView] = useState<"weekly" | "monthly" | "calendar" | "none">("none");
+  // Calendar-only view
+  const [view, setView] = useState<"calendar">("calendar");
   const [items, setItems] = useState<any[]>([]);
   const [monthMatrix, setMonthMatrix] = useState<{ date: Date; count: number }[][]>([]);
 
   useEffect(() => {
     (async () => {
-      if (!user?.id || view === "none") { setItems([]); return; }
+      if (!user?.id) { setItems([]); setMonthMatrix([]); return; }
       const now = new Date();
-      let from: Date;
-      if (view === "weekly") {
-        const day = now.getDay();
-        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-        from = new Date(now); from.setDate(diff); from.setHours(0,0,0,0);
-      } else if (view === "monthly" || view === "calendar") {
-        from = new Date(now.getFullYear(), now.getMonth(), 1);
-      }
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
       const { data } = await supabase
         .from("cognitive_reflections")
         .select("id, created_at, content, ai_summary")
@@ -37,7 +31,7 @@ export function JournalPanel() {
       const list = data || [];
       setItems(list);
 
-      if (view === "calendar") {
+      {
         // Build matrix for current month with counts per day
         const start = new Date(now.getFullYear(), now.getMonth(), 1);
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -64,7 +58,7 @@ export function JournalPanel() {
         setMonthMatrix(matrix);
       }
     })();
-  }, [user?.id, view]);
+  }, [user?.id]);
 
   return (
     <Card className="border-accent/30">
@@ -79,32 +73,13 @@ export function JournalPanel() {
               const res = await addReflection({ type: "journal", content: text.trim() });
               toast.success("Saved");
               setText("");
-              if (view !== "none") {
-                // refresh list
-                setView(view);
-              }
+              // Refresh calendar immediately
+              setView("calendar");
             } catch (e: any) { toast.error(e?.message || "Failed"); } finally { setBusy(false); }
           }}>Save</Button>
-          <Button variant={view === "monthly" ? "default" : "outline"} onClick={() => setView("monthly")}>View Monthly</Button>
-          <Button variant={view === "weekly" ? "default" : "outline"} onClick={() => setView("weekly")}>View Weekly</Button>
-          <Button variant={view === "calendar" ? "default" : "outline"} onClick={() => setView("calendar")}>Calendar</Button>
         </div>
-
-        {view !== "none" && view !== "calendar" && (
-          <div className="space-y-2 pt-2">
-            {items.length === 0 ? (
-              <div className="text-xs text-muted-foreground">No entries.</div>
-            ) : items.map((r) => (
-              <div key={r.id} className="p-2 rounded border">
-                <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</div>
-                <div className="text-sm">{r.content}</div>
-                {r.ai_summary && <div className="text-xs text-muted-foreground mt-1">AI: {r.ai_summary}</div>}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {view === "calendar" && (
+        {/* Calendar Grid */}
+        {
           <div className="space-y-3 pt-2">
             <div className="grid grid-cols-7 gap-2 text-xs text-muted-foreground">
               {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (<div key={d} className="text-center">{d}</div>))}
@@ -137,7 +112,7 @@ export function JournalPanel() {
               ))}
             </div>
           </div>
-        )}
+        }
       </CardContent>
     </Card>
   );
