@@ -31,6 +31,7 @@ export function CognitiveTopBar() {
     (async () => {
       if (!user?.id) return;
       try {
+        const now = new Date();
         // Get last 7 days of moods for trend
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         const { data: recentMoods } = await supabase
@@ -68,7 +69,7 @@ export function CognitiveTopBar() {
         const daysInMonth = end.getDate();
         const { data: moodsMonth } = await supabase
           .from("cognitive_moods")
-          .select("created_at, intensity")
+          .select("created_at, intensity, mood")
           .eq("user_id", user.id)
           .gte("created_at", start.toISOString())
           .lte("created_at", new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString());
@@ -79,9 +80,11 @@ export function CognitiveTopBar() {
           .gte("created_at", start.toISOString())
           .lte("created_at", new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString());
         const avgByDay: Record<number, number[]> = {};
+        const lastMoodByDay: Record<number, string> = {};
         (moodsMonth || []).forEach((m: any) => {
           const d = new Date(m.created_at).getDate();
           (avgByDay[d] ||= []).push(m.intensity || 5);
+          lastMoodByDay[d] = m.mood || lastMoodByDay[d];
         });
         const countByDay: Record<number, number> = {};
         (reflMonth || []).forEach((r: any) => {
@@ -96,7 +99,8 @@ export function CognitiveTopBar() {
         for (let d = 1; d <= daysInMonth; d++) {
           const arr = avgByDay[d] || [];
           const avg = arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
-          weekRow.push({ date: new Date(now.getFullYear(), now.getMonth(), d), avg, count: countByDay[d] || 0 });
+          const today = new Date();
+          weekRow.push({ date: new Date(today.getFullYear(), today.getMonth(), d), avg, count: countByDay[d] || 0 });
           if (weekRow.length === 7) { matrix.push(weekRow); weekRow = []; }
         }
         if (weekRow.length) { while (weekRow.length < 7) weekRow.push({ date: new Date(NaN), avg: null, count: 0 }); matrix.push(weekRow); }
@@ -293,7 +297,7 @@ export function CognitiveTopBar() {
               const tone = cell.avg == null ? 0 : Math.min(10, Math.max(0, cell.avg));
               const bg = tone === 0 ? 'bg-transparent border-transparent' : tone < 4 ? 'bg-purple-100' : tone < 7 ? 'bg-purple-300' : 'bg-purple-500';
               return (
-                <div key={idx} className={`h-14 rounded border flex items-start justify-start p-1 ${isNaN(cell.date as any) ? 'bg-transparent border-transparent' : bg}`} title={isNaN(cell.date as any)? '' : `Avg mood: ${cell.avg?.toFixed(1) || '–'} | Journals: ${cell.count}`}>
+                <div key={idx} className={`h-14 rounded border relative flex items-start justify-start p-1 ${isNaN(cell.date as any) ? 'bg-transparent border-transparent' : bg}`} title={isNaN(cell.date as any)? '' : `Avg mood: ${cell.avg?.toFixed(1) || '–'} | Journals: ${cell.count}`}>
                   {!isNaN(cell.date as any) && (
                     <div className="text-[10px] text-white/90">
                       {cell.date.getDate()}
@@ -302,6 +306,12 @@ export function CognitiveTopBar() {
                           {cell.count}
                         </div>
                       )}
+                    </div>
+                  )}
+                  {/* Mood emoji overlay */}
+                  {!isNaN(cell.date as any) && tone > 0 && (
+                    <div className="absolute right-1 top-1 text-[12px]">
+                      {tone < 3 ? "😞" : tone < 5 ? "😟" : tone < 7 ? "😐" : tone < 9 ? "🙂" : "⚡"}
                     </div>
                   )}
                 </div>
@@ -335,3 +345,14 @@ export function CognitiveTopBar() {
 }
 
 
+function moodToEmoji(mood?: string) {
+  switch (mood) {
+    case "drained": return "😞";
+    case "anxious": return "😟";
+    case "neutral": return "😐";
+    case "motivated": return "🙂";
+    case "energized": return "💖";
+    case "peak": return "⚡";
+    default: return "";
+  }
+}
