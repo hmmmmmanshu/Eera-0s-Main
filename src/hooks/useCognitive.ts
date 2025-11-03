@@ -212,7 +212,7 @@ TEXT: ${text}`;
     const chatHistory: ChatMessage[] = [
       {
         role: "system",
-        content: `You are Acharya, an operator-mentor. Be concise. Use user's tone if given. Context: ${contextPrompt}`,
+        content: `You are Acharya, an operator-mentor. Always reply in this structure:\n\nSummary:\n- one sentence\n\nRecommendations:\n- 2-3 bullets\n\nNext steps:\n- 2-3 concrete bullets\n\nUse user's tone if given. Context: ${contextPrompt}`,
       },
     ];
 
@@ -238,7 +238,7 @@ TEXT: ${text}`;
     let reply: string;
     try {
       reply = await generateChatResponse({
-        systemPrompt: `You are Acharya, an operator-mentor helping founders. Be concise, actionable, and empathetic. Context about the user: ${contextPrompt}`,
+        systemPrompt: `You are Acharya, an operator-mentor helping founders. Be concise, actionable, and empathetic.\n\nAlways reply using this structure:\nSummary (one sentence)\nRecommendations (bullets)\nNext steps (bullets)\n\nContext about the user: ${contextPrompt}`,
         messages: chatHistory,
         temperature: 0.7,
         maxTokens: OUTPUT_TOKENS,
@@ -448,7 +448,7 @@ TEXT: ${text}`;
     saveSessionMessage({ role: "user", content: message, ts: Date.now(), persona });
     
     const ctx = await assembleCognitiveContext(userId);
-    const system = personaSystem(persona, ctx.userProfile.tone);
+    const system = `${personaSystem(persona, ctx.userProfile.tone)}\n\nAlways reply using this structure:\nSummary (one sentence)\nRecommendations (bullets)\nNext steps (bullets)`;
     const contextPrompt = JSON.stringify({
       profile: ctx.userProfile,
       week: ctx.currentWeek,
@@ -818,7 +818,18 @@ TEXT: ${text}`;
     }
   }, [userId, createOrGetSession]);
 
-  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, sendChatWithPlanExtractStreaming, pinPlanToSession };
+  // Utility: list recent messages for a session
+  const listRecentMessages = useCallback(async (sessionId: string, limit = 20) => {
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("role, content, created_at")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true })
+      .limit(limit);
+    if (error) throw error; return data || [];
+  }, []);
+
+  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, sendChatWithPlanExtractStreaming, pinPlanToSession, listRecentMessages, createOrGetSession };
 }
 
 function personaSystem(persona: Persona, tone?: string) {

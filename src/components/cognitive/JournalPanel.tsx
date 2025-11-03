@@ -12,8 +12,9 @@ export function JournalPanel() {
   const { addReflection } = useCognitiveActions(user?.id);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-  const [view, setView] = useState<"weekly" | "monthly" | "none">("none");
+  const [view, setView] = useState<"weekly" | "monthly" | "calendar" | "none">("none");
   const [items, setItems] = useState<any[]>([]);
+  const [monthMatrix, setMonthMatrix] = useState<{ date: Date; count: number }[][]>([]);
 
   useEffect(() => {
     (async () => {
@@ -24,7 +25,7 @@ export function JournalPanel() {
         const day = now.getDay();
         const diff = now.getDate() - day + (day === 0 ? -6 : 1);
         from = new Date(now); from.setDate(diff); from.setHours(0,0,0,0);
-      } else {
+      } else if (view === "monthly" || view === "calendar") {
         from = new Date(now.getFullYear(), now.getMonth(), 1);
       }
       const { data } = await supabase
@@ -33,7 +34,35 @@ export function JournalPanel() {
         .eq("user_id", user.id)
         .gte("created_at", from.toISOString())
         .order("created_at", { ascending: false });
-      setItems(data || []);
+      const list = data || [];
+      setItems(list);
+
+      if (view === "calendar") {
+        // Build matrix for current month with counts per day
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const daysInMonth = end.getDate();
+        const counts: Record<number, number> = {};
+        list.forEach((r: any) => {
+          const d = new Date(r.created_at).getDate();
+          counts[d] = (counts[d] || 0) + 1;
+        });
+        const matrix: { date: Date; count: number }[][] = [];
+        let week: { date: Date; count: number }[] = [];
+        // Pad leading blanks to start on Monday-like grid
+        const firstDay = new Date(start).getDay();
+        const pad = (firstDay === 0 ? 6 : firstDay - 1);
+        for (let i = 0; i < pad; i++) week.push({ date: new Date(NaN), count: 0 });
+        for (let day = 1; day <= daysInMonth; day++) {
+          week.push({ date: new Date(now.getFullYear(), now.getMonth(), day), count: counts[day] || 0 });
+          if (week.length === 7) { matrix.push(week); week = []; }
+        }
+        if (week.length) {
+          while (week.length < 7) week.push({ date: new Date(NaN), count: 0 });
+          matrix.push(week);
+        }
+        setMonthMatrix(matrix);
+      }
     })();
   }, [user?.id, view]);
 
@@ -58,9 +87,10 @@ export function JournalPanel() {
           }}>Save</Button>
           <Button variant={view === "monthly" ? "default" : "outline"} onClick={() => setView("monthly")}>View Monthly</Button>
           <Button variant={view === "weekly" ? "default" : "outline"} onClick={() => setView("weekly")}>View Weekly</Button>
+          <Button variant={view === "calendar" ? "default" : "outline"} onClick={() => setView("calendar")}>Calendar</Button>
         </div>
 
-        {view !== "none" && (
+        {view !== "none" && view !== "calendar" && (
           <div className="space-y-2 pt-2">
             {items.length === 0 ? (
               <div className="text-xs text-muted-foreground">No entries.</div>
@@ -71,6 +101,41 @@ export function JournalPanel() {
                 {r.ai_summary && <div className="text-xs text-muted-foreground mt-1">AI: {r.ai_summary}</div>}
               </div>
             ))}
+          </div>
+        )}
+
+        {view === "calendar" && (
+          <div className="space-y-3 pt-2">
+            <div className="grid grid-cols-7 gap-2 text-xs text-muted-foreground">
+              {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (<div key={d} className="text-center">{d}</div>))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {monthMatrix.flat().map((cell, idx) => (
+                <div key={idx} className={`h-16 rounded border flex items-start justify-start p-1 ${isNaN(cell.date as any) ? 'bg-transparent border-transparent' : 'bg-muted/30'}`}>
+                  {!isNaN(cell.date as any) && (
+                    <div className="text-[10px] text-muted-foreground">
+                      {cell.date.getDate()}
+                      {cell.count > 0 && (
+                        <div className="mt-1 text-[10px] px-1 rounded bg-accent text-accent-foreground inline-block">
+                          {cell.count}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Recent entries list */}
+            <div className="space-y-2 pt-2">
+              {items.length === 0 ? (
+                <div className="text-xs text-muted-foreground">No entries this month.</div>
+              ) : items.slice(0, 10).map((r) => (
+                <div key={r.id} className="p-2 rounded border">
+                  <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</div>
+                  <div className="text-sm line-clamp-2">{r.content}</div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </CardContent>

@@ -7,7 +7,7 @@ import { useCognitiveActions } from "@/hooks/useCognitive";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Maximize2, Minimize2 } from "lucide-react";
 
 export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?: string | null) => void }) {
   const { user } = useAuth();
@@ -21,6 +21,8 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   const [modelOk, setModelOk] = useState<boolean | null>(null);
   const location = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [fullScreen, setFullScreen] = useState(false);
+  const { createOrGetSession, listRecentMessages } = useCognitiveActions(user?.id) as any;
 
   useEffect(() => {
     (async () => {
@@ -46,6 +48,22 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
       setMessages((h) => [...h, { role: "assistant", text: "Continuing the selected plan. Share your next detail or ask to generate steps." }]);
     }
   }, [location.search]);
+
+  // Load recent messages from the latest session on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const sessionId = await createOrGetSession("cognitive");
+        const recent = await listRecentMessages(sessionId, 20);
+        if (recent && recent.length > 0) {
+          const mapped = recent.map((m: any) => ({ role: m.role as "user"|"assistant", text: m.content as string }));
+          setMessages(mapped);
+        }
+      } catch {
+        // ignore loading errors
+      }
+    })();
+  }, [createOrGetSession, listRecentMessages]);
 
   const handleSend = async () => {
     if (!input.trim() || busy || !modelOk) return;
@@ -121,11 +139,16 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   };
 
   return (
-    <Card className="border-accent/30">
+    <Card className={`border-accent/30 ${fullScreen ? "fixed inset-0 z-50 rounded-none" : ""}`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Acharya Chat</CardTitle>
-          <Badge variant={modelOk ? "default" : "outline"}>{modelOk === false ? "Model unavailable" : "Ready"}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={modelOk ? "default" : "outline"}>{modelOk === false ? "Model unavailable" : "Ready"}</Badge>
+            <Button size="icon" variant="ghost" onClick={() => setFullScreen((v) => !v)}>
+              {fullScreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
