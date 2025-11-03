@@ -332,35 +332,18 @@ TEXT: ${text}`;
     // Persisting derived tags/sentiment is disabled until columns exist in schema
     // (kept local for return value / UI only)
 
-    // AI summary (LLM)
+  // AI summary (LLM)
     const ctx = await assembleCognitiveContext(userId);
     const sys = `Summarize the reflection in 3-5 bullets. Be concise. Tone=${ctx.userProfile.tone || "neutral"}.`;
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
     let ai_summary: string | null = null;
     try {
       const t0 = Date.now();
-      const summary = (await generateText({
-        model: TEXT_MODEL_PRIMARY,
-        system: sys,
-        prompt: trimText(payload.content, 2000),
-        maxTokens: 300,
-      })).content;
-      await logLLM(userId, "reflection.summary", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
+      const summary = await generateChatResponse({ systemPrompt: sys, messages: [{ role: "user", content: trimText(payload.content, 2000) }], maxTokens: 300 });
+      await logLLM(userId, "reflection.summary", "gemini", "success", { durationMs: Date.now() - t0 });
       ai_summary = summary;
     } catch (e: any) {
-      try {
-        const t1 = Date.now();
-        const summary2 = (await generateText({
-          model: TEXT_MODEL_FALLBACK,
-          system: sys,
-          prompt: trimText(payload.content, 2000),
-          maxTokens: 300,
-        })).content;
-        await logLLM(userId, "reflection.summary", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
-        ai_summary = summary2;
-      } catch (e2: any) {
-        await logLLM(userId, "reflection.summary", TEXT_MODEL_FALLBACK, "failure", { error: e2?.message });
-      }
+      await logLLM(userId, "reflection.summary", "gemini", "failure", { error: e?.message });
     }
     if (ai_summary) {
       await supabase.from("cognitive_reflections").update({ ai_summary }).eq("id", inserted.id);
@@ -369,7 +352,7 @@ TEXT: ${text}`;
     // Lightweight classification for journaling
     try {
       const classifyPrompt = `Classify reflection. Output JSON {intent: journal|insight|plan|issue, hub: marketing|sales|finance|ops|hr|legal|cognitive, subcategories: string[], sentiment: string, tags: string[]}`;
-      let res = (await generateText({ model: TEXT_MODEL_PRIMARY, system: classifyPrompt, prompt: trimText(payload.content, 3500), json: true as any, maxTokens: 300 })).content;
+      let res = await generateChatResponse({ systemPrompt: classifyPrompt, messages: [{ role: "user", content: trimText(payload.content, 3500) }], jsonMode: true, maxTokens: 300 });
       try { const cls = JSON.parse(res);
         await supabase.from("journal_classifications").insert({ user_id: userId, reflection_id: inserted.id, intent: cls?.intent || 'journal', hub: cls?.hub || null, subcategories: Array.isArray(cls?.subcategories)? cls.subcategories:[], sentiment: cls?.sentiment || null, tags: Array.isArray(cls?.tags)? cls.tags: [] });
       } catch {}
@@ -388,33 +371,12 @@ TEXT: ${text}`;
         reflections: ctx.recentReflections.map(r => ({ id: r.id, text: r.text, ai_summary: r.ai_summary })),
       });
       if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
-      let jsonText: string | null = null;
       try {
         const t0 = Date.now();
-        jsonText = (await generateText({
-          model: TEXT_MODEL_PRIMARY,
-          system: "You output strict JSON with fields: moodAverage, topMoods, themes, insights[3], actions[3].",
-          prompt: trimText(prompt, 6000),
-          json: true,
-          maxTokens: 500,
-        })).content;
-        await logLLM(userId, "weekly.snapshot", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
-      } catch {
-        try {
-          const t1 = Date.now();
-          jsonText = (await generateText({
-            model: TEXT_MODEL_FALLBACK,
-            system: "You output strict JSON with fields: moodAverage, topMoods, themes, insights[3], actions[3].",
-            prompt: trimText(prompt, 6000),
-            json: true,
-            maxTokens: 500,
-          })).content;
-          await logLLM(userId, "weekly.snapshot", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
-        } catch {}
-      }
-      if (jsonText) {
-        try { return JSON.parse(jsonText); } catch { /* fallthrough */ }
-      }
+        const jsonText = await generateChatResponse({ systemPrompt: "You output strict JSON with fields: moodAverage, topMoods, themes, insights[3], actions[3].", messages: [{ role: "user", content: trimText(prompt, 6000) }], jsonMode: true, maxTokens: 500 });
+        await logLLM(userId, "weekly.snapshot", "gemini", "success", { durationMs: Date.now() - t0 });
+        try { return JSON.parse(jsonText); } catch {}
+      } catch {}
       // Last-resort: derive minimal snapshot locally without LLM
       const moodAverage = ctx.currentWeek.moodAverage;
       const topMoods = ctx.currentWeek.moods.slice(-5).map(m => m.score);
@@ -537,8 +499,8 @@ TEXT: ${text}`;
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
     try {
       const t0 = Date.now();
-      const json = (await generateText({ model: TEXT_MODEL_PRIMARY, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
-      await logLLM(userId, "ideas.generate", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
+      const json = await generateChatResponse({ systemPrompt: system, messages: [{ role: "user", content: trimText(prompt, 6000) }], jsonMode: true, maxTokens: 600 });
+      await logLLM(userId, "ideas.generate", "gemini", "success", { durationMs: Date.now() - t0 });
       const parsed = JSON.parse(json);
       // Handle case where JSON mode returns an object with an array inside
       if (Array.isArray(parsed)) {
@@ -553,27 +515,7 @@ TEXT: ${text}`;
         if (arrays.length > 0) return arrays[0] as any[];
       }
       return [];
-    } catch (e: any) {
-      const msg = e?.message || "";
-      if (msg.includes("429") || msg.includes("rate") || msg.includes("402")) {
-        const t1 = Date.now();
-        const json2 = (await generateText({ model: TEXT_MODEL_FALLBACK, system, prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
-        await logLLM(userId, "ideas.generate", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
-        try {
-          const parsed = JSON.parse(json2);
-          if (Array.isArray(parsed)) return parsed;
-          if (parsed && typeof parsed === 'object') {
-            if (Array.isArray(parsed.ideas)) return parsed.ideas;
-            if (Array.isArray(parsed.items)) return parsed.items;
-            if (Array.isArray(parsed.result)) return parsed.result;
-            const arrays = Object.values(parsed).filter(Array.isArray);
-            if (arrays.length > 0) return arrays[0] as any[];
-          }
-          return [];
-        } catch { return []; }
-      }
-      return [];
-    }
+    } catch { return []; }
   }, [userId]);
 
   const saveIdea = useCallback(async (idea: { title: string; category?: string; rationale?: string; nextStep?: string }) => {
@@ -652,17 +594,12 @@ TEXT: ${text}`;
       .order("created_at", { ascending: true });
     const prompt = JSON.stringify({ range: { fromISO, toISO }, reflections: data });
     if (!withinBudget()) throw new Error("Rate limit: please wait a few seconds.");
-    let res: any;
     try {
       const t0 = Date.now();
-      res = (await generateText({ model: TEXT_MODEL_PRIMARY, system: "Summarize reflections into themes and 3 actions. Output JSON.", prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
-      await logLLM(userId, "range.summary", TEXT_MODEL_PRIMARY, "success", { durationMs: Date.now() - t0 });
-    } catch {
-      const t1 = Date.now();
-      res = (await generateText({ model: TEXT_MODEL_FALLBACK, system: "Summarize reflections into themes and 3 actions. Output JSON.", prompt: trimText(prompt, 6000), json: true as any, maxTokens: 600 })).content;
-      await logLLM(userId, "range.summary", TEXT_MODEL_FALLBACK, "success", { durationMs: Date.now() - t1 });
-    }
-    try { return JSON.parse(res); } catch { return { raw: res }; }
+      const res = await generateChatResponse({ systemPrompt: "Summarize reflections into themes and 3 actions. Output JSON.", messages: [{ role: "user", content: trimText(prompt, 6000) }], jsonMode: true, maxTokens: 600 });
+      await logLLM(userId, "range.summary", "gemini", "success", { durationMs: Date.now() - t0 });
+      try { return JSON.parse(res); } catch { return { raw: res }; }
+    } catch (e) { return { error: (e as any)?.message }; }
   }, [userId]);
 
   const preflightLLM = useCallback(async () => {
