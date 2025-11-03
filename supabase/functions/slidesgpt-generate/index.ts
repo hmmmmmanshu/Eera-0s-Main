@@ -14,12 +14,13 @@ const ALLOWED_ORIGINS = [
 const SLIDESGPT_API_BASE = 'https://api.slidesgpt.com/v1';
 
 function corsHeaders(origin: string | null) {
-  const allowOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : '*';
+  // Allow specific origins or all if in development
+  const allowOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || '*';
   return {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Max-Age': '86400', // 24 hours
   } as Record<string, string>;
 }
 
@@ -27,8 +28,12 @@ Deno.serve(async (req) => {
   const origin = req.headers.get('origin');
   const headers = corsHeaders(origin);
 
+  // Handle preflight OPTIONS request - must return 200 OK
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers });
+    return new Response('', {
+      status: 200,
+      headers: corsHeaders(origin),
+    });
   }
 
   try {
