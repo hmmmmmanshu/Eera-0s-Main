@@ -10,6 +10,9 @@ const SLIDESGPT_API_BASE = "https://api.slidesgpt.com/v1";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const USE_PROXY = true; // Route through Supabase Edge Function to avoid CORS
 
+// Prefer invoking via Supabase client to ensure proper headers (apikey/authorization)
+import { supabase } from "@/integrations/supabase/client";
+
 if (!SLIDESGPT_API_KEY) {
   console.warn("SlidesGPT API key not found. Pitch deck generation will be disabled.");
 }
@@ -42,41 +45,53 @@ export async function generatePresentation(
   try {
     // Prefer proxy to avoid CORS and keep key server-side
     const useProxy = USE_PROXY && SUPABASE_URL;
-    const url = useProxy
-      ? `${SUPABASE_URL}/functions/v1/slidesgpt-generate`
-      : `${SLIDESGPT_API_BASE}/presentations/generate`;
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (!useProxy) {
+    let response: Response;
+    if (useProxy) {
+      // Use supabase.functions.invoke to attach required headers automatically
+      const { data, error } = await supabase.functions.invoke("slidesgpt-generate", {
+        body: {
+          prompt: request.prompt,
+          theme: request.theme || "professional",
+          slides: request.slides || 10,
+        },
+      });
+      if (error) {
+        throw new Error(error.message || "Supabase function error");
+      }
+      // Normalize to expected shape
+      return data as SlidesGPTGenerateResponse;
+    } else {
+      const url = `${SLIDESGPT_API_BASE}/presentations/generate`;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
       if (!SLIDESGPT_API_KEY) {
         throw new Error(
           "SlidesGPT API key not configured. Add VITE_SLIDESGPT_API_KEY to .env.local or enable proxy."
         );
       }
       headers["Authorization"] = `Bearer ${SLIDESGPT_API_KEY}`;
+      response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          prompt: request.prompt,
+          theme: request.theme || "professional",
+          slides: request.slides || 10,
+        }),
+      });
     }
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        prompt: request.prompt,
-        theme: request.theme || "professional",
-        slides: request.slides || 10,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message || `SlidesGPT API error: ${response.status} ${response.statusText}`
-      );
+    if (response) {
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `SlidesGPT API error: ${response.status} ${response.statusText}`
+        );
+      }
+      const data: SlidesGPTGenerateResponse = await response.json();
+      return data;
     }
-
-    const data: SlidesGPTGenerateResponse = await response.json();
-    return data;
   } catch (error: any) {
     console.error("SlidesGPT API error:", error);
     throw new Error(`Failed to generate presentation: ${error.message}`);
