@@ -20,6 +20,29 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const handleGoogleAuth = async () => {
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      if (error) throw error;
+      // Redirect happens via Supabase; nothing else to do here.
+    } catch (error: any) {
+      console.error("Google auth error:", error);
+      toast({
+        title: "Google sign-in failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -242,6 +265,29 @@ const Auth = () => {
                 Or
               </span>
             </div>
+          </div>
+
+          <div className="mt-6">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={loading}
+              onClick={handleGoogleAuth}
+            >
+              {/* Simple Google "G" mark */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 533.5 544.3"
+                className="mr-2 h-4 w-4"
+              >
+                <path fill="#4285F4" d="M533.5 278.4c0-18.6-1.7-36.5-4.8-53.8H272v101.8h146.9c-6.3 34.1-25.1 63.1-53.5 82.4v68h86.7c50.8-46.8 81.4-115.7 81.4-198.4z"/>
+                <path fill="#34A853" d="M272 544.3c72.9 0 134.2-24.1 178.9-65.5l-86.7-68c-24.1 16.2-55 25.8-92.2 25.8-70.9 0-131-47.9-152.5-112.3H30.8v70.6c44.5 88 135.9 149.4 241.2 149.4z"/>
+                <path fill="#FBBC05" d="M119.5 324.3c-10.1-30.1-10.1-62.6 0-92.7V161H30.8c-41.2 82.4-41.2 179.9 0 262.3l88.7-68.9z"/>
+                <path fill="#EA4335" d="M272 107.7c39.6-.6 77.5 13.9 106.6 40.7l79.7-79.7C406.2 24.4 343.9 0 272 0 166.7 0 75.3 61.4 30.8 149.4l88.7 70.6C141 155.6 201.1 107.7 272 107.7z"/>
+              </svg>
+              Continue with Google
+            </Button>
           </div>
 
           <div className="mt-6 text-center">

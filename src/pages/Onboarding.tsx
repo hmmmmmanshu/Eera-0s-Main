@@ -244,6 +244,14 @@ const Onboarding = () => {
                 "Complete Setup"
               )}
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => (window.location.href = "/dashboard")}
+            >
+              Skip for now
+            </Button>
           </form>
         </Form>
       </Card>
