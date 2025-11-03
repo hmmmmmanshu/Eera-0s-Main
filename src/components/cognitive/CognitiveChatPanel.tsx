@@ -12,7 +12,7 @@ import { Loader2, Maximize2, Minimize2 } from "lucide-react";
 export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?: string | null) => void }) {
   const { user } = useAuth();
   const { preflightLLM } = useCognitiveActions(user?.id);
-  const { sendChatWithPlanExtractStreaming } = useCognitiveActions(user?.id) as any;
+  const { sendChatWithPlanExtractStreaming, listSessions, listRecentMessages, createOrGetSession, renameSession } = useCognitiveActions(user?.id) as any;
   const [messages, setMessages] = useState<{ role: "user"|"assistant", text: string; streaming?: boolean }[]>([
     { role: "assistant", text: "Hi! What should we work on today?" }
   ]);
@@ -22,7 +22,9 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   const location = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [fullScreen, setFullScreen] = useState(false);
-  const { createOrGetSession, listRecentMessages } = useCognitiveActions(user?.id) as any;
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -53,17 +55,23 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   useEffect(() => {
     (async () => {
       try {
-        const sessionId = await createOrGetSession("cognitive");
-        const recent = await listRecentMessages(sessionId, 20);
-        if (recent && recent.length > 0) {
-          const mapped = recent.map((m: any) => ({ role: m.role as "user"|"assistant", text: m.content as string }));
-          setMessages(mapped);
+        const s = await listSessions(6);
+        if (!s || s.length === 0) {
+          const sessionId = await createOrGetSession("cognitive");
+          setSessions([{ id: sessionId, title: "New Session" }]);
+          setActiveSessionId(sessionId);
+        } else {
+          setSessions(s);
+          setActiveSessionId(s[0].id);
+          const recent = await listRecentMessages(s[0].id, 20);
+          const mapped = (recent || []).map((m: any) => ({ role: m.role as "user"|"assistant", text: m.content as string }));
+          setMessages(mapped.length ? mapped : [{ role: "assistant", text: "Hi! What should we work on today?" }]);
         }
       } catch {
         // ignore loading errors
       }
     })();
-  }, [createOrGetSession, listRecentMessages]);
+  }, [listSessions, createOrGetSession, listRecentMessages]);
 
   const handleSend = async () => {
     if (!input.trim() || busy || !modelOk) return;
@@ -80,7 +88,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
 
     try {
       let fullReply = "";
-      const stream = sendChatWithPlanExtractStreaming(msg);
+      const stream = sendChatWithPlanExtractStreaming(msg, activeSessionId || undefined);
 
       for await (const item of stream) {
         if (item.chunk) {
@@ -138,6 +146,13 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
     }
   };
 
+  const handleQuick = async (prompt: string) => {
+    if (busy || !modelOk) return;
+    setInput(prompt);
+    await new Promise((r) => setTimeout(r, 0));
+    await handleSend();
+  };
+
   return (
     <Card className={`border-accent/30 ${fullScreen ? "fixed inset-0 z-50 rounded-none" : ""}`}>
       <CardHeader>
@@ -150,8 +165,46 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
             </Button>
           </div>
         </div>
+        {/* Tabs: New Session + recent sessions */}
+        <div className="mt-3 flex items-center gap-2 overflow-x-auto">
+          <Button size="sm" variant="outline" onClick={async () => {
+            const sid = await createOrGetSession("cognitive");
+            setSessions((arr: any[]) => [{ id: sid, title: "New Session" }, ...arr]);
+            setActiveSessionId(sid);
+            setMessages([{ role: "assistant", text: "Hi! What should we work on today?" }]);
+          }}>+ New Session</Button>
+          {sessions.map((s: any) => (
+            <div key={s.id} className={`px-3 py-1 rounded border cursor-pointer ${activeSessionId === s.id ? 'bg-accent text-accent-foreground' : 'bg-muted'}`} onClick={async () => {
+              setActiveSessionId(s.id);
+              const recent = await listRecentMessages(s.id, 20);
+              const mapped = (recent || []).map((m: any) => ({ role: m.role as "user"|"assistant", text: m.content as string }));
+              setMessages(mapped.length ? mapped : [{ role: "assistant", text: "Hi! What should we work on today?" }]);
+            }}>
+              {renamingId === s.id ? (
+                <input autoFocus defaultValue={s.title || 'Session'} className="bg-transparent outline-none w-40" onBlur={async (e) => {
+                  const t = e.target.value.trim() || 'Session';
+                  await renameSession(s.id, t);
+                  setSessions((arr: any[]) => arr.map(it => it.id===s.id? { ...it, title: t }: it));
+                  setRenamingId(null);
+                }} onKeyDown={async (e) => {
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                }} />
+              ) : (
+                <span onDoubleClick={() => setRenamingId(s.id)}>{s.title || 'Session'}</span>
+              )}
+            </div>
+          ))}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* Topic of the Day and Quick Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setInput((v) => (v ? v : "Suggest a focus topic for today based on my context."))}>Topic of the Day</Button>
+          <Button size="sm" variant="outline" onClick={() => handleQuick("Generate exactly 5 startup ideas with title, category, rationale, nextStep as compact bullets.")}>Generate 5 ideas</Button>
+          <Button size="sm" variant="outline" onClick={() => handleQuick("Summarize our last session into Summary, Recommendations, Next steps.")}>Summarize last session</Button>
+          <Button size="sm" variant="outline" onClick={() => handleQuick("Continue the pinned plan. Propose the next 3 concrete steps.")}>Continue plan</Button>
+          <Button size="sm" variant="outline" onClick={() => handleQuick("Create a weekly focus checklist for me (3-5 items).")}>Create weekly focus</Button>
+        </div>
         <div className="space-y-2 max-h-80 overflow-y-auto">
           {messages.map((m, idx) => (
             <div key={idx} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>

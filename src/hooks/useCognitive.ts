@@ -615,10 +615,11 @@ TEXT: ${text}`;
 
   // Streaming version of sendChatWithPlanExtract
   const sendChatWithPlanExtractStreaming = useCallback(async function* (
-    message: string
+    message: string,
+    existingSessionId?: string
   ): AsyncGenerator<{ chunk?: string; complete?: { reply: string; sessionId: string; pinnedPlanId: string | null; classification: any } }, void, unknown> {
     if (!userId) throw new Error("No user");
-    const sessionId = await createOrGetSession();
+    const sessionId = existingSessionId || (await createOrGetSession());
     
     // Start classification and context loading in parallel for faster response
     const classificationPromise = classifyChatMessage(message).catch(() => ({ 
@@ -755,6 +756,26 @@ TEXT: ${text}`;
     }
   }, [userId, createOrGetSession]);
 
+  // Sessions helpers
+  const listSessions = useCallback(async (limit = 10) => {
+    if (!userId) throw new Error("No user");
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .select("id, title, updated_at, created_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error; return data || [];
+  }, [userId]);
+
+  const renameSession = useCallback(async (sessionId: string, title: string) => {
+    const { error } = await supabase
+      .from("chat_sessions")
+      .update({ title })
+      .eq("id", sessionId);
+    if (error) throw error;
+  }, []);
+
   // Utility: list recent messages for a session
   const listRecentMessages = useCallback(async (sessionId: string, limit = 20) => {
     const { data, error } = await supabase
@@ -766,7 +787,7 @@ TEXT: ${text}`;
     if (error) throw error; return data || [];
   }, []);
 
-  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, sendChatWithPlanExtractStreaming, pinPlanToSession, listRecentMessages, createOrGetSession };
+  return { addReflection, weeklyOverview, cognitiveChat, generateIdeas, saveIdea, suggestSlots, createEvent, fetchReflectionById, fetchIdeasByStatus, summarizeRange, preflightLLM, sendChatWithPlanExtract, sendChatWithPlanExtractStreaming, pinPlanToSession, listRecentMessages, createOrGetSession, listSessions, renameSession };
 }
 
 function personaSystem(persona: Persona, tone?: string) {
