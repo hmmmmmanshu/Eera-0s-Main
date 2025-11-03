@@ -163,7 +163,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
     <Card className={`border-accent/30 ${fullScreen ? "fixed inset-0 z-50 rounded-none" : ""}`}>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Acharya Chat</CardTitle>
+          <CardTitle>Eera Chat</CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant={modelOk ? "default" : "outline"}>{modelOk === false ? "Model unavailable" : "Ready"}</Badge>
             <Button size="icon" variant="ghost" onClick={() => setFullScreen((v) => !v)}>
@@ -239,7 +239,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
         </div>
         <div className="flex gap-2">
           <Input 
-            placeholder="Chat with Acharya… (Press Enter to send)" 
+            placeholder="Chat with Eera… (Press Enter to send)" 
             value={input} 
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
