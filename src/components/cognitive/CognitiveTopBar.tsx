@@ -15,6 +15,8 @@ export function CognitiveTopBar() {
   const [delta, setDelta] = useState<number | null>(null);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [weekTrend, setWeekTrend] = useState<number[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [monthMatrix, setMonthMatrix] = useState<{ date: Date; avg: number | null; count: number }[][]>([]);
 
   const moods = [
     { id: "drained", label: "Drained", icon: Frown, color: "text-red-500", bgColor: "bg-red-50 hover:bg-red-100 border-red-200", intensity: 2 },
@@ -60,6 +62,46 @@ export function CognitiveTopBar() {
         }
         setWeekTrend(trend);
 
+        // Build calendar combining moods + reflections
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const daysInMonth = end.getDate();
+        const { data: moodsMonth } = await supabase
+          .from("cognitive_moods")
+          .select("created_at, intensity")
+          .eq("user_id", user.id)
+          .gte("created_at", start.toISOString())
+          .lte("created_at", new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString());
+        const { data: reflMonth } = await supabase
+          .from("cognitive_reflections")
+          .select("created_at")
+          .eq("user_id", user.id)
+          .gte("created_at", start.toISOString())
+          .lte("created_at", new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59).toISOString());
+        const avgByDay: Record<number, number[]> = {};
+        (moodsMonth || []).forEach((m: any) => {
+          const d = new Date(m.created_at).getDate();
+          (avgByDay[d] ||= []).push(m.intensity || 5);
+        });
+        const countByDay: Record<number, number> = {};
+        (reflMonth || []).forEach((r: any) => {
+          const d = new Date(r.created_at).getDate();
+          countByDay[d] = (countByDay[d] || 0) + 1;
+        });
+        const matrix: { date: Date; avg: number | null; count: number }[][] = [];
+        let weekRow: { date: Date; avg: number | null; count: number }[] = [];
+        const firstDay = new Date(start).getDay();
+        const pad = (firstDay === 0 ? 6 : firstDay - 1);
+        for (let i = 0; i < pad; i++) weekRow.push({ date: new Date(NaN), avg: null, count: 0 });
+        for (let d = 1; d <= daysInMonth; d++) {
+          const arr = avgByDay[d] || [];
+          const avg = arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+          weekRow.push({ date: new Date(now.getFullYear(), now.getMonth(), d), avg, count: countByDay[d] || 0 });
+          if (weekRow.length === 7) { matrix.push(weekRow); weekRow = []; }
+        }
+        if (weekRow.length) { while (weekRow.length < 7) weekRow.push({ date: new Date(NaN), avg: null, count: 0 }); matrix.push(weekRow); }
+        setMonthMatrix(matrix);
+
         const snap = await weeklyOverview();
         const payload = (snap as any)?.payload || snap;
         const currentAvg = payload?.moodAverage ?? null;
@@ -94,7 +136,7 @@ export function CognitiveTopBar() {
         setDelta(0);
       }
     })();
-  }, [user?.id, weeklyOverview]);
+  }, [user?.id, weeklyOverview, refreshKey]);
 
   const handleMoodSave = async () => {
     if (!user?.id || !selectedMood) { 
@@ -173,6 +215,7 @@ export function CognitiveTopBar() {
         trend.push(avg);
       }
       setWeekTrend(trend);
+      setRefreshKey((k) => k + 1);
     } catch (e: any) { 
       toast.error(e?.message || "Failed to save mood"); 
     }
@@ -236,6 +279,34 @@ export function CognitiveTopBar() {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Month Calendar Heatmap */}
+        <div className="space-y-2 pt-2 border-t border-purple-100">
+          <p className="text-sm font-semibold text-purple-700">This Month</p>
+          <div className="grid grid-cols-7 gap-2 text-xs text-muted-foreground">
+            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (<div key={d} className="text-center">{d}</div>))}
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {monthMatrix.flat().map((cell, idx) => {
+              const tone = cell.avg == null ? 0 : Math.min(10, Math.max(0, cell.avg));
+              const bg = tone === 0 ? 'bg-transparent border-transparent' : tone < 4 ? 'bg-purple-100' : tone < 7 ? 'bg-purple-300' : 'bg-purple-500';
+              return (
+                <div key={idx} className={`h-14 rounded border flex items-start justify-start p-1 ${isNaN(cell.date as any) ? 'bg-transparent border-transparent' : bg}`} title={isNaN(cell.date as any)? '' : `Avg mood: ${cell.avg?.toFixed(1) || '–'} | Journals: ${cell.count}`}>
+                  {!isNaN(cell.date as any) && (
+                    <div className="text-[10px] text-white/90">
+                      {cell.date.getDate()}
+                      {cell.count > 0 && (
+                        <div className="mt-1 text-[10px] px-1 rounded bg-white/80 text-purple-700 inline-block">
+                          {cell.count}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 

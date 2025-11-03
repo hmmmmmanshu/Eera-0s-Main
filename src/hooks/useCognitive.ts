@@ -616,7 +616,8 @@ TEXT: ${text}`;
   // Streaming version of sendChatWithPlanExtract
   const sendChatWithPlanExtractStreaming = useCallback(async function* (
     message: string,
-    existingSessionId?: string
+    existingSessionId?: string,
+    persona?: Persona
   ): AsyncGenerator<{ chunk?: string; complete?: { reply: string; sessionId: string; pinnedPlanId: string | null; classification: any } }, void, unknown> {
     if (!userId) throw new Error("No user");
     const sessionId = existingSessionId || (await createOrGetSession());
@@ -654,7 +655,7 @@ TEXT: ${text}`;
     // Build chat history (reduced context)
     const chatHistory: ChatMessage[] = [{
       role: "system",
-      content: `You are Acharya, an operator-mentor. Be concise. Context: ${contextPrompt}`,
+      content: `${persona ? personaSystem(persona, undefined) + "\n\n" : ""}You are Acharya, an operator-mentor. Be concise. Context: ${contextPrompt}`,
     }];
 
     if (recentMessages && recentMessages.length > 0) {

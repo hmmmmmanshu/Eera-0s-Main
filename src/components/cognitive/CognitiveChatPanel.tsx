@@ -25,6 +25,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   const [sessions, setSessions] = useState<any[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [persona, setPersona] = useState<"friend"|"guide"|"mentor"|"ea">("friend");
 
   useEffect(() => {
     (async () => {
@@ -88,7 +89,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
 
     try {
       let fullReply = "";
-      const stream = sendChatWithPlanExtractStreaming(msg, activeSessionId || undefined);
+      const stream = sendChatWithPlanExtractStreaming(msg, activeSessionId || undefined, persona);
 
       for await (const item of stream) {
         if (item.chunk) {
@@ -204,6 +205,15 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
           <Button size="sm" variant="outline" onClick={() => handleQuick("Summarize our last session into Summary, Recommendations, Next steps.")}>Summarize last session</Button>
           <Button size="sm" variant="outline" onClick={() => handleQuick("Continue the pinned plan. Propose the next 3 concrete steps.")}>Continue plan</Button>
           <Button size="sm" variant="outline" onClick={() => handleQuick("Create a weekly focus checklist for me (3-5 items).")}>Create weekly focus</Button>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Persona</span>
+            <select className="text-xs border rounded px-2 py-1 bg-background" value={persona} onChange={(e) => setPersona(e.target.value as any)}>
+              <option value="friend">Friend</option>
+              <option value="guide">Guide</option>
+              <option value="mentor">Mentor</option>
+              <option value="ea">EA</option>
+            </select>
+          </div>
         </div>
         <div className="space-y-2 max-h-80 overflow-y-auto">
           {messages.map((m, idx) => (
