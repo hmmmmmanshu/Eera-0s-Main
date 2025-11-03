@@ -391,9 +391,31 @@ export function PitchDeckAnalyzer() {
         slides: generationForm.slides,
       });
 
-      setGeneratedPresentation(response.presentation);
+      console.log("SlidesGPT Response:", response);
+      
+      // Handle response - SlidesGPT returns { presentation: {...} }
+      const presentation = response.presentation || response;
+      
+      if (!presentation) {
+        throw new Error("No presentation data in response");
+      }
+
+      console.log("Presentation data:", presentation);
+      console.log("Embed URL:", presentation.embed_url);
+      console.log("Download URL:", presentation.download_url);
+
+      setGeneratedPresentation(presentation);
       toast.success("Pitch deck generated successfully!");
+      
+      // Scroll to the generated presentation after a short delay
+      setTimeout(() => {
+        const presentationCard = document.querySelector('[data-presentation-card]');
+        if (presentationCard) {
+          presentationCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     } catch (error: any) {
+      console.error("Generation error:", error);
       toast.error(`Failed to generate pitch deck: ${error.message}`);
     } finally {
       setGenerating(false);
@@ -650,29 +672,48 @@ export function PitchDeckAnalyzer() {
 
           {/* Generated Presentation */}
           {generatedPresentation && (
-            <Card>
+            <Card data-presentation-card className="border-2 border-green-500">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                   Presentation Generated Successfully!
                 </CardTitle>
+                <CardDescription>
+                  {generatedPresentation.title && `Title: ${generatedPresentation.title}`}
+                  {generatedPresentation.id && ` • ID: ${generatedPresentation.id}`}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Embed Preview */}
-                {generatedPresentation.embed_url && (
-                  <div className="border rounded-lg overflow-hidden">
+                {generatedPresentation.embed_url ? (
+                  <div className="border rounded-lg overflow-hidden bg-gray-50">
                     <iframe
                       src={generatedPresentation.embed_url}
                       className="w-full h-[600px]"
                       title="Generated Pitch Deck"
                       allowFullScreen
+                      loading="lazy"
+                      onError={(e) => {
+                        console.error("Iframe load error:", e);
+                        toast.error("Failed to load presentation preview");
+                      }}
                     />
+                  </div>
+                ) : (
+                  <div className="border rounded-lg p-8 bg-yellow-50 text-center">
+                    <AlertTriangle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+                    <p className="text-sm text-yellow-700">
+                      Embed URL not available. Use the download or open buttons below.
+                    </p>
+                    <p className="text-xs text-yellow-600 mt-2">
+                      Response data: {JSON.stringify(generatedPresentation, null, 2)}
+                    </p>
                   </div>
                 )}
 
-                {/* Download Button */}
-                <div className="flex gap-2">
-                  {generatedPresentation.download_url && (
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {generatedPresentation.download_url ? (
                     <Button
                       asChild
                       className="flex-1"
@@ -687,6 +728,16 @@ export function PitchDeckAnalyzer() {
                         <Download className="h-4 w-4 mr-2" />
                         Download PowerPoint
                       </a>
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled
+                      variant="outline"
+                      className="flex-1"
+                      size="lg"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download URL Not Available
                     </Button>
                   )}
                   {generatedPresentation.embed_url && (
@@ -706,6 +757,14 @@ export function PitchDeckAnalyzer() {
                       </a>
                     </Button>
                   )}
+                  <Button
+                    onClick={() => setGeneratedPresentation(null)}
+                    variant="ghost"
+                    size="lg"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
                 </div>
               </CardContent>
             </Card>
