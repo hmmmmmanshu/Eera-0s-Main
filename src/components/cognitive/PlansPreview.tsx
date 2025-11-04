@@ -35,7 +35,7 @@ export function PlansPreview() {
   return (
     <Card className="border-accent/30">
       <CardHeader><CardTitle>Recent Plans & Follow-ups</CardTitle></CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-2 min-h-[400px]">
         {plans.length === 0 ? (
           <div className="text-sm text-muted-foreground">No recent plans yet.</div>
         ) : plans.map((p) => (

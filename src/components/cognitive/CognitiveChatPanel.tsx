@@ -28,6 +28,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   const [persona, setPersona] = useState<"friend"|"guide"|"mentor"|"ea">("friend");
   const [dailyTopic, setDailyTopic] = useState<string>("");
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -44,10 +45,14 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
     })();
   }, [preflightLLM, topicOfTheDay]);
 
-  // Auto-scroll to bottom when messages update
+  // Auto-scroll to bottom only when user sends a new message or when streaming
+  // NOT when loading history from a different session
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (shouldAutoScroll && !historyLoading) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      setShouldAutoScroll(false);
+    }
+  }, [messages, shouldAutoScroll, historyLoading]);
 
   // If user clicked Continue from plans list, pre-fill a helpful prompt
   useEffect(() => {
@@ -62,11 +67,14 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   useEffect(() => {
     (async () => {
       try {
+        setHistoryLoading(true);
+        setShouldAutoScroll(false); // Don't auto-scroll on initial load
         const s = await listSessions(6);
         if (!s || s.length === 0) {
           const sessionId = await createOrGetSession("cognitive");
           setSessions([{ id: sessionId, title: "New Session" }]);
           setActiveSessionId(sessionId);
+          setMessages([{ role: "assistant", text: "Hi! What should we work on today?" }]);
         } else {
           setSessions(s);
           setActiveSessionId(s[0].id);
@@ -76,6 +84,8 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
         }
       } catch {
         // ignore loading errors
+      } finally {
+        setHistoryLoading(false);
       }
     })();
   }, [listSessions, createOrGetSession, listRecentMessages]);
@@ -89,6 +99,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
 
     // Optimistic UI: Add user message immediately
     setMessages((h) => [...h, { role: "user", text: msg }]);
+    setShouldAutoScroll(true); // Enable auto-scroll when user sends a message
     
     // Add typing indicator
     setMessages((h) => [...h, { role: "assistant", text: "", streaming: true }]);
@@ -123,6 +134,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
             }
             return newMessages;
           });
+          setShouldAutoScroll(true); // Auto-scroll when message completes
           
           onPlanCreated?.(item.complete.pinnedPlanId);
           break; // Exit loop once complete
@@ -179,13 +191,20 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
             const sid = await createOrGetSession("cognitive", true);
             setSessions((arr: any[]) => [{ id: sid, title: "New Session" }, ...arr]);
             setActiveSessionId(sid);
+            setHistoryLoading(true);
+            setMessages([]);
+            // Small delay to ensure UI updates before setting messages
+            await new Promise((r) => setTimeout(r, 50));
             setMessages([{ role: "assistant", text: "Hi! What should we work on today?" }]);
+            setHistoryLoading(false);
+            setShouldAutoScroll(false); // Don't auto-scroll when switching to new session
           }}>+ New Session</Button>
           {sessions.map((s: any) => (
             <div key={s.id} className={`px-3 py-1 rounded border cursor-pointer ${activeSessionId === s.id ? 'bg-accent text-accent-foreground' : 'bg-muted'}`} onClick={async () => {
               setActiveSessionId(s.id);
               setHistoryLoading(true);
               setMessages([]);
+              setShouldAutoScroll(false); // Don't auto-scroll when switching tabs
               const recent = await listRecentMessages(s.id, 20);
               const mapped = (recent || []).map((m: any) => ({ role: m.role as "user"|"assistant", text: m.content as string }));
               setMessages(mapped.length ? mapped : [{ role: "assistant", text: "Hi! What should we work on today?" }]);
