@@ -27,6 +27,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [persona, setPersona] = useState<"friend"|"guide"|"mentor"|"ea">("friend");
   const [dailyTopic, setDailyTopic] = useState<string>("");
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -174,7 +175,8 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
         {/* Tabs: New Session + recent sessions */}
         <div className="mt-3 flex items-center gap-2 overflow-x-auto">
           <Button size="sm" variant="outline" onClick={async () => {
-            const sid = await createOrGetSession("cognitive");
+            // Force-create a new session to avoid reusing previous chat
+            const sid = await createOrGetSession("cognitive", true);
             setSessions((arr: any[]) => [{ id: sid, title: "New Session" }, ...arr]);
             setActiveSessionId(sid);
             setMessages([{ role: "assistant", text: "Hi! What should we work on today?" }]);
@@ -182,9 +184,12 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
           {sessions.map((s: any) => (
             <div key={s.id} className={`px-3 py-1 rounded border cursor-pointer ${activeSessionId === s.id ? 'bg-accent text-accent-foreground' : 'bg-muted'}`} onClick={async () => {
               setActiveSessionId(s.id);
+              setHistoryLoading(true);
+              setMessages([]);
               const recent = await listRecentMessages(s.id, 20);
               const mapped = (recent || []).map((m: any) => ({ role: m.role as "user"|"assistant", text: m.content as string }));
               setMessages(mapped.length ? mapped : [{ role: "assistant", text: "Hi! What should we work on today?" }]);
+              setHistoryLoading(false);
             }}>
               {renamingId === s.id ? (
                 <input autoFocus defaultValue={s.title || 'Session'} className="bg-transparent outline-none w-40" onBlur={async (e) => {
@@ -220,8 +225,13 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
             </select>
           </div>
         </div>
-        <div className="space-y-2 max-h-80 overflow-y-auto">
-          {messages.map((m, idx) => (
+        <div className="space-y-2 max-h-80 overflow-y-auto transition-opacity duration-200" key={activeSessionId || 'no-session'}>
+          {historyLoading && (
+            <div className="flex justify-center py-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading conversation…
+            </div>
+          )}
+          {!historyLoading && messages.map((m, idx) => (
             <div key={idx} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[85%] p-3 rounded-lg text-sm relative ${
                 m.role === "user" 

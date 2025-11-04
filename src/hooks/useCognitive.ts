@@ -82,16 +82,19 @@ TEXT: ${text}`;
   }
 
   // --- New: Chat sessions & plan extraction ---
-  const createOrGetSession = useCallback(async (activeHub?: string) => {
+  // If forceNew is true, always create a fresh session instead of returning the most recent one
+  const createOrGetSession = useCallback(async (activeHub?: string, forceNew?: boolean) => {
     if (!userId) throw new Error("No user");
-    const { data } = await supabase
-      .from("chat_sessions")
-      .select("id")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (data?.id) return data.id as string;
+    if (!forceNew) {
+      const { data } = await supabase
+        .from("chat_sessions")
+        .select("id")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) return data.id as string;
+    }
     const { data: inserted, error } = await supabase
       .from("chat_sessions")
       .insert({ user_id: userId, active_hub: activeHub || null, title: "Session" })
