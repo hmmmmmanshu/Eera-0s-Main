@@ -244,7 +244,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
             </select>
           </div>
         </div>
-        <div className="space-y-2 max-h-80 overflow-y-auto transition-opacity duration-200" key={activeSessionId || 'no-session'}>
+        <div className="space-y-2 min-h-[40vh] max-h-[65vh] overflow-y-auto transition-opacity duration-200" key={activeSessionId || 'no-session'}>
           {historyLoading && (
             <div className="flex justify-center py-6 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading conversation…

@@ -34,26 +34,37 @@ export function PlansPreview() {
 
   return (
     <Card className="border-accent/30">
-      <CardHeader><CardTitle>Recent Plans & Follow-ups</CardTitle></CardHeader>
-      <CardContent className="space-y-2 min-h-[400px]">
+      <CardHeader><CardTitle>Recent Plans</CardTitle></CardHeader>
+      <CardContent>
         {plans.length === 0 ? (
           <div className="text-sm text-muted-foreground">No recent plans yet.</div>
-        ) : plans.map((p) => (
-          <div key={p.id} className="flex items-center justify-between p-2 rounded border">
-            <div>
-              <div className="text-sm font-medium">{p.title}</div>
-              <div className="text-xs text-muted-foreground flex items-center gap-2">
-                <Badge variant="outline">{p.hub}</Badge>
-                {p.next_step && <span>Next: {p.next_step}</span>}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => navigate(`/cognitive?continuePlan=${p.id}`)}>Continue</Button>
-              <Button size="sm" variant="ghost" onClick={() => goHub(p.hub, p.id)}>Start implementing</Button>
+        ) : (
+          <div className="relative">
+            {/* Horizontal slider */}
+            <div className="flex items-stretch gap-3 overflow-x-auto pb-2 -mb-2 scrollbar-thin">
+              {plans.map((p) => (
+                <div
+                  key={p.id}
+                  className="shrink-0 w-64 h-36 rounded-lg border bg-muted/40 hover:bg-muted transition-colors cursor-pointer p-3 flex flex-col justify-between"
+                  title={p.title}
+                  onClick={() => navigate(`/cognitive?continuePlan=${p.id}`)}
+                >
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium line-clamp-2 leading-snug">{p.title}</div>
+                    <div className="text-[11px] text-muted-foreground line-clamp-2">
+                      {p.next_step ? `Next: ${p.next_step}` : "Open to continue"}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className="text-[10px]">{p.hub}</Badge>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); goHub(p.hub, p.id); }}>Open</Button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-        <div className="flex justify-end">
+        )}
+        <div className="flex justify-end pt-2">
           <Button size="sm" variant="outline" onClick={() => navigate('/cognitive?view=plans')}>View All</Button>
         </div>
       </CardContent>
