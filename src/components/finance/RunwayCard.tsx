@@ -41,10 +41,11 @@ export function RunwayCard() {
         // Dynamic import to avoid circular dependency
         const { syncRunway } = await import("@/lib/syncFinanceData");
         
-        // Preserve manual values during auto-sync
+        // Preserve manual values during auto-sync; only fill missing fields
         await syncRunway(user.id, true);
         await queryClient.invalidateQueries({ queryKey: ["runway"] });
         await refetch();
+        toast.success("Runway auto-synced. Manual values preserved.");
       } catch (error: any) {
         console.error("Error auto-syncing runway:", error);
       }

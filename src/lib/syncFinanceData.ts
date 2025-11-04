@@ -119,12 +119,12 @@ export async function calculateCashBalance(userId: string): Promise<number> {
 
     if (expenseError && expenseError.code !== "PGRST116") throw expenseError;
 
-    // Get all paid payroll (outflow)
+    // Get all paid or processed payroll (outflow)
     const { data: payroll, error: payrollError } = await supabase
       .from("hr_payroll")
       .select("net_pay, gross_pay")
       .eq("user_id", userId)
-      .eq("status", "paid");
+      .in("status", ["paid", "processed"]);
 
     if (payrollError && payrollError.code !== "PGRST116") throw payrollError;
 
@@ -242,12 +242,12 @@ export async function syncCashFlow(userId: string, months: number = 6): Promise<
 
     if (expenseError) throw expenseError;
 
-    // Fetch payroll data (contributes to outflow)
+    // Fetch payroll data (paid or processed contribute to outflow)
     const { data: payroll, error: payrollError } = await supabase
       .from("hr_payroll")
       .select("*")
       .eq("user_id", userId)
-      .eq("status", "paid");
+      .in("status", ["paid", "processed"]);
 
     if (payrollError && payrollError.code !== "PGRST116") throw payrollError;
 
@@ -311,16 +311,28 @@ export async function syncCashFlow(userId: string, months: number = 6): Promise<
       }
     });
 
-    // Process payroll (paid payroll contributes to outflow)
+    // Process payroll
     payroll?.forEach((pay) => {
-      const payDate = pay.payment_date ? new Date(pay.payment_date) : new Date(pay.created_at);
-      if (payDate >= startDate && payDate <= endDate) {
-        const monthKey = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}`;
-        if (!cashFlowByMonth[monthKey]) {
-          cashFlowByMonth[monthKey] = { inflow: 0, outflow: 0 };
-        }
-        cashFlowByMonth[monthKey].outflow += Number(pay.net_pay || pay.gross_pay || 0);
+      // Prefer allocating to declared pay_period (YYYY-MM) if available, else fall back to payment/created date
+      let monthKey: string | null = null;
+      if (pay.pay_period) {
+        // pay_period format: YYYY-MM
+        monthKey = `${pay.pay_period}-01`;
+      } else {
+        const payDate = pay.payment_date ? new Date(pay.payment_date) : new Date(pay.created_at);
+        if (payDate < startDate || payDate > endDate) return;
+        monthKey = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, "0")}-01`;
       }
+
+      // Filter by date window using a Date for safety
+      const monthDate = new Date(monthKey);
+      if (monthDate < startDate || monthDate > endDate) return;
+
+      const monthBucketKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`;
+      if (!cashFlowByMonth[monthBucketKey]) {
+        cashFlowByMonth[monthBucketKey] = { inflow: 0, outflow: 0 };
+      }
+      cashFlowByMonth[monthBucketKey].outflow += Number(pay.net_pay || pay.gross_pay || 0);
     });
 
     // Upsert cash flow records
