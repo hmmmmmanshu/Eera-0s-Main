@@ -433,24 +433,36 @@ export async function amplifyPromptForNanoBanana(
   // Step 7: Negative prompt
   const negativePrompt = generateNegativePrompt(imageType, intent, context.brandContext);
 
-  // Step 8: Assemble final Nano Banana-optimized prompt
-  const finalPrompt = `
-${sceneComposition}
-
-${visualSpecs}
-
-${narrativeContext}
-
-${textZones}
-
-Platform Optimization: ${platform === "linkedin" 
-  ? "Professional, clean, business-appropriate, high-trust, optimized for feed scrolling, corporate credibility" 
-  : "Engaging, vibrant, scroll-stopping, mobile-optimized, Instagram feed aesthetic, high visual impact"}.
-
-Quality Requirements: Ultra-detailed, professional photography/design quality, 8k resolution, cinematic lighting, perfect composition, brand-consistent.
-
-Avoid: ${negativePrompt}
-`.trim();
+  // Step 8: Assemble final Gemini-optimized prompt
+  // Gemini works best with clear, structured prompts that are visual-first
+  // Format: Single paragraph with key visual elements prioritized
+  const platformStyle = platform === "linkedin" 
+    ? "Professional, clean, business-appropriate, high-trust, optimized for feed scrolling" 
+    : "Engaging, vibrant, scroll-stopping, mobile-optimized, Instagram feed aesthetic";
+  
+  // Condense visual specs to key points (remove excessive newlines)
+  const visualSpecsCondensed = visualSpecs
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .join('. ')
+    .replace(/\. \./g, '.')
+    .replace(/\s+/g, ' ');
+  
+  // Condense narrative to essential brand context
+  const narrativeCondensed = narrativeContext
+    .split('\n')
+    .slice(0, 4)
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && !line.includes(':'))
+    .join('. ')
+    .replace(/\s+/g, ' ');
+  
+  // Condense text zones to first line only (most important)
+  const textZonesCondensed = textZones.split('\n')[0].trim();
+  
+  // Build optimized prompt: Scene + Visuals + Context + Requirements
+  const finalPrompt = `${sceneComposition} ${visualSpecsCondensed} ${narrativeCondensed} ${textZonesCondensed}. Platform style: ${platformStyle}. Quality requirements: Ultra-detailed, professional photography/design quality, 8k resolution, cinematic lighting, perfect composition, brand-consistent. Avoid: ${negativePrompt}`.trim();
 
   return {
     prompt: finalPrompt,

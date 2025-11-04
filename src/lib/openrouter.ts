@@ -88,17 +88,11 @@ export const TEXT_MODELS = {
 } as const;
 
 export const IMAGE_MODELS = {
-  "google/gemini-2.5-flash-image-preview:free": {
-    name: "Standard Quality",
-    badge: "RECOMMENDED",
-    speed: "Fast",
-    description: "High-quality images optimized for social media",
-  },
   "google/gemini-2.5-flash-image-preview": {
-    name: "Premium Quality",
-    badge: "BEST",
+    name: "Gemini 2.5 Flash (Premium)",
+    badge: "PREMIUM",
     speed: "Fast",
-    description: "Highest quality images with enhanced details",
+    description: "Highest quality images with enhanced details and professional results",
   },
 } as const;
 
@@ -498,45 +492,28 @@ export async function generateImage(
  */
 export async function generateImageWithFallback(
   options: ImageGenerationOptions,
-  fallbackModels: string[] = ["google/gemini-2.5-flash-image-preview:free"]
+  fallbackModels: string[] = [] // No fallback - premium only
 ): Promise<GeneratedImage> {
-  const models = [options.model, ...fallbackModels.filter(m => m !== options.model)];
+  // Force premium model only - no fallback
+  const premiumModel = "google/gemini-2.5-flash-image-preview";
+  console.log(`[OpenRouter] Using premium model only: ${premiumModel}`);
 
-  for (let i = 0; i < models.length; i++) {
-    const currentModel = models[i];
-    console.log(`[OpenRouter Fallback] Attempt ${i + 1}/${models.length} with model: ${currentModel}`);
+  try {
+    const result = await generateImage({
+      ...options,
+      model: premiumModel,
+    });
 
-    try {
-      const result = await generateImage({
-        ...options,
-        model: currentModel,
-      });
-
-      if (i > 0) {
-        console.log(`[OpenRouter Fallback] Success with fallback model: ${currentModel}`);
-      }
-
-      // Ensure result has prompt field for compatibility
-      if (!result.prompt) {
-        result.prompt = options.prompt;
-      }
-
-      return result;
-    } catch (error) {
-      console.error(`[OpenRouter Fallback] Model ${currentModel} failed:`, error);
-
-      // If this was the last model, throw the error
-      if (i === models.length - 1) {
-        throw new Error(`All models failed. Last error: ${error}`);
-      }
-
-      // Otherwise, try the next model
-      console.log(`[OpenRouter Fallback] Trying next model...`);
+    // Ensure result has prompt field for compatibility
+    if (!result.prompt) {
+      result.prompt = options.prompt;
     }
-  }
 
-  // This should never be reached, but TypeScript needs it
-  throw new Error("All fallback attempts failed");
+    return result;
+  } catch (error) {
+    console.error(`[OpenRouter] Premium model failed:`, error);
+    throw new Error(`Image generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
 }
 
 /**

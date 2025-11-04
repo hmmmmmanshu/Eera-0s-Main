@@ -105,7 +105,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [tone, setTone] = useState<"quirky" | "humble" | "inspirational" | "professional" | "witty">(savedDraft?.tone || "professional");
   const [objective, setObjective] = useState<"awareness" | "leads" | "engagement" | "recruitment">(savedDraft?.objective || "engagement");
   
-  // Image generation (Step 3.5)
+  // Image generation (Step 3.5) - Always use premium model
   const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("google/gemini-2.5-flash-image-preview");
   const [aspectRatio, setAspectRatio] = useState<"1:1" | "4:5" | "16:9" | "9:16">("1:1");
   const [negativePrompt, setNegativePrompt] = useState("");
@@ -566,15 +566,20 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   };
 
   const handleSaveDraft = async () => {
-    if (!generatedContent) {
-      toast.error("No content to save");
+    // Allow saving if we have either content OR images
+    const hasContent = generatedContent?.caption;
+    const hasImages = slides.length > 0 || generatedImageUrl;
+    
+    if (!hasContent && !hasImages) {
+      toast.error("No content or images to save");
       return;
     }
 
     console.log("[Save Draft] Starting save:", {
       platform,
-      contentLength: generatedContent.caption?.length,
+      contentLength: generatedContent?.caption?.length || 0,
       slideCount: slides.length,
+      hasImage: !!generatedImageUrl,
     });
 
     try {
@@ -583,7 +588,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       const postData = {
         platform,
         content_type: contentType,
-        content: generatedContent.caption,
+        content: generatedContent?.caption || headline || "", // Use headline as fallback if no generated content
         media_urls: orderedMedia,
         status: "draft" as const,
         scheduled_time: null,
@@ -661,13 +666,17 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             <div className="grid grid-cols-2 gap-4">
               <Card 
                 className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                  accountType === "personal" ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border"
+                  accountType === "personal" 
+                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                    : "border-2 border-border hover:border-accent/50"
                 }`}
                 onClick={() => setAccountType("personal")}
               >
                 <CardContent className="p-6 text-center space-y-2">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                    <Settings className="w-6 h-6 text-primary" />
+                  <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
+                    accountType === "personal" ? "bg-accent/20" : "bg-primary/10"
+                  }`}>
+                    <Settings className={`w-6 h-6 ${accountType === "personal" ? "text-accent" : "text-primary"}`} />
                   </div>
                   <p className="font-semibold">Personal Account</p>
                   <p className="text-xs text-muted-foreground">Founder's personal brand</p>
@@ -676,13 +685,17 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               </Card>
               <Card 
                 className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                  accountType === "company" ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border"
+                  accountType === "company" 
+                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                    : "border-2 border-border hover:border-accent/50"
                 }`}
                 onClick={() => setAccountType("company")}
               >
                 <CardContent className="p-6 text-center space-y-2">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-primary" />
+                  <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
+                    accountType === "company" ? "bg-accent/20" : "bg-primary/10"
+                  }`}>
+                    <FileText className={`w-6 h-6 ${accountType === "company" ? "text-accent" : "text-primary"}`} />
                   </div>
                   <p className="font-semibold">Company Account</p>
                   <p className="text-xs text-muted-foreground">Official brand voice</p>
@@ -706,24 +719,36 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             <Label>Choose Platform</Label>
             <div className="grid grid-cols-2 gap-4">
               <Card 
-                className={`cursor-pointer transition-all ${platform === "linkedin" ? "ring-2 ring-primary" : ""}`}
+                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                  platform === "linkedin" 
+                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                    : "border-2 border-border hover:border-accent/50"
+                }`}
                 onClick={() => setPlatform("linkedin")}
               >
                 <CardContent className="p-6 text-center space-y-2">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-primary" />
+                  <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
+                    platform === "linkedin" ? "bg-accent/20" : "bg-primary/10"
+                  }`}>
+                    <FileText className={`w-6 h-6 ${platform === "linkedin" ? "text-accent" : "text-primary"}`} />
                   </div>
                   <p className="font-semibold">LinkedIn</p>
                   <Badge variant="secondary">Professional</Badge>
                 </CardContent>
               </Card>
               <Card 
-                className={`cursor-pointer transition-all ${platform === "instagram" ? "ring-2 ring-primary" : ""}`}
+                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                  platform === "instagram" 
+                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                    : "border-2 border-border hover:border-accent/50"
+                }`}
                 onClick={() => setPlatform("instagram")}
               >
                 <CardContent className="p-6 text-center space-y-2">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                    <ImageIcon className="w-6 h-6 text-primary" />
+                  <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
+                    platform === "instagram" ? "bg-accent/20" : "bg-primary/10"
+                  }`}>
+                    <ImageIcon className={`w-6 h-6 ${platform === "instagram" ? "text-accent" : "text-primary"}`} />
                   </div>
                   <p className="font-semibold">Instagram</p>
                   <Badge variant="secondary">Visual</Badge>
@@ -753,12 +778,18 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   return (
                     <Card 
                       key={type.id}
-                      className={`cursor-pointer transition-all ${contentType === type.id ? "ring-2 ring-primary" : ""}`}
+                      className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                        contentType === type.id 
+                          ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                          : "border-2 border-border hover:border-accent/50"
+                      }`}
                       onClick={() => setContentType(type.id)}
                     >
                       <CardContent className="p-6 text-center space-y-2">
-                        <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                          <Icon className="w-6 h-6 text-primary" />
+                        <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
+                          contentType === type.id ? "bg-accent/20" : "bg-primary/10"
+                        }`}>
+                          <Icon className={`w-6 h-6 ${contentType === type.id ? "text-accent" : "text-primary"}`} />
                         </div>
                         <p className="font-semibold">{type.label}</p>
                       </CardContent>
@@ -803,17 +834,19 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     <Card
                       key={type.id}
                       className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                        imageType === type.id ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border"
+                        imageType === type.id 
+                          ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                          : "border-2 border-border hover:border-accent/50"
                       }`}
                       onClick={() => setImageType(type.id)}
                     >
                       <CardContent className="p-4 space-y-2">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-2">
-                            <Icon className={`w-5 h-5 ${imageType === type.id ? "text-primary" : "text-muted-foreground"}`} />
+                            <Icon className={`w-5 h-5 ${imageType === type.id ? "text-accent" : "text-muted-foreground"}`} />
                           </div>
                           {preset && imageType === type.id && (
-                            <Badge variant="secondary" className="text-xs">✨ Recommended</Badge>
+                            <Badge variant="default" className="text-xs bg-accent text-accent-foreground">✨ Recommended</Badge>
                           )}
                         </div>
                         <p className={`font-semibold text-sm ${imageType === type.id ? "text-foreground" : "text-foreground"}`}>{type.label}</p>
@@ -1080,47 +1113,32 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           </div>
         )}
 
-        {/* Step 4.5: Model Selection (for image/video content) */}
+        {/* Step 4.5: Model Selection (for image/video content) - Premium model only */}
         {step === 4.5 && (contentType === "image" || contentType === "carousel" || contentType === "video") && (
           <div className="space-y-4">
             <div>
-              <Label>Choose AI Model</Label>
+              <Label>AI Model</Label>
               <p className="text-xs text-muted-foreground mt-1">
-                All models automatically apply your brand colors
+                Using premium Gemini 2.5 Flash for highest quality results
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {Object.entries(IMAGE_MODELS).map(([modelKey, info]) => {
-                const model = modelKey as keyof typeof IMAGE_MODELS;
-                const preset = imageType ? IMAGE_TYPE_PRESETS[imageType] : null;
-                const isRecommended = preset && imageType && IMAGE_TYPE_PRESETS[imageType].suggestedModel === "gemini"; // All current models map to Gemini
-                return (
-                  <Card
-                    key={model}
-                    className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                      selectedModel === model ? "ring-2 ring-primary border-primary bg-primary/5" : "border-border"
-                    }`}
-                    onClick={() => setSelectedModel(model)}
-                  >
-                    <CardContent className="p-4 space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className={`w-5 h-5 ${selectedModel === model ? "text-primary" : "text-muted-foreground"}`} />
-                        </div>
-                        <Badge variant={isRecommended && selectedModel === model ? "default" : "secondary"} className="text-xs">
-                          {isRecommended ? "✨ Recommended" : info.badge}
-                        </Badge>
-                      </div>
-                      <p className={`font-semibold text-sm ${selectedModel === model ? "text-foreground" : "text-foreground"}`}>{info.name}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-2">{info.description}</p>
-                      <div className="flex items-center justify-end text-xs">
-                        <span className="text-muted-foreground">{info.speed} Generation</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+            <Card className="ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-accent" />
+                  </div>
+                  <Badge variant="default" className="text-xs bg-accent text-accent-foreground">
+                    PREMIUM
+                  </Badge>
+                </div>
+                <p className="font-semibold text-sm">{IMAGE_MODELS[selectedModel].name}</p>
+                <p className="text-xs text-muted-foreground">{IMAGE_MODELS[selectedModel].description}</p>
+                <div className="flex items-center justify-end text-xs">
+                  <span className="text-muted-foreground">{IMAGE_MODELS[selectedModel].speed} Generation</span>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Advanced Options */}
             <Accordion type="single" collapsible>
@@ -1478,7 +1496,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 variant="outline" 
                 className="flex-1"
                 onClick={handleSaveDraft}
-                disabled={createPostMutation.isPending || !generatedContent}
+                disabled={createPostMutation.isPending || (!generatedContent && !generatedImageUrl && slides.length === 0)}
               >
                 {createPostMutation.isPending ? "Saving..." : "Save Draft"}
               </Button>
