@@ -307,7 +307,7 @@ export const Logo = () => {
         animate={{ opacity: 1 }}
         className="font-medium whitespace-pre text-foreground"
       >
-        Eera OS
+        Eera
       </motion.span>
     </Link>
   );

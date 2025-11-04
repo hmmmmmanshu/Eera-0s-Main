@@ -2,7 +2,7 @@ import { Bell, Search, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
 const DashboardTopBar = () => {
@@ -23,10 +23,10 @@ const DashboardTopBar = () => {
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-3">
+          <Link to="/dashboard" className="flex items-center gap-3">
             <img src="/Logo.png" alt="EERA OS Logo" className="w-14 h-14 object-contain" />
-            <span className="text-xl font-bold">Acharya OS</span>
-          </div>
+            <span className="text-xl font-bold">Eera</span>
+          </Link>
 
           {/* Search */}
           <div className="hidden md:flex flex-1 max-w-md mx-8">

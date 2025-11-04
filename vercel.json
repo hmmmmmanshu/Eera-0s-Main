@@ -1,21 +1,4 @@
 {
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "eera-0s-main.vercel.app" }],
-      "destination": "https://eera-os.com/:path*",
-      "permanent": true
-    },
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.eera-os.com" }],
-      "destination": "https://eera-os.com/:path*",
-      "permanent": true
-    }
-  ]
-}
-
-{
   "rewrites": [
     {
       "source": "/(.*)",

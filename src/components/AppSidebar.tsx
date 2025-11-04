@@ -168,7 +168,7 @@ export const Logo = () => {
         animate={{ opacity: 1 }}
         className="font-medium whitespace-pre text-foreground"
       >
-        Acharya Ventures OS
+        Eera
       </motion.span>
     </Link>
   );
