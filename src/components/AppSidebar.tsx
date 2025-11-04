@@ -162,7 +162,7 @@ export const Logo = () => {
       to="/dashboard"
       className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-foreground"
     >
-      <img src="/logo.webp" alt="EERA OS Logo" className="h-6 w-6 shrink-0 object-contain" />
+      <img src="/Logo.png" alt="EERA OS Logo" className="h-6 w-6 shrink-0 object-contain" />
       <motion.span
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -180,7 +180,7 @@ export const LogoIcon = () => {
       to="/dashboard"
       className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-foreground"
     >
-      <img src="/logo.webp" alt="EERA OS Logo" className="h-6 w-6 shrink-0 object-contain" />
+      <img src="/Logo.png" alt="EERA OS Logo" className="h-6 w-6 shrink-0 object-contain" />
     </Link>
   );
 };

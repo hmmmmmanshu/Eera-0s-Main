@@ -8,7 +8,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.webp" alt="Acharya Ventures OS Logo" className="w-8 h-8 object-contain" />
+            <img src="/Logo.png" alt="Acharya Ventures OS Logo" className="w-8 h-8 object-contain" />
           </Link>
 
           {/* CTA */}

@@ -41,3 +41,4 @@ supabase/functions/slidesgpt-generate/index.ts
 
 Just copy-paste this entire file content into the Dashboard editor.
 
+

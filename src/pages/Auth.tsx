@@ -191,7 +191,7 @@ const Auth = () => {
           </Button>
           <div className="flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-hub-marketing flex items-center justify-center">
-              <img src="/logo.webp" alt="Logo" className="w-6 h-6 object-contain" />
+              <img src="/Logo.png" alt="Logo" className="w-6 h-6 object-contain" />
             </div>
             <span className="text-2xl font-bold">EERA OS</span>
           </div>

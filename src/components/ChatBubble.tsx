@@ -30,7 +30,7 @@ const ChatBubble = () => {
         <div className="w-[320px] h-[420px] bg-background border border-border rounded-xl shadow-2xl overflow-hidden">
           <div className="flex items-center justify-between px-4 h-12 border-b border-border bg-muted/40">
             <div className="flex items-center gap-2">
-              <img src="/logo.webp" alt="Eera" className="h-5 w-5" />
+              <img src="/Logo.png" alt="Eera" className="h-5 w-5" />
               <span className="text-sm font-medium">Talk to Eera</span>
             </div>
             <button className="p-1 hover:opacity-80" onClick={() => setOpen(false)} aria-label="Close">
