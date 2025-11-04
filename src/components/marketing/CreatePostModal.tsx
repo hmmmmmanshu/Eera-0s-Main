@@ -587,7 +587,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
       const postData = {
         platform,
-        content_type: contentType,
+        // content_type excluded to match current DB schema
         content: generatedContent?.caption || headline || "", // Use headline as fallback if no generated content
         media_urls: orderedMedia,
         status: "draft" as const,
