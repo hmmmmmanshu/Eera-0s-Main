@@ -6,7 +6,7 @@ const Footer = () => {
           {/* Logo and branding */}
           <div className="flex flex-col items-center justify-center space-y-6">
             <div className="flex items-center gap-2">
-              <img src="/Logo.png" alt="Acharya Ventures OS Logo" className="w-8 h-8 object-contain" />
+              <img src="/Logo.png" alt="Acharya Ventures OS Logo" className="w-14 h-14 object-contain" />
             </div>
             
             <p className="text-sm text-muted-foreground text-center">

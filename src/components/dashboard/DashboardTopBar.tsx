@@ -24,7 +24,7 @@ const DashboardTopBar = () => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <img src="/Logo.png" alt="EERA OS Logo" className="w-8 h-8 object-contain" />
+            <img src="/Logo.png" alt="EERA OS Logo" className="w-14 h-14 object-contain" />
             <span className="text-xl font-bold">Acharya OS</span>
           </div>
 

@@ -1,5 +1,4 @@
 import { Brain, Zap, Layout, Bot } from "lucide-react";
-import teamReplacement from "@/assets/team-replacement.jpg";
 
 const features = [
   {
@@ -72,7 +71,7 @@ const WhySection = () => {
             <div className="animate-scale-in" style={{ animationDelay: "0.4s" }}>
               <div className="relative rounded-2xl overflow-hidden shadow-xl border border-border">
                   <img 
-                  src={teamReplacement} 
+                  src="/Image 1.jpg" 
                   alt="Multiple AI tools unified into EERA OS" 
                   className="w-full h-auto"
                 />

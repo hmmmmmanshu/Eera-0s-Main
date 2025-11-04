@@ -190,8 +190,8 @@ const Auth = () => {
             Back to Home
           </Button>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-hub-marketing flex items-center justify-center">
-              <img src="/Logo.png" alt="Logo" className="w-6 h-6 object-contain" />
+            <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-primary to-hub-marketing flex items-center justify-center">
+              <img src="/Logo.png" alt="Logo" className="w-11 h-11 object-contain" />
             </div>
             <span className="text-2xl font-bold">EERA OS</span>
           </div>

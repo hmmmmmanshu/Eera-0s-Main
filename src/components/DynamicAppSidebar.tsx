@@ -140,7 +140,7 @@ export function DynamicAppSidebar({ open, setOpen }: AppSidebarProps) {
           >
             <div className="container mx-auto px-6 py-3 flex items-center justify-between">
               <div className="flex items-center gap-6">
-                <img src="/Logo.png" alt="EERA OS Logo" className="h-6 w-6 shrink-0 object-contain" />
+                <img src="/Logo.png" alt="EERA OS Logo" className="h-11 w-11 shrink-0 object-contain" />
                 <div className="flex items-center gap-4">
                   {links.map((link) => (
                     <Link
@@ -301,7 +301,7 @@ export const Logo = () => {
       to="/dashboard"
       className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-foreground"
     >
-      <img src="/Logo.png" alt="EERA OS Logo" className="h-6 w-6 shrink-0 object-contain" />
+      <img src="/Logo.png" alt="EERA OS Logo" className="h-11 w-11 shrink-0 object-contain" />
       <motion.span
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -319,7 +319,7 @@ export const LogoIcon = () => {
       to="/dashboard"
       className="relative z-20 flex items-center space-x-2 py-1 text-sm font-normal text-foreground"
     >
-      <img src="/Logo.png" alt="EERA OS Logo" className="h-6 w-6 shrink-0 object-contain" />
+      <img src="/Logo.png" alt="EERA OS Logo" className="h-11 w-11 shrink-0 object-contain" />
     </Link>
   );
 };
