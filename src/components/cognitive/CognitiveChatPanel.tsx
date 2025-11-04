@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
 import { Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { FeatureRequestButton } from "@/components/FeatureRequestButton";
 
 export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?: string | null) => void }) {
   const { user } = useAuth();
@@ -179,6 +180,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
           <CardTitle>Eera Chat</CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant={modelOk ? "default" : "outline"}>{modelOk === false ? "Model unavailable" : "Ready"}</Badge>
+            <FeatureRequestButton />
             <Button size="icon" variant="ghost" onClick={() => setFullScreen((v) => !v)}>
               {fullScreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>

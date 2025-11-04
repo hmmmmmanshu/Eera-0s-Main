@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { FeatureRequestDialog } from "@/components/FeatureRequestDialog";
 
 interface AppTopBarProps {
   title: string;
@@ -10,6 +11,7 @@ interface AppTopBarProps {
 
 export function AppTopBar({ title }: AppTopBarProps) {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 items-center gap-4 px-6">
@@ -51,9 +53,9 @@ export function AppTopBar({ title }: AppTopBarProps) {
             )}
           </div>
 
-          <a href="mailto:hello@eera.app?subject=Feature%20Request" className="hidden md:block">
-            <Button variant="outline" size="sm">Request a feature</Button>
-          </a>
+          <div className="hidden md:block">
+            <Button variant="outline" size="sm" onClick={() => setRequestOpen(true)}>Request a feature</Button>
+          </div>
           
           <Link to="/profile-settings">
             <Button variant="ghost" size="icon">
@@ -62,6 +64,7 @@ export function AppTopBar({ title }: AppTopBarProps) {
           </Link>
         </div>
       </div>
+      <FeatureRequestDialog open={requestOpen} onOpenChange={setRequestOpen} />
     </header>
   );
 }
