@@ -482,7 +482,8 @@ export async function generateWithGeminiSimple(params: {
           ],
           generationConfig: {
             responseModalities: ["image"],
-            aspectRatio: geminiAspectRatio,
+            // Note: aspectRatio is not supported in generationConfig for imagen-3.0-generate-001
+            // Aspect ratio should be specified in the prompt text itself
           },
         }),
       }

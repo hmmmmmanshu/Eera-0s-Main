@@ -585,6 +585,7 @@ export function buildSimpleGeminiPrompt(params: {
     brandColors,
     tone,
     styleVariation,
+    aspectRatio,
   } = params;
   
   // 1. Opening: Professional [image type] for [platform], showing [what to show]
@@ -630,7 +631,16 @@ export function buildSimpleGeminiPrompt(params: {
   // 6. Layout Hint
   const layoutHint = "Clean space for headline text overlay on top";
   
-  // 7. Quality
+  // 7. Aspect Ratio
+  const aspectRatioDesc = aspectRatio === "1:1" 
+    ? "square format (1:1 aspect ratio)"
+    : aspectRatio === "4:5"
+    ? "portrait format (4:5 aspect ratio)"
+    : aspectRatio === "16:9"
+    ? "landscape format (16:9 aspect ratio)"
+    : "vertical format (9:16 aspect ratio)";
+  
+  // 8. Quality
   const quality = imageType === "product" || imageType === "social_proof"
     ? "High-quality professional photography quality"
     : "High-quality professional design quality";
@@ -643,6 +653,7 @@ export function buildSimpleGeminiPrompt(params: {
     `with ${colors}`,
     atmosphere,
     layoutHint,
+    aspectRatioDesc,
     quality,
   ];
   
@@ -659,6 +670,7 @@ export function buildSimpleGeminiPrompt(params: {
       style,
       `with ${colors}`,
       atmosphere,
+      aspectRatioDesc,
       quality,
     ].join(". ") + ".";
   }
