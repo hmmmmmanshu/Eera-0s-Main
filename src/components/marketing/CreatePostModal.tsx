@@ -231,21 +231,19 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         platform,
         content: headline,
         media_urls: [],
-        status: "draft" as const, // Use "draft" instead of "generating" (not in PostStatus type)
+        status: "generating" as const, // Status while images are being generated
         scheduled_time: null,
         published_time: null,
         views: 0,
         likes: 0,
         comments: 0,
         shares: 0,
-        // New fields from migration (using type assertion)
-        ...({
-          generated_images: [],
-          aspect_ratio: aspectRatio,
-          image_count: imageCount,
-          refinement_count: 0,
-          account_type: accountType,
-        } as any),
+        // New fields from migration
+        generated_images: [] as string[], // Will be updated as images complete
+        aspect_ratio: aspectRatio,
+        image_count: imageCount,
+        refinement_count: 0,
+        account_type: accountType,
       };
       
       const createdPost = await createPostMutation.mutateAsync(postData);

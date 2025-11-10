@@ -100,3 +100,34 @@ BEGIN
   END IF;
 END $$;
 
+-- Add account_type: Stores whether the post is for personal or company account
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'marketing_posts' 
+    AND column_name = 'account_type'
+  ) THEN
+    ALTER TABLE marketing_posts 
+    ADD COLUMN account_type TEXT CHECK (account_type IN ('personal', 'company'));
+  END IF;
+END $$;
+
+-- Update status CHECK constraint to include 'generating' status
+DO $$ 
+BEGIN
+  -- Drop existing constraint if it exists
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'marketing_posts_status_check'
+  ) THEN
+    ALTER TABLE marketing_posts DROP CONSTRAINT marketing_posts_status_check;
+  END IF;
+  
+  -- Add updated constraint with 'generating' status
+  ALTER TABLE marketing_posts
+  ADD CONSTRAINT marketing_posts_status_check 
+  CHECK (status = ANY (ARRAY['draft'::text, 'scheduled'::text, 'published'::text, 'failed'::text, 'generating'::text]));
+END $$;
+
