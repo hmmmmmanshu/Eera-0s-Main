@@ -22,20 +22,21 @@ export interface TextGenerationOptions {
 }
 
 export interface ImageGenerationOptions {
-  model: string;
+  model?: string; // Optional, defaults to Gemini
   prompt: string;
   aspectRatio?: "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "4:5" | "5:4" | "2:3" | "3:2" | "21:9";
   brandContext?: BrandContext;
   negativePrompt?: string;
   imageType?: string | null;
-  accountType?: "personal" | "company";
+  accountType: "personal" | "company"; // Required for Gemini simplified prompts
+  platform: "linkedin" | "instagram"; // Required for Gemini simplified prompts
   colorConfig?: {
     mode: "brand" | "custom" | "mood";
     primary?: string;
     accent?: string;
   };
   objective?: "awareness" | "leads" | "engagement" | "recruitment";
-  tone?: string;
+  tone: string; // Required for Gemini simplified prompts
 }
 
 export interface GeneratedText {
@@ -488,20 +489,81 @@ export async function generateImage(
 
 /**
  * Generate with automatic fallback
- * Falls back from paid Gemini model to free one if it fails
+ * Uses direct Gemini API with simplified prompts when model is Gemini
+ * Falls back to OpenRouter for other models
  */
 export async function generateImageWithFallback(
   options: ImageGenerationOptions,
   fallbackModels: string[] = [] // No fallback - premium only
 ): Promise<GeneratedImage> {
-  // Force premium model only - no fallback
-  const premiumModel = "google/gemini-2.5-flash-image-preview";
-  console.log(`[OpenRouter] Using premium model only: ${premiumModel}`);
-
+  const model = options.model || "google/gemini-2.5-flash-image-preview";
+  
+  // Check if this is a Gemini model - use direct API with simplified prompts
+  const isGeminiModel = model.includes("gemini") || model.includes("google/");
+  
+  if (isGeminiModel) {
+    console.log(`[Gemini Direct] Using direct Gemini API with simplified prompts`);
+    
+    // Import the simplified Gemini function
+    const { generateWithGeminiSimple } = await import("./imageGeneration");
+    
+    // Extract parameters needed for simplified prompt builder
+    if (!options.accountType || !options.platform || !options.tone) {
+      throw new Error("Missing required parameters for Gemini simplified prompts: accountType, platform, tone");
+    }
+    
+    // Get brand colors from brandContext if available
+    const brandColors = options.brandContext?.visual?.colors ? {
+      primary: (options.brandContext.visual.colors as any)?.primary,
+      accent: (options.brandContext.visual.colors as any)?.secondary,
+    } : undefined;
+    
+    try {
+      // Extract headline and keyPoints from prompt
+      // Format is typically: "headline. keyPoint1. keyPoint2" or just "headline"
+      const promptParts = options.prompt.split('.').map(p => p.trim()).filter(Boolean);
+      const headline = promptParts[0] || options.prompt;
+      const keyPoints = promptParts.length > 1 ? promptParts.slice(1).join('. ') : undefined;
+      
+      const result = await generateWithGeminiSimple({
+        accountType: options.accountType,
+        platform: options.platform,
+        imageType: options.imageType as any,
+        headline: headline,
+        keyPoints: keyPoints,
+        colorMode: options.colorConfig?.mode || "brand",
+        customColors: options.colorConfig?.mode === "custom" ? {
+          primary: options.colorConfig.primary || "",
+          accent: options.colorConfig.accent || "",
+        } : undefined,
+        brandColors: options.colorConfig?.mode === "brand" ? brandColors : undefined,
+        tone: options.tone,
+        styleVariation: "minimal", // Default, could be made configurable
+        aspectRatio: options.aspectRatio || "1:1",
+      });
+      
+      return {
+        url: result.url,
+        prompt: result.prompt,
+        model,
+        generationTime: 0, // Could track this if needed
+        metadata: {
+          aspectRatio: options.aspectRatio,
+        },
+      };
+    } catch (error) {
+      console.error(`[Gemini Direct] Generation failed:`, error);
+      throw new Error(`Gemini image generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+  
+  // For non-Gemini models, use OpenRouter (legacy support)
+  console.log(`[OpenRouter] Using OpenRouter API for model: ${model}`);
+  
   try {
     const result = await generateImage({
       ...options,
-      model: premiumModel,
+      model,
     });
 
     // Ensure result has prompt field for compatibility
@@ -511,7 +573,7 @@ export async function generateImageWithFallback(
 
     return result;
   } catch (error) {
-    console.error(`[OpenRouter] Premium model failed:`, error);
+    console.error(`[OpenRouter] Generation failed:`, error);
     throw new Error(`Image generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }

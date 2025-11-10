@@ -8,7 +8,7 @@ import { useEffect } from "react";
 // ========================================
 
 export type Platform = "linkedin" | "instagram" | "twitter" | "facebook";
-export type PostStatus = "draft" | "scheduled" | "published" | "failed";
+export type PostStatus = "draft" | "scheduled" | "published" | "failed" | "generating";
 export type PostFormat = "text" | "image" | "video" | "carousel" | "story";
 
 export interface PostImageMeta {
@@ -53,6 +53,15 @@ export interface MarketingPost {
   created_at: string;
   updated_at: string;
   post_meta?: PostMeta | null;
+  // Auto-save fields for image generation workflow
+  selected_image_url?: string | null;
+  refined_image_url?: string | null;
+  refinement_count?: number;
+  generated_images?: string[] | null; // Array of image URLs
+  final_image_url?: string | null;
+  aspect_ratio?: "1:1" | "4:5" | "16:9" | "9:16" | null;
+  image_count?: number;
+  account_type?: "personal" | "company" | null;
 }
 
 export interface MarketingMetric {
@@ -297,6 +306,267 @@ export function useUpdatePost() {
     },
     onError: (error) => {
       toast.error(`Failed to update post: ${error.message}`);
+    },
+  });
+}
+
+// ========================================
+// AUTO-SAVE MUTATION HOOKS FOR IMAGE GENERATION
+// ========================================
+
+/**
+ * Creates an initial draft post when image generation starts
+ * Status is set to "generating" to indicate generation is in progress
+ */
+export function useCreateDraftPost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      headline: string;
+      platform: Platform;
+      account_type: "personal" | "company";
+      aspect_ratio: "1:1" | "4:5" | "16:9" | "9:16";
+      image_count: number;
+    }) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("Not authenticated");
+      }
+
+      const insertData = {
+        platform: params.platform,
+        content: params.headline,
+        media_urls: [],
+        status: "generating" as PostStatus,
+        scheduled_time: null,
+        published_time: null,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        account_type: params.account_type,
+        aspect_ratio: params.aspect_ratio,
+        image_count: params.image_count,
+        generated_images: [],
+        refinement_count: 0,
+      };
+
+      const { data, error } = await supabase
+        .from("marketing_posts")
+        .insert({ ...insertData, user_id: user.id })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[useCreateDraftPost] Error:", error);
+        throw error;
+      }
+
+      console.log("[useCreateDraftPost] Draft post created:", data.id);
+      return data as MarketingPost;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["marketing-posts"] });
+      console.log("[useCreateDraftPost] Success - Post ID:", data.id);
+    },
+    onError: (error) => {
+      console.error("[useCreateDraftPost] Failed:", error);
+      toast.error(`Failed to create draft: ${error.message}`);
+    },
+  });
+}
+
+/**
+ * Updates post with generated images array
+ * Updates status to "draft" when all images are complete
+ */
+export function useUpdatePostImages() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      post_id: string;
+      generated_images: string[];
+      media_urls?: string[];
+    }) => {
+      const updates: Partial<MarketingPost> = {
+        generated_images: params.generated_images,
+        media_urls: params.media_urls || params.generated_images,
+        status: "draft" as PostStatus, // Mark as draft when images are ready
+      };
+
+      const { data, error } = await supabase
+        .from("marketing_posts")
+        .update(updates)
+        .eq("id", params.post_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[useUpdatePostImages] Error:", error);
+        throw error;
+      }
+
+      console.log("[useUpdatePostImages] Updated with", params.generated_images.length, "images");
+      return data as MarketingPost;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["marketing-posts"] });
+    },
+    onError: (error) => {
+      console.error("[useUpdatePostImages] Failed:", error);
+      toast.error(`Failed to update images: ${error.message}`);
+    },
+  });
+}
+
+/**
+ * Updates post when user selects an image from generated options
+ */
+export function useSelectImage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      post_id: string;
+      selected_image_url: string;
+    }) => {
+      const updates: Partial<MarketingPost> = {
+        selected_image_url: params.selected_image_url,
+        final_image_url: params.selected_image_url, // Also set as final for now
+        media_urls: [params.selected_image_url], // Update media_urls
+      };
+
+      const { data, error } = await supabase
+        .from("marketing_posts")
+        .update(updates)
+        .eq("id", params.post_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[useSelectImage] Error:", error);
+        throw error;
+      }
+
+      console.log("[useSelectImage] Image selected:", params.selected_image_url);
+      return data as MarketingPost;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["marketing-posts"] });
+    },
+    onError: (error) => {
+      console.error("[useSelectImage] Failed:", error);
+      toast.error(`Failed to select image: ${error.message}`);
+    },
+  });
+}
+
+/**
+ * Updates post when user refines an image
+ * Increments refinement_count and updates refined_image_url
+ */
+export function useRefineImage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      post_id: string;
+      refined_image_url: string;
+    }) => {
+      // First get current refinement_count
+      const { data: currentPost, error: fetchError } = await supabase
+        .from("marketing_posts")
+        .select("refinement_count")
+        .eq("id", params.post_id)
+        .single();
+
+      if (fetchError) {
+        console.error("[useRefineImage] Error fetching current post:", fetchError);
+        throw fetchError;
+      }
+
+      const currentCount = currentPost?.refinement_count || 0;
+      const newCount = currentCount + 1;
+
+      const updates: Partial<MarketingPost> = {
+        refined_image_url: params.refined_image_url,
+        refinement_count: newCount,
+        final_image_url: params.refined_image_url, // Update final image
+        media_urls: [params.refined_image_url], // Update media_urls
+      };
+
+      const { data, error } = await supabase
+        .from("marketing_posts")
+        .update(updates)
+        .eq("id", params.post_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[useRefineImage] Error:", error);
+        throw error;
+      }
+
+      console.log("[useRefineImage] Image refined, count:", newCount);
+      return data as MarketingPost;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["marketing-posts"] });
+    },
+    onError: (error) => {
+      console.error("[useRefineImage] Failed:", error);
+      toast.error(`Failed to refine image: ${error.message}`);
+    },
+  });
+}
+
+/**
+ * Finalizes post with final image and caption
+ * Status remains "draft" (ready for scheduling)
+ */
+export function useFinalizePost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      post_id: string;
+      final_image_url: string;
+      final_caption: string;
+    }) => {
+      const updates: Partial<MarketingPost> = {
+        final_image_url: params.final_image_url,
+        content: params.final_caption, // Store caption in content field
+        media_urls: [params.final_image_url],
+        status: "draft" as PostStatus, // Keep as draft for scheduling
+      };
+
+      const { data, error } = await supabase
+        .from("marketing_posts")
+        .update(updates)
+        .eq("id", params.post_id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[useFinalizePost] Error:", error);
+        throw error;
+      }
+
+      console.log("[useFinalizePost] Post finalized");
+      return data as MarketingPost;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["marketing-posts"] });
+      toast.success("Post finalized successfully!");
+    },
+    onError: (error) => {
+      console.error("[useFinalizePost] Failed:", error);
+      toast.error(`Failed to finalize post: ${error.message}`);
     },
   });
 }

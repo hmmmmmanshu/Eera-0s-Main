@@ -5,8 +5,10 @@
  */
 
 import type { BrandContext } from "./brandContext";
+import type { ImageType } from "@/types/imageTypes";
 import { supabase } from "@/integrations/supabase/client";
 import { enhanceImagePrompt as geminiEnhancePrompt } from "./gemini";
+import { buildSimpleGeminiPrompt } from "./promptAmplification";
 
 // ========================================
 // TYPES
@@ -270,8 +272,24 @@ export async function generateImage(
 // ========================================
 
 /**
+ * Map aspect ratio to Gemini-supported ratios
+ * Gemini supports: "1:1", "16:9", "9:16", "4:3", "3:4"
+ * Maps "4:5" to "4:3" (portrait) or "3:4" based on orientation
+ */
+function mapAspectRatioForGemini(aspectRatio: AspectRatio): "1:1" | "16:9" | "9:16" | "4:3" | "3:4" {
+  const ratioMap: Record<AspectRatio, "1:1" | "16:9" | "9:16" | "4:3" | "3:4"> = {
+    "1:1": "1:1",
+    "16:9": "16:9",
+    "9:16": "9:16",
+    "4:5": "3:4", // Map 4:5 portrait to 3:4 (closest match)
+  };
+  return ratioMap[aspectRatio] || "1:1";
+}
+
+/**
  * Google Gemini 2.5 Flash with Imagen 3.0
  * Native image generation using imagen-3.0-generate-001 model
+ * Uses simplified prompts via buildSimpleGeminiPrompt() when full parameters are provided
  * Reference: https://aistudio.google.com/models/gemini-2-5-flash-image
  */
 async function generateWithGemini(
@@ -283,10 +301,8 @@ async function generateWithGemini(
     throw new Error("VITE_GEMINI_API_KEY is required for image generation");
   }
 
-  console.log("[Gemini Image] Starting generation with imagen-3.0-generate-001");
-  console.log("[Gemini Image] Prompt:", prompt);
-
   const { width, height } = getDimensions(params.aspectRatio);
+  const geminiAspectRatio = mapAspectRatioForGemini(params.aspectRatio);
   
   try {
     // Use Gemini 2.5 Flash with Imagen 3.0 for native image generation
@@ -309,10 +325,7 @@ async function generateWithGemini(
           ],
           generationConfig: {
             responseModalities: ["image"],
-            // Gemini aspect ratio options: "1:1", "16:9", "9:16", "4:3", "3:4"
-            ...(params.aspectRatio && { 
-              aspectRatio: params.aspectRatio === "4:5" ? "4:3" : params.aspectRatio 
-            }),
+            aspectRatio: geminiAspectRatio,
           },
         }),
       }
@@ -402,6 +415,281 @@ async function generateWithGemini(
     
     return uploadToSupabase(blob, `placeholder-${Date.now()}.png`);
   }
+}
+
+/**
+ * Generate image with Gemini using simplified prompts
+ * Uses buildSimpleGeminiPrompt() for concise, natural language prompts (50-80 words)
+ * Direct Gemini API call to imagen-3.0-generate-001 model
+ */
+export async function generateWithGeminiSimple(params: {
+  accountType: "personal" | "company";
+  platform: "linkedin" | "instagram";
+  imageType: ImageType | null;
+  headline: string;
+  keyPoints?: string;
+  colorMode: "brand" | "custom" | "mood";
+  customColors?: { primary: string; accent: string };
+  brandColors?: { primary: string; accent: string };
+  tone: string;
+  styleVariation?: "minimal" | "bold" | "elegant";
+  aspectRatio: "1:1" | "4:5" | "16:9" | "9:16";
+}): Promise<{ url: string; prompt: string }> {
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!API_KEY) {
+    throw new Error("VITE_GEMINI_API_KEY is required for image generation");
+  }
+
+  // Build simplified prompt (50-80 words)
+  const simplePrompt = buildSimpleGeminiPrompt({
+    accountType: params.accountType,
+    platform: params.platform,
+    imageType: params.imageType,
+    headline: params.headline,
+    keyPoints: params.keyPoints,
+    colorMode: params.colorMode,
+    customColors: params.customColors,
+    brandColors: params.brandColors,
+    tone: params.tone,
+    styleVariation: params.styleVariation || "minimal",
+    aspectRatio: params.aspectRatio,
+  });
+
+  console.log("[Gemini Simple] Using simplified prompt:", simplePrompt);
+  console.log("[Gemini Simple] Word count:", simplePrompt.split(/\s+/).length);
+
+  const geminiAspectRatio = mapAspectRatioForGemini(params.aspectRatio);
+  const { width, height } = getDimensions(params.aspectRatio);
+
+  try {
+    // Direct Gemini API call
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateContent?key=${API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: simplePrompt,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseModalities: ["image"],
+            aspectRatio: geminiAspectRatio,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Gemini Simple] API Error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+      });
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("[Gemini Simple] API Response received");
+
+    // Extract image data from response
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
+      console.error("[Gemini Simple] No image data in response:", data);
+      throw new Error("No image data in Gemini response");
+    }
+
+    const imageData = data.candidates[0].content.parts[0].inlineData;
+    const base64Image = imageData.data;
+    const mimeType = imageData.mimeType || "image/png";
+
+    // Convert base64 to blob
+    const binaryString = atob(base64Image);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: mimeType });
+
+    // Upload to Supabase Storage
+    const filename = `gemini-simple-${Date.now()}.png`;
+    const publicUrl = await uploadToSupabase(blob, filename);
+
+    console.log("[Gemini Simple] Upload successful:", publicUrl);
+    return { url: publicUrl, prompt: simplePrompt };
+  } catch (error) {
+    console.error("[Gemini Simple] Generation failed:", error);
+    
+    // Create fallback placeholder
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    
+    if (ctx) {
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, '#0A66FF');
+      gradient.addColorStop(1, '#6B46C1');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 48px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('AI Generated Image', width / 2, height / 2 - 30);
+      ctx.font = '24px Arial';
+      ctx.fillText(`${width}×${height}`, width / 2, height / 2 + 30);
+    }
+    
+    const blob = await new Promise<Blob>((resolve) => {
+      canvas.toBlob((b) => resolve(b!), 'image/png');
+    });
+    
+    const fallbackUrl = await uploadToSupabase(blob, `placeholder-${Date.now()}.png`);
+    return { url: fallbackUrl, prompt: simplePrompt };
+  }
+}
+
+/**
+ * Generate multiple image variations in parallel with different styles
+ * Generates 1, 2, or 3 images with distinct visual styles (minimal, bold, elegant)
+ * Uses simplified prompts and direct Gemini API
+ */
+export async function generateImageVariations(params: {
+  count: 1 | 2 | 3;
+  accountType: "personal" | "company";
+  platform: "linkedin" | "instagram";
+  imageType: ImageType | null;
+  headline: string;
+  keyPoints?: string;
+  colorMode: "brand" | "custom" | "mood";
+  customColors?: { primary: string; accent: string };
+  brandColors?: { primary: string; accent: string };
+  tone: string;
+  aspectRatio: "1:1" | "4:5" | "16:9" | "9:16";
+}): Promise<Array<{
+  url: string;
+  style: "minimal" | "bold" | "elegant";
+  prompt: string;
+  generationTime: number;
+}>> {
+  const { count, ...baseParams } = params;
+  
+  // Determine style variations based on count
+  const styleVariations: Array<"minimal" | "bold" | "elegant"> = [];
+  if (count >= 1) styleVariations.push("minimal");
+  if (count >= 2) styleVariations.push("bold");
+  if (count >= 3) styleVariations.push("elegant");
+  
+  console.log(`[Image Variations] Generating ${count} image(s) with styles:`, styleVariations);
+  
+  // Build prompts for each style variation
+  const prompts = styleVariations.map(style => 
+    buildSimpleGeminiPrompt({
+      ...baseParams,
+      styleVariation: style,
+    })
+  );
+  
+  console.log(`[Image Variations] Generated ${prompts.length} prompt(s)`);
+  
+  // Generate images in parallel
+  const generationPromises = styleVariations.map(async (style, index) => {
+    const startTime = Date.now();
+    const prompt = prompts[index];
+    
+    try {
+      console.log(`[Image Variations] Generating ${style} style image (${index + 1}/${count})`);
+      
+      const result = await generateWithGeminiSimple({
+        ...baseParams,
+        styleVariation: style,
+      });
+      
+      const generationTime = Date.now() - startTime;
+      
+      console.log(`[Image Variations] ✓ ${style} style image generated in ${generationTime}ms`);
+      
+      return {
+        url: result.url,
+        style,
+        prompt: result.prompt,
+        generationTime,
+      };
+    } catch (error) {
+      const generationTime = Date.now() - startTime;
+      console.error(`[Image Variations] ✗ ${style} style image failed:`, error);
+      
+      // Re-throw with context for Promise.allSettled handling
+      throw {
+        style,
+        prompt,
+        generationTime,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  });
+  
+  // Use Promise.allSettled to handle partial failures gracefully
+  const results = await Promise.allSettled(generationPromises);
+  
+  // Process results and separate successes from failures
+  const successful: Array<{
+    url: string;
+    style: "minimal" | "bold" | "elegant";
+    prompt: string;
+    generationTime: number;
+  }> = [];
+  
+  const failed: Array<{
+    style: "minimal" | "bold" | "elegant";
+    prompt: string;
+    error: string;
+  }> = [];
+  
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      successful.push(result.value);
+    } else {
+      const failure = result.reason;
+      failed.push({
+        style: styleVariations[index],
+        prompt: prompts[index],
+        error: failure.error || "Unknown error",
+      });
+    }
+  });
+  
+  // Log summary
+  console.log(`[Image Variations] Summary: ${successful.length} succeeded, ${failed.length} failed`);
+  if (failed.length > 0) {
+    console.warn(`[Image Variations] Failed styles:`, failed.map(f => `${f.style} (${f.error})`));
+  }
+  
+  // If all failed, throw an error
+  if (successful.length === 0) {
+    const errorMessages = failed.map(f => `${f.style}: ${f.error}`).join("; ");
+    throw new Error(`All image variations failed: ${errorMessages}`);
+  }
+  
+  // If some failed, log warning but return successful ones
+  if (failed.length > 0) {
+    console.warn(
+      `[Image Variations] Partial success: ${successful.length}/${count} images generated. ` +
+      `Failed: ${failed.map(f => f.style).join(", ")}`
+    );
+  }
+  
+  return successful;
 }
 
 /**

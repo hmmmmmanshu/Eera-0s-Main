@@ -27,13 +27,11 @@ import { Badge } from "@/components/ui/badge";
 import { 
   FileText, 
   Image as ImageIcon, 
-  Video, 
   Sparkles, 
   Upload, 
   CheckCircle, 
   Settings,
   Palette,
-  Zap,
   BarChart3,
   Package,
   MessageSquareQuote,
@@ -44,21 +42,16 @@ import {
   Calendar
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 
 // Hooks
-import { useBrandProfile, useCreatePost } from "@/hooks/useMarketingData";
+import { useBrandProfile, useCreatePost, useUpdatePost } from "@/hooks/useMarketingData";
 import { assembleBrandContext } from "@/lib/brandContext";
-import type { PostImageMeta } from "@/hooks/useMarketingData";
 
 // AI Functions
 import { generatePostContent, type GeneratedPostContent } from "@/lib/gemini";
-import { 
-  generateImageWithFallback,
-  IMAGE_MODELS,
-  type ImageGenerationOptions
-} from "@/lib/openrouter";
-import { linkPromptToPostFromImageUrl } from "@/lib/promptLearning";
+import { generateImageVariations, generateWithGeminiSimple } from "@/lib/imageGeneration";
 
 // Image Type System
 import type { ImageType } from "@/types/imageTypes";
@@ -98,46 +91,49 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   
   // Form data with auto-restore
   const [platform, setPlatform] = useState<"linkedin" | "instagram">(savedDraft?.platform || "linkedin");
-  const [contentType, setContentType] = useState<"text" | "image" | "carousel" | "video">(savedDraft?.contentType || "text");
-  const [imageType, setImageType] = useState<ImageType | null>(savedDraft?.imageType || null);
+  const [imageType, setImageType] = useState<ImageType | null>(savedDraft?.imageType || "announcement");
   const [headline, setHeadline] = useState(savedDraft?.headline || "");
   const [keyPoints, setKeyPoints] = useState(savedDraft?.keyPoints || "");
   const [tone, setTone] = useState<"quirky" | "humble" | "inspirational" | "professional" | "witty">(savedDraft?.tone || "professional");
   const [objective, setObjective] = useState<"awareness" | "leads" | "engagement" | "recruitment">(savedDraft?.objective || "engagement");
   
-  // Image generation (Step 3.5) - Always use premium model
-  const [selectedModel, setSelectedModel] = useState<keyof typeof IMAGE_MODELS>("google/gemini-2.5-flash-image-preview");
+  // Image generation - Always use Gemini
   const [aspectRatio, setAspectRatio] = useState<"1:1" | "4:5" | "16:9" | "9:16">("1:1");
-  const [negativePrompt, setNegativePrompt] = useState("");
-  const [consistentStyle, setConsistentStyle] = useState(true);
-  const [seed, setSeed] = useState<number>(() => Math.floor(Math.random() * 1_000_000));
+  const [imageCount, setImageCount] = useState<1 | 2 | 3>(savedDraft?.imageCount || 1);
+  
+  // Validation state
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationStatus, setGenerationStatus] = useState({
-    brandAnalysis: "pending",
-    contentGen: "pending",
-    imageGen: "pending",
-    optimization: "pending",
-  });
-  const [generationTime, setGenerationTime] = useState(0);
-  
-  // Generated content
-  const [generatedContent, setGeneratedContent] = useState<GeneratedPostContent | null>(null);
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
-  // Slides (ordered) for carousel/reel
-  const [slides, setSlides] = useState<PostImageMeta[]>([]);
-  const [newSlidePrompt, setNewSlidePrompt] = useState("");
-  const [slidePoints, setSlidePoints] = useState("");
-  const [slideActionsBusy, setSlideActionsBusy] = useState<number | null>(null);
-  const [batchGenerating, setBatchGenerating] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number }>({ completed: 0, total: 0 });
-  const [slideStatuses, setSlideStatuses] = useState<Record<number, "queued" | "generating" | "uploading" | "done" | "error">>({});
-  const [reelStoryboard, setReelStoryboard] = useState<{ slides: { imageUrl: string; durationSec: number; overlayText?: string }[] } | null>(null);
   
   // Hooks
   const { data: profile } = useBrandProfile();
   const createPostMutation = useCreatePost();
+  const updatePostMutation = useUpdatePost();
+  
+  // Step 2 state - Image generation and selection
+  const [generatedImages, setGeneratedImages] = useState<Array<{
+    url: string;
+    style: "minimal" | "bold" | "elegant";
+    prompt: string;
+    generationTime: number;
+  }>>([]);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [imageGenerationStatus, setImageGenerationStatus] = useState<"idle" | "generating" | "complete" | "error">("idle");
+  const [generationProgress, setGenerationProgress] = useState<{ completed: number; total: number }>({ completed: 0, total: 0 });
+  const [generatedCaption, setGeneratedCaption] = useState<GeneratedPostContent | null>(null);
+  const [currentPostId, setCurrentPostId] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  
+  // Step 3 state - Refinement
+  const [refinementCount, setRefinementCount] = useState(0);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null); // Selected or refined image
+  const [styleSliderValue, setStyleSliderValue] = useState(50); // 0 = More Professional, 100 = More Casual
+  const [refinementColorMode, setRefinementColorMode] = useState<"warmer" | "cooler" | "brand" | "custom">("brand");
+  const [refinementCustomColors, setRefinementCustomColors] = useState<{ primary: string; accent: string } | null>(null);
+  const [editedCaption, setEditedCaption] = useState<string>("");
+  const [isRefining, setIsRefining] = useState(false);
 
   // Auto-save form data to localStorage (do not persist step to avoid auto-resume)
   useEffect(() => {
@@ -147,204 +143,395 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         colorMode,
         customColors,
         platform,
-        contentType,
         imageType,
         headline,
         keyPoints,
         tone,
         objective,
+        aspectRatio,
+        imageCount,
         timestamp: Date.now(),
       };
       localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(draftData));
     }
-  }, [open, accountType, colorMode, customColors, platform, contentType, imageType, headline, keyPoints, tone, objective]);
-
-  // Auto-select model, aspect ratio, and negative prompt based on image type
+  }, [open, accountType, colorMode, customColors, platform, imageType, headline, keyPoints, tone, objective, aspectRatio, imageCount]);
+  
+  // Auto-select aspect ratio based on image type
   useEffect(() => {
-    if (imageType && (contentType === "image" || contentType === "carousel")) {
+    if (imageType) {
       const preset = IMAGE_TYPE_PRESETS[imageType];
-      // Map preset model to OpenRouter model keys
-      const modelMap: Record<string, keyof typeof IMAGE_MODELS> = {
-        gemini: "google/gemini-2.5-flash-image-preview",
-        dalle3: "google/gemini-2.5-flash-image-preview", // Using Gemini for now
-        sdxl: "google/gemini-2.5-flash-image-preview", // Using Gemini for now
-        leonardo: "google/gemini-2.5-flash-image-preview", // Using Gemini for now
-      };
-      setSelectedModel(modelMap[preset.suggestedModel] || "google/gemini-2.5-flash-image-preview");
       setAspectRatio(preset.aspectRatio);
-      setNegativePrompt(preset.negativePrompt);
     }
-  }, [imageType, contentType]);
+  }, [imageType]);
 
-  // Reset wizard when modal opens
+  // Reset wizard when modal opens - Always start fresh at Step 1
   useEffect(() => {
     if (open) {
       setStep(1);
-      setGeneratedContent(null);
-      setGeneratedImageUrl(null);
-      setSlides([]);
-      setGenerationStatus({ brandAnalysis: "pending", contentGen: "pending", imageGen: "pending", optimization: "pending" });
+      // Reset all state
+      setGeneratedImages([]);
+      setSelectedImageUrl(null);
+      setImageGenerationStatus("idle");
+      setGenerationProgress({ completed: 0, total: 0 });
+      setGeneratedCaption(null);
+      setCurrentPostId(null);
+      setGenerationError(null);
+      setRefinementCount(0);
+      setCurrentImageUrl(null);
+      setStyleSliderValue(50);
+      setRefinementColorMode("brand");
+      setRefinementCustomColors(null);
+      setEditedCaption("");
+      setIsRefining(false);
+      setIsGenerating(false);
     }
   }, [open]);
-
-  // When platform or content type changes, clear generated state and keep user in editing steps only
+  
+  // Initialize current image and caption when Step 3 is reached
   useEffect(() => {
-    setGeneratedContent(null);
-    setGeneratedImageUrl(null);
-    setSlides([]);
-    if (step > 3) {
-      setStep(3);
+    if (step === 3 && selectedImageUrl && !currentImageUrl) {
+      setCurrentImageUrl(selectedImageUrl);
+      if (generatedCaption?.caption) {
+        setEditedCaption(generatedCaption.caption);
+      }
     }
-  }, [platform, contentType]);
+  }, [step, selectedImageUrl, currentImageUrl, generatedCaption]);
+  
+  // Auto-generate images and caption when Step 2 is reached
+  useEffect(() => {
+    if (step === 2 && imageGenerationStatus === "idle" && accountType && platform && headline && imageType && aspectRatio && profile) {
+      handleGenerateImagesAndCaption();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]); // Only trigger when step changes to 2
+  
+  // Function to generate images and caption
+  const handleGenerateImagesAndCaption = async () => {
+    if (!profile || !accountType || !platform || !headline || !imageType) {
+      toast.error("Missing required information");
+      return;
+    }
+    
+    setIsGenerating(true);
+    setImageGenerationStatus("generating");
+    setGenerationProgress({ completed: 0, total: imageCount });
+    setGenerationError(null);
+    
+    try {
+      const brandContext = assembleBrandContext(profile);
+      
+      // Get brand colors
+      const brandColors = profile.color_palette ? {
+        primary: (profile.color_palette as any)?.primary,
+        accent: (profile.color_palette as any)?.secondary,
+      } : undefined;
+      
+      // Create post record in database with "generating" status
+      const postData = {
+        platform,
+        content: headline,
+        media_urls: [],
+        status: "draft" as const, // Use "draft" instead of "generating" (not in PostStatus type)
+        scheduled_time: null,
+        published_time: null,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        // New fields from migration (using type assertion)
+        ...({
+          generated_images: [],
+          aspect_ratio: aspectRatio,
+          image_count: imageCount,
+          refinement_count: 0,
+          account_type: accountType,
+        } as any),
+      };
+      
+      const createdPost = await createPostMutation.mutateAsync(postData);
+      setCurrentPostId(createdPost.id);
+      console.log("[Step 2] Post created with generating status:", createdPost.id);
+      
+      // Generate caption in parallel with images
+      const captionPromise = generatePostContent({
+        platform,
+        contentType: "image",
+        headline,
+        keyPoints: keyPoints || undefined,
+        tone,
+        objective,
+        brandContext,
+      });
+      
+      // Generate images
+      const imagesPromise = generateImageVariations({
+        count: imageCount,
+        accountType,
+        platform,
+        imageType,
+        headline,
+        keyPoints: keyPoints || undefined,
+        colorMode,
+        customColors: colorMode === "custom" ? customColors || undefined : undefined,
+        brandColors: colorMode === "brand" ? brandColors : undefined,
+        tone,
+        aspectRatio,
+      });
+      
+      // Wait for both to complete
+      const [caption, images] = await Promise.all([captionPromise, imagesPromise]);
+      
+      setGeneratedCaption(caption);
+      setGeneratedImages(images);
+      setImageGenerationStatus("complete");
+      setGenerationProgress({ completed: images.length, total: imageCount });
+      
+      // Update post with generated images
+      const imageUrls = images.map(img => img.url);
+      await updatePostMutation.mutateAsync({
+        id: createdPost.id,
+        updates: {
+          generated_images: imageUrls,
+          media_urls: imageUrls, // Also update media_urls for compatibility
+        },
+      });
+      
+      console.log("[Step 2] Images and caption generated successfully");
+    } catch (error) {
+      console.error("[Step 2] Generation failed:", error);
+      setImageGenerationStatus("error");
+      setGenerationError(error instanceof Error ? error.message : "Failed to generate images");
+      toast.error(`Generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  
+  // Handle image selection
+  const handleSelectImage = async (imageUrl: string) => {
+    setSelectedImageUrl(imageUrl);
+    
+    if (currentPostId) {
+      try {
+        await updatePostMutation.mutateAsync({
+          id: currentPostId,
+          updates: {
+            selected_image_url: imageUrl,
+            final_image_url: imageUrl,
+            status: "draft",
+            media_urls: [imageUrl], // Update media_urls to selected image
+          },
+        });
+        console.log("[Step 2] Image selected and saved:", imageUrl);
+      } catch (error) {
+        console.error("[Step 2] Failed to save selected image:", error);
+        toast.error("Failed to save selection");
+      }
+    }
+  };
+  
+  // Handle refinement - Apply changes to image
+  const handleRefineImage = async () => {
+    if (!profile || !accountType || !platform || !headline || !imageType || !currentImageUrl || refinementCount >= 2) {
+      return;
+    }
+    
+    setIsRefining(true);
+    
+    try {
+      const brandContext = assembleBrandContext(profile);
+      const brandColors = profile.color_palette ? {
+        primary: (profile.color_palette as any)?.primary,
+        accent: (profile.color_palette as any)?.secondary,
+      } : undefined;
+      
+      // Determine tone based on style slider (0-50 = professional, 50-100 = casual)
+      const adjustedTone = styleSliderValue < 50 
+        ? "professional" 
+        : styleSliderValue < 75 
+        ? "humble" 
+        : "quirky";
+      
+      // Determine color mode based on refinement color selection
+      let finalColorMode: "brand" | "custom" | "mood" = colorMode;
+      let finalCustomColors = customColors;
+      
+      if (refinementColorMode === "warmer") {
+        finalColorMode = "mood"; // Will use warm mood colors (handled by prompt builder)
+      } else if (refinementColorMode === "cooler") {
+        finalColorMode = "mood"; // Will use cool mood colors (handled by prompt builder)
+      } else if (refinementColorMode === "brand") {
+        finalColorMode = "brand";
+      } else if (refinementColorMode === "custom") {
+        finalColorMode = "custom";
+        finalCustomColors = refinementCustomColors || customColors || { primary: "#3B82F6", accent: "#8B5CF6" };
+      }
+      
+      // Add color temperature context to keyPoints for warmer/cooler
+      let enhancedKeyPoints = keyPoints || "";
+      if (refinementColorMode === "warmer") {
+        enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n" : "") + "Use warm color tones (oranges, reds, yellows)";
+      } else if (refinementColorMode === "cooler") {
+        enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n" : "") + "Use cool color tones (blues, purples, greens)";
+      }
+      
+      // Generate refined image with adjusted parameters
+      const refinedResult = await generateWithGeminiSimple({
+        accountType,
+        platform,
+        imageType,
+        headline,
+        keyPoints: enhancedKeyPoints || undefined,
+        colorMode: finalColorMode,
+        customColors: finalColorMode === "custom" ? finalCustomColors : undefined,
+        brandColors: finalColorMode === "brand" ? brandColors : undefined,
+        tone: adjustedTone,
+        styleVariation: "minimal", // Use minimal for refinements
+        aspectRatio,
+      });
+      
+      // Update current image
+      setCurrentImageUrl(refinedResult.url);
+      const newRefinementCount = refinementCount + 1;
+      setRefinementCount(newRefinementCount);
+      
+      // Update post in database
+      if (currentPostId) {
+        await updatePostMutation.mutateAsync({
+          id: currentPostId,
+          updates: {
+            refined_image_url: refinedResult.url,
+            refinement_count: newRefinementCount,
+            final_image_url: refinedResult.url, // Also update final_image_url
+            media_urls: [refinedResult.url], // Update media_urls
+          } as any,
+        });
+      }
+      
+      toast.success(`Image refined! (${newRefinementCount}/2)`);
+    } catch (error) {
+      console.error("[Step 3] Refinement failed:", error);
+      toast.error(`Refinement failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsRefining(false);
+    }
+  };
+  
+  // Handle finalization - Use This Image or Schedule Post
+  const handleFinalizePost = async () => {
+    if (!currentPostId || !currentImageUrl) {
+      toast.error("Missing post or image");
+      return;
+    }
+    
+    try {
+      // Update post with final image and caption
+      const finalCaption = editedCaption || generatedCaption?.caption || headline;
+      await updatePostMutation.mutateAsync({
+        id: currentPostId,
+        updates: {
+          final_image_url: currentImageUrl,
+          status: "draft",
+          media_urls: [currentImageUrl],
+          content: finalCaption,
+          // Store caption in content field (final_caption field doesn't exist in schema)
+          ...({
+            final_caption: finalCaption,
+          } as any),
+        } as any,
+      });
+      
+      toast.success("Post saved successfully!");
+      resetAndClose();
+    } catch (error) {
+      console.error("[Step 3] Finalization failed:", error);
+      toast.error(`Failed to save post: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  };
+  
+  // Handle generate more (3 new variations)
+  const handleGenerateMore = async () => {
+    if (!profile || !accountType || !platform || !headline || !imageType) {
+      return;
+    }
+    
+    setIsGenerating(true);
+    setImageGenerationStatus("generating");
+    setGenerationProgress({ completed: 0, total: 3 });
+    setSelectedImageUrl(null);
+    setGenerationError(null);
+    
+    try {
+      const brandContext = assembleBrandContext(profile);
+      const brandColors = profile.color_palette ? {
+        primary: (profile.color_palette as any)?.primary,
+        accent: (profile.color_palette as any)?.secondary,
+      } : undefined;
+      
+      // Generate 3 new variations
+      const images = await generateImageVariations({
+        count: 3,
+        accountType,
+        platform,
+        imageType,
+        headline,
+        keyPoints: keyPoints || undefined,
+        colorMode,
+        customColors: colorMode === "custom" ? customColors || undefined : undefined,
+        brandColors: colorMode === "brand" ? brandColors : undefined,
+        tone,
+        aspectRatio,
+      });
+      
+      setGeneratedImages(images);
+      setImageGenerationStatus("complete");
+      setGenerationProgress({ completed: images.length, total: 3 });
+      
+      // Update post with new generated images
+      if (currentPostId) {
+        const imageUrls = images.map(img => img.url);
+        await updatePostMutation.mutateAsync({
+          id: currentPostId,
+          updates: {
+            generated_images: imageUrls,
+            image_count: 3,
+          },
+        });
+      }
+      
+      toast.success("Generated 3 new variations!");
+    } catch (error) {
+      console.error("[Step 2] Generate more failed:", error);
+      setImageGenerationStatus("error");
+      setGenerationError(error instanceof Error ? error.message : "Failed to generate images");
+      toast.error(`Generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
 
   const resetAndClose = () => {
     setStep(1);
-    setHeadline("");
-    setKeyPoints("");
-    setGeneratedContent(null);
-    setGeneratedImageUrl(null);
-    setSlides([]);
+    // Reset all state
+    setGeneratedImages([]);
+    setSelectedImageUrl(null);
+    setImageGenerationStatus("idle");
+    setGenerationProgress({ completed: 0, total: 0 });
+    setGeneratedCaption(null);
+    setCurrentPostId(null);
+    setGenerationError(null);
+    setRefinementCount(0);
+    setCurrentImageUrl(null);
+    setStyleSliderValue(50);
+    setRefinementColorMode("brand");
+    setRefinementCustomColors(null);
+    setEditedCaption("");
+    setIsRefining(false);
+    setIsGenerating(false);
     localStorage.removeItem(FORM_STORAGE_KEY); // Clear saved draft
     onOpenChange(false);
   };
-
-  const moveSlide = (index: number, direction: "up" | "down") => {
-    setSlides((prev) => {
-      const next = [...prev];
-      const newIndex = direction === "up" ? index - 1 : index + 1;
-      if (newIndex < 0 || newIndex >= next.length) return prev;
-      const tmp = next[index];
-      next[index] = next[newIndex];
-      next[newIndex] = tmp;
-      return next;
-    });
-  };
-
-  const deleteSlide = (index: number) => {
-    setSlides((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const regenerateSlide = async (index: number) => {
-    try {
-      setSlideActionsBusy(index);
-      const brandContext = assembleBrandContext(profile!);
-      const prompt = slides[index].prompt || `${headline}. ${keyPoints || ""}`;
-          const result = await generateImageWithFallback({
-            model: selectedModel,
-            prompt,
-            brandContext,
-            aspectRatio,
-            negativePrompt: negativePrompt || undefined,
-            imageType: imageType || undefined,
-          });
-      setSlides((prev) => {
-        const next = [...prev];
-        next[index] = { ...next[index], url: result.url };
-        return next;
-      });
-    } catch (e) {
-      toast.error("Failed to regenerate slide");
-    } finally {
-      setSlideActionsBusy(null);
-    }
-  };
-
-  const addSlideFromPrompt = async () => {
-    if (!newSlidePrompt.trim()) {
-      toast.error("Enter a prompt for the slide");
-      return;
-    }
-    if (slides.length >= 10) {
-      toast.error("Maximum 10 slides per carousel");
-      return;
-    }
-    try {
-      setSlideActionsBusy(-1);
-      const brandContext = assembleBrandContext(profile!);
-      const result = await generateImageWithFallback({
-        model: selectedModel,
-        prompt: newSlidePrompt,
-        brandContext,
-        aspectRatio,
-        negativePrompt: negativePrompt || undefined,
-        imageType: imageType || undefined,
-      });
-      setSlides((prev) => [...prev, { url: result.url, prompt: newSlidePrompt, aspectRatio, seed: consistentStyle ? seed : undefined, imageType }]);
-      setNewSlidePrompt("");
-    } catch (e) {
-      toast.error("Failed to add slide");
-    } finally {
-      setSlideActionsBusy(null);
-    }
-  };
-
-  const splitKeyPointsIntoPrompts = (): string[] => {
-    const source = (contentType === "carousel" && slidePoints) ? slidePoints : keyPoints;
-    const points = (source || "")
-      .split(/\n|•|\-|\u2022/)
-      .map(p => p.trim())
-      .filter(Boolean);
-    if (points.length === 0) {
-      // fallback: slice headline into 3 themed prompts
-      return [headline, `${headline} – value proposition`, `${headline} – call to action`].filter(Boolean).slice(0, 3);
-    }
-    return points.slice(0, 10);
-  };
-
-  const generateSlidesFromKeyPoints = async () => {
-    const remaining = 10 - slides.length;
-    if (remaining <= 0) {
-      toast.error("You already have 10 slides");
-      return;
-    }
-    const prompts = splitKeyPointsIntoPrompts().slice(0, remaining);
-    if (prompts.length === 0) {
-      toast.error("No key points to generate from");
-      return;
-    }
-    try {
-      setBatchGenerating(true);
-      setBatchProgress({ completed: 0, total: prompts.length });
-      const brandContext = assembleBrandContext(profile!);
-      for (let i = 0; i < prompts.length; i++) {
-        const idx = slides.length + i;
-        setSlideStatuses(prev => ({ ...prev, [idx]: "queued" }));
-      }
-      for (let i = 0; i < prompts.length; i++) {
-        const prompt = prompts[i];
-        const idx = slides.length + i;
-        try {
-          setSlideStatuses(prev => ({ ...prev, [idx]: "generating" }));
-          const result = await generateImageWithFallback({
-            model: selectedModel,
-            prompt,
-            brandContext,
-            aspectRatio,
-            negativePrompt: negativePrompt || "blurry, lowres, watermark, text artifacts, extra limbs",
-            imageType: imageType || undefined,
-          });
-          setSlideStatuses(prev => ({ ...prev, [idx]: "uploading" }));
-          // upload already handled inside generateImageWithFallback -> result.url is public URL
-          setSlides(prev => [...prev, { url: result.url, prompt, aspectRatio, seed: consistentStyle ? seed : undefined, imageType }]);
-          setSlideStatuses(prev => ({ ...prev, [idx]: "done" }));
-        } catch (e) {
-          setSlideStatuses(prev => ({ ...prev, [idx]: "error" }));
-        } finally {
-          setBatchProgress(prev => ({ ...prev, completed: prev.completed + 1 }));
-        }
-      }
-      toast.success("Slides generated");
-    } finally {
-      setBatchGenerating(false);
-    }
-  };
-
-  const contentTypes = [
-    { id: "text" as const, icon: FileText, label: "Text Only", platforms: ["linkedin"] },
-    { id: "image" as const, icon: ImageIcon, label: "Image Post", platforms: ["linkedin", "instagram"] },
-    { id: "carousel" as const, icon: ImageIcon, label: "Carousel", platforms: ["instagram"] },
-    { id: "video" as const, icon: Video, label: "Reel/Short", platforms: ["instagram"] },
-  ];
 
   const imageTypes = [
     { id: "infographic" as const, icon: BarChart3, label: "Infographic", desc: "Stats, process flows, data viz", platforms: ["linkedin", "instagram"] },
@@ -357,283 +544,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     { id: "event" as const, icon: Calendar, label: "Event/Webinar", desc: "Registrations, live sessions", platforms: ["linkedin", "instagram"] },
   ];
 
-  const placeholders: Record<ImageType, { headline: string; keyPoints: string }> = {
-    infographic: {
-      headline: "e.g., How Our Process Works in 3 Steps",
-      keyPoints: "Step 1: Discovery\nStep 2: Implementation\nStep 3: Results",
-    },
-    product: {
-      headline: "e.g., Introducing Our New AI-Powered Dashboard",
-      keyPoints: "• Real-time analytics\n• Beautiful visualizations\n• Easy to use",
-    },
-    quote: {
-      headline: "e.g., 'This tool saved us 10 hours per week'",
-      keyPoints: "- Sarah Chen, CEO at TechCorp",
-    },
-    announcement: {
-      headline: "e.g., We Just Hit 10,000 Users!",
-      keyPoints: "Thank you to our amazing community for making this possible",
-    },
-    educational: {
-      headline: "e.g., 5 Ways to Improve Your Marketing ROI",
-      keyPoints: "1. Focus on quality over quantity\n2. Track the right metrics\n3. Test and iterate",
-    },
-    social_proof: {
-      headline: "e.g., Customer Success Story: 300% Growth",
-      keyPoints: "Company: TechCorp\nResult: 300% increase in leads\nTimeframe: 3 months",
-    },
-    comparison: {
-      headline: "e.g., Before vs After: Our New Approach",
-      keyPoints: "Before: Manual process, slow\nAfter: Automated, 10x faster",
-    },
-    event: {
-      headline: "e.g., Free Webinar: AI for Founders",
-      keyPoints: "Date: March 15, 2025\nTime: 2:00 PM EST\nSpeaker: Jane Doe",
-    },
-  };
-
-  // Auto-trigger generation when reaching step 5
-  useEffect(() => {
-    if (step === 5 && !generatedContent && !isGenerating) {
-      handleGeneration();
-    }
-  }, [step]);
-
-  const handleGeneration = async () => {
-    if (!headline.trim()) {
-      toast.error("Please provide a headline");
-      setStep(3);
-      return;
-    }
-
-    if (!profile) {
-      toast.error("Complete your brand profile first");
-      return;
-    }
-
-    setIsGenerating(true);
-    const startTime = Date.now();
-
-    try {
-      // 1. Brand Analysis
-      setGenerationStatus(prev => ({ ...prev, brandAnalysis: "in-progress" }));
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate analysis
-      const brandContext = assembleBrandContext(profile);
-      setGenerationStatus(prev => ({ ...prev, brandAnalysis: "complete" }));
-
-      // 2. Generate Text Content
-      setGenerationStatus(prev => ({ ...prev, contentGen: "in-progress" }));
-      const textContent = await generatePostContent({
-        platform,
-        contentType,
-        headline,
-        keyPoints,
-        tone,
-        objective,
-        brandContext,
-      });
-      setGeneratedContent(textContent);
-      setGenerationStatus(prev => ({ ...prev, contentGen: "complete" }));
-
-      // 3. Generate Image(s) (if needed)
-      let imageUrl = null;
-      if (contentType === "image" || contentType === "carousel") {
-        setGenerationStatus(prev => ({ ...prev, imageGen: "in-progress" }));
-        
-        if (contentType === "carousel") {
-          // Batch generate from slide points
-          await generateSlidesFromKeyPoints();
-          console.log("[CreatePostModal] Carousel batch generation complete", { count: slides.length });
-        } else {
-          console.log("[CreatePostModal] Starting AI image generation");
-          const imagePrompt = `${headline}. ${keyPoints || ""}`;
-          
-          // Get colors based on color mode
-          let colorConfig: { mode: "brand" | "custom" | "mood"; primary?: string; accent?: string } = {
-            mode: colorMode,
-          };
-          
-          if (colorMode === "custom" && customColors) {
-            colorConfig.primary = customColors.primary;
-            colorConfig.accent = customColors.accent;
-          } else if (colorMode === "brand" && profile?.color_palette) {
-            colorConfig.primary = (profile.color_palette as any)?.primary;
-            colorConfig.accent = (profile.color_palette as any)?.secondary;
-          }
-          
-          const imageResult = await generateImageWithFallback({
-            model: selectedModel,
-            prompt: imagePrompt,
-            brandContext,
-            aspectRatio: aspectRatio,
-            negativePrompt: negativePrompt || undefined,
-            imageType: imageType || undefined,
-            accountType: accountType || undefined,
-            colorConfig,
-            objective,
-            tone,
-          });
-          imageUrl = imageResult.url;
-          setGeneratedImageUrl(imageUrl);
-          setSlides([{ url: imageUrl, prompt: imagePrompt, aspectRatio, seed: consistentStyle ? seed : undefined, imageType }]);
-          console.log("[CreatePostModal] Image generation complete", { url: imageUrl });
-        }
-        setGenerationStatus(prev => ({ ...prev, imageGen: "complete" }));
-        
-      } else {
-        setGenerationStatus(prev => ({ ...prev, imageGen: "skipped" }));
-      }
-
-      // 4. Optimization
-      setGenerationStatus(prev => ({ ...prev, optimization: "in-progress" }));
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setGenerationStatus(prev => ({ ...prev, optimization: "complete" }));
-
-      const endTime = Date.now();
-      setGenerationTime((endTime - startTime) / 1000);
-
-      toast.success("Content generated successfully!");
-      
-      // Move to preview after short delay
-      setTimeout(() => setStep(5), 1000);
-      
-    } catch (error: unknown) {
-      console.error("Generation failed:", error);
-      const message = error instanceof Error ? error.message : "Unknown error";
-      if (message.includes("402")) {
-        toast.error("Image generation failed: OpenRouter credits required. Please add credits and retry.");
-      } else if (message.includes("No endpoints found") || message.includes(":free")) {
-        toast.error("Selected model is unavailable. Switch to 'Gemini 2.5 Image Preview' (non-free) or another model.");
-      } else {
-        toast.error(`Generation failed: ${message}`);
-      }
-      setStep(3); // Go back to input
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // Quick edit handlers
-  const handleQuickEdit = async (editType: "change_background" | "adjust_colors" | "add_text_space") => {
-    if (!generatedImageUrl || !profile || !imageType) {
-      toast.error("No image to edit. Please generate an image first.");
-      return;
-    }
-
-    try {
-      setIsGenerating(true);
-      const brandContext = assembleBrandContext(profile);
-      
-      // Build edit-specific prompt modification
-      let editInstruction = "";
-      const basePrompt = `${headline}. ${keyPoints || ""}`;
-      
-      switch (editType) {
-        case "change_background":
-          editInstruction = "Regenerate this image with a completely different background style - try a gradient, abstract pattern, or contrasting color background while keeping the main subject unchanged.";
-          break;
-        case "adjust_colors":
-          editInstruction = "Regenerate this image with adjusted color scheme - make it more vibrant and aligned with brand colors, adjusting saturation and contrast while maintaining the same composition.";
-          break;
-        case "add_text_space":
-          editInstruction = "Regenerate this image with more empty space reserved for text overlay - ensure the main visual elements are pushed to one side leaving a clear text zone (typically 40% of the image area should be clean for text).";
-          break;
-      }
-
-      const modifiedPrompt = `${basePrompt}. ${editInstruction}`;
-      
-      toast.info(`Regenerating image with ${editType.replace("_", " ")}...`);
-      
-      const imageResult = await generateImageWithFallback({
-        model: selectedModel,
-        prompt: modifiedPrompt,
-        brandContext,
-        aspectRatio: aspectRatio,
-        negativePrompt: negativePrompt || undefined,
-        imageType: imageType || undefined,
-      });
-      
-      setGeneratedImageUrl(imageResult.url);
-      setSlides([{ url: imageResult.url, prompt: modifiedPrompt, aspectRatio, seed: consistentStyle ? seed : undefined, imageType }]);
-      toast.success("Image regenerated successfully!");
-      
-    } catch (error) {
-      console.error("Quick edit failed:", error);
-      toast.error(`Failed to regenerate image: ${error instanceof Error ? error.message : "Unknown error"}`);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleSaveDraft = async () => {
-    // Allow saving if we have either content OR images
-    const hasContent = generatedContent?.caption;
-    const hasImages = slides.length > 0 || generatedImageUrl;
-    
-    if (!hasContent && !hasImages) {
-      toast.error("No content or images to save");
-      return;
-    }
-
-    console.log("[Save Draft] Starting save:", {
-      platform,
-      contentLength: generatedContent?.caption?.length || 0,
-      slideCount: slides.length,
-      hasImage: !!generatedImageUrl,
-    });
-
-    try {
-      const orderedMedia = slides.length > 0 ? slides.map(s => s.url) : (generatedImageUrl ? [generatedImageUrl] : []);
-
-      const postData = {
-        platform,
-        // content_type excluded to match current DB schema
-        content: generatedContent?.caption || headline || "", // Use headline as fallback if no generated content
-        media_urls: orderedMedia,
-        status: "draft" as const,
-        scheduled_time: null,
-        published_time: null,
-        views: 0,
-        likes: 0,
-        comments: 0,
-        shares: 0,
-        post_meta: {
-          images: slides.length > 0 ? slides.map(s => ({ ...s, imageType })) : (generatedImageUrl ? [{ url: generatedImageUrl, aspectRatio, imageType }] : []),
-          ...(contentType === "video" && reelStoryboard ? { reel_storyboard: reelStoryboard } : {}),
-        },
-      };
-
-      console.log("[Save Draft] Post data:", postData);
-
-      const result = await createPostMutation.mutateAsync(postData);
-      
-      console.log("[Save Draft] Save successful:", result);
-      
-      // Link prompt performance to post by matching image URL
-      if (result?.id) {
-        // Try to link from any generated image URLs
-        const allImageUrls = slides.length > 0 
-          ? slides.map(s => s.url).filter(Boolean)
-          : generatedImageUrl 
-            ? [generatedImageUrl] 
-            : [];
-        
-        for (const imageUrl of allImageUrls) {
-          if (imageUrl) {
-            linkPromptToPostFromImageUrl(result.id, imageUrl).catch(err => {
-              console.warn("[Save Draft] Failed to link prompt performance:", err);
-            });
-          }
-        }
-      }
-      
-      toast.success("Draft saved successfully!");
-      resetAndClose();
-    } catch (error) {
-      console.error("[Save Draft] Save failed:", error);
-      toast.error(`Failed to save draft: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -641,894 +551,771 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         <DialogHeader>
           <DialogTitle>Create New Post</DialogTitle>
           <DialogDescription>
-            Step {step} of {contentType === "text" ? 6 : (contentType === "image" || contentType === "carousel") ? 7 : 6}: {
-              step === 1 ? "Account Type" :
-              step === 2 ? "Choose Platform" :
-              step === 3 ? "Select Format" :
-              step === 3.5 ? "Choose Image Type" :
-              step === 4 ? "Add Content" :
-              step === 4.5 ? "Choose AI Model" :
-              step === 5 ? "Generate" :
-              "Preview & Schedule"
+            Step {step} of 3: {
+              step === 1 ? "Quick Setup" :
+              step === 2 ? "Choose Your Image" :
+              "Refine & Finalize"
             }
           </DialogDescription>
         </DialogHeader>
 
-        {/* Step 1: Account Type Selection (NEW - First Question) */}
+        {/* Step 1: Quick Setup - All inputs on one screen */}
         {step === 1 && (
-          <div className="space-y-4">
-            <div>
-              <Label>Who is this post for?</Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                This helps us personalize the content and tone for your audience
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Card 
-                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                  accountType === "personal" 
-                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                    : "border-2 border-border hover:border-accent/50"
-                }`}
-                onClick={() => setAccountType("personal")}
-              >
-                <CardContent className="p-6 text-center space-y-2">
-                  <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
-                    accountType === "personal" ? "bg-accent/20" : "bg-primary/10"
-                  }`}>
-                    <Settings className={`w-6 h-6 ${accountType === "personal" ? "text-accent" : "text-primary"}`} />
-                  </div>
-                  <p className="font-semibold">Personal Account</p>
-                  <p className="text-xs text-muted-foreground">Founder's personal brand</p>
-                  <Badge variant="secondary" className="text-xs mt-2">Authentic • Human • First-Person</Badge>
-                </CardContent>
-              </Card>
-              <Card 
-                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                  accountType === "company" 
-                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                    : "border-2 border-border hover:border-accent/50"
-                }`}
-                onClick={() => setAccountType("company")}
-              >
-                <CardContent className="p-6 text-center space-y-2">
-                  <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
-                    accountType === "company" ? "bg-accent/20" : "bg-primary/10"
-                  }`}>
-                    <FileText className={`w-6 h-6 ${accountType === "company" ? "text-accent" : "text-primary"}`} />
-                  </div>
-                  <p className="font-semibold">Company Account</p>
-                  <p className="text-xs text-muted-foreground">Official brand voice</p>
-                  <Badge variant="secondary" className="text-xs mt-2">Professional • Corporate • "We"</Badge>
-                </CardContent>
-              </Card>
-            </div>
-            <Button 
-              className="w-full" 
-              onClick={() => setStep(2)}
-              disabled={!accountType}
-            >
-              Continue
-            </Button>
-          </div>
-        )}
-
-        {/* Step 2: Platform */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <Label>Choose Platform</Label>
-            <div className="grid grid-cols-2 gap-4">
-              <Card 
-                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                  platform === "linkedin" 
-                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                    : "border-2 border-border hover:border-accent/50"
-                }`}
-                onClick={() => setPlatform("linkedin")}
-              >
-                <CardContent className="p-6 text-center space-y-2">
-                  <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
-                    platform === "linkedin" ? "bg-accent/20" : "bg-primary/10"
-                  }`}>
-                    <FileText className={`w-6 h-6 ${platform === "linkedin" ? "text-accent" : "text-primary"}`} />
-                  </div>
-                  <p className="font-semibold">LinkedIn</p>
-                  <Badge variant="secondary">Professional</Badge>
-                </CardContent>
-              </Card>
-              <Card 
-                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                  platform === "instagram" 
-                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                    : "border-2 border-border hover:border-accent/50"
-                }`}
-                onClick={() => setPlatform("instagram")}
-              >
-                <CardContent className="p-6 text-center space-y-2">
-                  <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
-                    platform === "instagram" ? "bg-accent/20" : "bg-primary/10"
-                  }`}>
-                    <ImageIcon className={`w-6 h-6 ${platform === "instagram" ? "text-accent" : "text-primary"}`} />
-                  </div>
-                  <p className="font-semibold">Instagram</p>
-                  <Badge variant="secondary">Visual</Badge>
-                </CardContent>
-              </Card>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>
-                Back
-              </Button>
-              <Button className="flex-1" onClick={() => setStep(3)}>
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Content Type */}
-        {step === 3 && (
-          <div className="space-y-4">
-            <Label>Select Content Type</Label>
-            <div className="grid grid-cols-2 gap-4">
-              {contentTypes
-                .filter(type => type.platforms.includes(platform))
-                .map((type) => {
-                  const Icon = type.icon;
-                  return (
-                    <Card 
-                      key={type.id}
-                      className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                        contentType === type.id 
-                          ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                          : "border-2 border-border hover:border-accent/50"
-                      }`}
-                      onClick={() => setContentType(type.id)}
-                    >
-                      <CardContent className="p-6 text-center space-y-2">
-                        <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center ${
-                          contentType === type.id ? "bg-accent/20" : "bg-primary/10"
-                        }`}>
-                          <Icon className={`w-6 h-6 ${contentType === type.id ? "text-accent" : "text-primary"}`} />
-                        </div>
-                        <p className="font-semibold">{type.label}</p>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>
-                Back
-              </Button>
-              <Button className="flex-1" onClick={() => {
-                // If image or carousel, go to image type selection. Otherwise go to content input.
-                if (contentType === "image" || contentType === "carousel") {
-                  setStep(3.5);
-                } else {
-                  setStep(4);
-                }
-              }}>
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3.5: Image Type Selection (only for image/carousel) */}
-        {step === 3.5 && (contentType === "image" || contentType === "carousel") && (
-          <div className="space-y-4">
-            <div>
-              <Label>Choose Image Type</Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Select the type of image you want to create. This helps AI generate the perfect design.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {imageTypes
-                .filter(type => type.platforms.includes(platform))
-                .map((type) => {
-                  const Icon = type.icon;
-                  const preset = imageType ? IMAGE_TYPE_PRESETS[imageType] : null;
-                  return (
-                    <Card
-                      key={type.id}
-                      className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                        imageType === type.id 
-                          ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                          : "border-2 border-border hover:border-accent/50"
-                      }`}
-                      onClick={() => setImageType(type.id)}
-                    >
-                      <CardContent className="p-4 space-y-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <Icon className={`w-5 h-5 ${imageType === type.id ? "text-accent" : "text-muted-foreground"}`} />
-                          </div>
-                          {preset && imageType === type.id && (
-                            <Badge variant="default" className="text-xs bg-accent text-accent-foreground">✨ Recommended</Badge>
-                          )}
-                        </div>
-                        <p className={`font-semibold text-sm ${imageType === type.id ? "text-foreground" : "text-foreground"}`}>{type.label}</p>
-                        <p className="text-xs text-muted-foreground line-clamp-2">{type.desc}</p>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(3)}>
-                Back
-              </Button>
-              <Button 
-                className="flex-1" 
-                onClick={() => setStep(4)}
-                disabled={!imageType}
-              >
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Content Input / Builder */}
-        {step === 4 && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Account Type Selection */}
             <div className="space-y-2">
-              <Label htmlFor="headline">Headline / Hook *</Label>
+              <Label>Account Type *</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <Card 
+                  className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                    accountType === "personal" 
+                      ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                      : "border-2 border-border hover:border-accent/50"
+                  }`}
+                  onClick={() => {
+                    setAccountType("personal");
+                    setValidationErrors(prev => ({ ...prev, accountType: "" }));
+                  }}
+                >
+                  <CardContent className="p-4 text-center space-y-2">
+                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
+                      accountType === "personal" ? "bg-accent/20" : "bg-primary/10"
+                    }`}>
+                      <Settings className={`w-5 h-5 ${accountType === "personal" ? "text-accent" : "text-primary"}`} />
+                    </div>
+                    <p className="font-semibold text-sm">Personal</p>
+                    <p className="text-xs text-muted-foreground">Founder's brand</p>
+                  </CardContent>
+                </Card>
+                <Card 
+                  className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                    accountType === "company" 
+                      ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                      : "border-2 border-border hover:border-accent/50"
+                  }`}
+                  onClick={() => {
+                    setAccountType("company");
+                    setValidationErrors(prev => ({ ...prev, accountType: "" }));
+                  }}
+                >
+                  <CardContent className="p-4 text-center space-y-2">
+                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
+                      accountType === "company" ? "bg-accent/20" : "bg-primary/10"
+                    }`}>
+                      <FileText className={`w-5 h-5 ${accountType === "company" ? "text-accent" : "text-primary"}`} />
+                    </div>
+                    <p className="font-semibold text-sm">Company</p>
+                    <p className="text-xs text-muted-foreground">Official brand</p>
+                  </CardContent>
+                </Card>
+              </div>
+              {validationErrors.accountType && (
+                <p className="text-xs text-red-500">{validationErrors.accountType}</p>
+              )}
+            </div>
+
+            {/* Platform Selection */}
+            <div className="space-y-2">
+              <Label>Platform *</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <Card 
+                  className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                    platform === "linkedin" 
+                      ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                      : "border-2 border-border hover:border-accent/50"
+                  }`}
+                  onClick={() => {
+                    setPlatform("linkedin");
+                    setValidationErrors(prev => ({ ...prev, platform: "" }));
+                    // Reset image type if it's not available for LinkedIn
+                    if (imageType && !imageTypes.find(it => it.id === imageType && it.platforms.includes("linkedin"))) {
+                      setImageType("announcement"); // Default to announcement which is available for both platforms
+                    }
+                  }}
+                >
+                  <CardContent className="p-4 text-center space-y-2">
+                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
+                      platform === "linkedin" ? "bg-accent/20" : "bg-primary/10"
+                    }`}>
+                      <FileText className={`w-5 h-5 ${platform === "linkedin" ? "text-accent" : "text-primary"}`} />
+                    </div>
+                    <p className="font-semibold text-sm">LinkedIn</p>
+                  </CardContent>
+                </Card>
+                <Card 
+                  className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                    platform === "instagram" 
+                      ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                      : "border-2 border-border hover:border-accent/50"
+                  }`}
+                  onClick={() => {
+                    setPlatform("instagram");
+                    setValidationErrors(prev => ({ ...prev, platform: "" }));
+                    // Reset image type if it's not available for Instagram
+                    if (imageType && !imageTypes.find(it => it.id === imageType && it.platforms.includes("instagram"))) {
+                      setImageType("announcement"); // Default to announcement which is available for both platforms
+                    }
+                  }}
+                >
+                  <CardContent className="p-4 text-center space-y-2">
+                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
+                      platform === "instagram" ? "bg-accent/20" : "bg-primary/10"
+                    }`}>
+                      <ImageIcon className={`w-5 h-5 ${platform === "instagram" ? "text-accent" : "text-primary"}`} />
+                    </div>
+                    <p className="font-semibold text-sm">Instagram</p>
+                  </CardContent>
+                </Card>
+              </div>
+              {validationErrors.platform && (
+                <p className="text-xs text-red-500">{validationErrors.platform}</p>
+              )}
+            </div>
+
+            {/* Headline Input */}
+            <div className="space-y-2">
+              <Label htmlFor="headline">What's your post about? *</Label>
               <Input 
                 id="headline" 
-                placeholder={imageType && placeholders[imageType] ? placeholders[imageType].headline : "What's your main message?"}
+                placeholder="e.g., We just hit 10,000 users! 🚀"
                 value={headline}
-                onChange={(e) => setHeadline(e.target.value)}
+                onChange={(e) => {
+                  setHeadline(e.target.value);
+                  setValidationErrors(prev => ({ ...prev, headline: "" }));
+                }}
+                className={validationErrors.headline ? "border-red-500" : ""}
+              />
+              {validationErrors.headline && (
+                <p className="text-xs text-red-500">{validationErrors.headline}</p>
+              )}
+            </div>
+
+            {/* Key Points Input (Optional) */}
+            <div className="space-y-2">
+              <Label htmlFor="keypoints">Additional details (optional)</Label>
+              <Textarea 
+                id="keypoints" 
+                placeholder="Thank you to everyone who believed in us"
+                rows={3}
+                value={keyPoints}
+                onChange={(e) => setKeyPoints(e.target.value)}
               />
             </div>
 
-            {contentType === "carousel" || contentType === "video" ? (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="slidepoints">{contentType === "video" ? "Beats (one per line)" : "Slide Points (one per line)"}</Label>
-                  <Textarea 
-                    id="slidepoints" 
-                    placeholder={contentType === "video" ? "Beat 1\nBeat 2\nBeat 3" : "Slide 1\nSlide 2\nSlide 3"}
-                    rows={6}
-                    value={slidePoints}
-                    onChange={(e) => setSlidePoints(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">No AI yet. We’ll create one visual per line after you pick a model.</p>
-                </div>
-
-                {/* Placeholder tray from points */}
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">{contentType === "video" ? "Storyboard Preview" : "Slides Preview"}</p>
-                  {splitKeyPointsIntoPrompts().length === 0 ? (
-                    <div className="text-xs text-muted-foreground">Add points above to preview placeholders.</div>
-                  ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {splitKeyPointsIntoPrompts().map((p, i) => (
-                        <div key={i} className="aspect-square rounded-md border bg-muted/40 p-2 text-[11px] flex items-center justify-center text-center">
-                          {i + 1}. {p}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor="keypoints">Key Points (optional)</Label>
-                <Textarea 
-                  id="keypoints" 
-                  placeholder={imageType && placeholders[imageType] ? placeholders[imageType].keyPoints : "• Point 1\n• Point 2\n• Point 3"}
-                  rows={4}
-                  value={keyPoints}
-                  onChange={(e) => setKeyPoints(e.target.value)}
-                />
-              </div>
-            )}
-
+            {/* Aspect Ratio and Image Type in a row */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="tone">Tone</Label>
-                <Select value={tone} onValueChange={(v: typeof tone) => setTone(v)}>
-                  <SelectTrigger>
+                <Label htmlFor="aspectRatio">Aspect Ratio *</Label>
+                <Select 
+                  value={aspectRatio} 
+                  onValueChange={(v: "1:1" | "4:5" | "16:9" | "9:16") => {
+                    setAspectRatio(v);
+                    setValidationErrors(prev => ({ ...prev, aspectRatio: "" }));
+                  }}
+                >
+                  <SelectTrigger id="aspectRatio" className={validationErrors.aspectRatio ? "border-red-500" : ""}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="quirky">Quirky</SelectItem>
-                    <SelectItem value="humble">Humble</SelectItem>
-                    <SelectItem value="inspirational">Inspirational</SelectItem>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="witty">Witty</SelectItem>
+                    <SelectItem value="1:1">1:1 (Square)</SelectItem>
+                    <SelectItem value="4:5">4:5 (Portrait)</SelectItem>
+                    <SelectItem value="16:9">16:9 (Landscape)</SelectItem>
+                    <SelectItem value="9:16">9:16 (Vertical)</SelectItem>
                   </SelectContent>
                 </Select>
+                {validationErrors.aspectRatio && (
+                  <p className="text-xs text-red-500">{validationErrors.aspectRatio}</p>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="objective">Objective</Label>
-                <Select value={objective} onValueChange={(v: typeof objective) => setObjective(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
+                <Label htmlFor="imageType">Image Type *</Label>
+                <Select 
+                  value={imageType || ""} 
+                  onValueChange={(v: ImageType) => {
+                    setImageType(v);
+                    setValidationErrors(prev => ({ ...prev, imageType: "" }));
+                  }}
+                >
+                  <SelectTrigger id="imageType" className={validationErrors.imageType ? "border-red-500" : ""}>
+                    <SelectValue placeholder="Select image type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="awareness">Awareness</SelectItem>
-                    <SelectItem value="leads">Generate Leads</SelectItem>
-                    <SelectItem value="engagement">Engagement</SelectItem>
-                    <SelectItem value="recruitment">Recruitment</SelectItem>
+                    {imageTypes
+                      .filter(type => type.platforms.includes(platform))
+                      .map((type) => {
+                        const Icon = type.icon;
+                        return (
+                          <SelectItem key={type.id} value={type.id}>
+                            <div className="flex items-center gap-2">
+                              <Icon className="w-4 h-4" />
+                              <span>{type.label}</span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                   </SelectContent>
                 </Select>
+                {validationErrors.imageType && (
+                  <p className="text-xs text-red-500">{validationErrors.imageType}</p>
+                )}
               </div>
             </div>
 
-            {/* Color Selection (NEW - only for image/carousel) */}
-            {(contentType === "image" || contentType === "carousel") && (
-              <div className="space-y-4 border-t pt-4">
-                <div className="space-y-2">
-                  <Label>Image Colors</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Choose how colors should be applied to this image
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="color-brand"
-                      name="colorMode"
-                      value="brand"
-                      checked={colorMode === "brand"}
-                      onChange={(e) => setColorMode("brand")}
-                      className="w-4 h-4"
-                    />
-                    <label htmlFor="color-brand" className="flex-1 cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">Use Brand Colors</span>
-                        {profile?.color_palette && (
-                          <div className="flex gap-1">
-                            <div 
-                              className="w-6 h-6 rounded border"
-                              style={{ backgroundColor: (profile.color_palette as any)?.primary || "#3B82F6" }}
-                              title={(profile.color_palette as any)?.primary || "#3B82F6"}
+            {/* Advanced Options Accordion */}
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="advanced">
+                <AccordionTrigger>Advanced Options</AccordionTrigger>
+                <AccordionContent className="space-y-4 pt-4">
+                  {/* Tone Dropdown */}
+                  <div className="space-y-2">
+                    <Label htmlFor="tone">Tone</Label>
+                    <Select value={tone} onValueChange={(v: typeof tone) => setTone(v)}>
+                      <SelectTrigger id="tone">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="quirky">Quirky</SelectItem>
+                        <SelectItem value="humble">Humble</SelectItem>
+                        <SelectItem value="inspirational">Inspirational</SelectItem>
+                        <SelectItem value="professional">Professional</SelectItem>
+                        <SelectItem value="witty">Witty</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Color Mode Selection */}
+                  <div className="space-y-2">
+                    <Label>Image Colors</Label>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="color-brand"
+                          name="colorMode"
+                          value="brand"
+                          checked={colorMode === "brand"}
+                          onChange={(e) => setColorMode("brand")}
+                          className="w-4 h-4"
+                        />
+                        <label htmlFor="color-brand" className="flex-1 cursor-pointer">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">Brand Colors</span>
+                            {profile?.color_palette && (
+                              <div className="flex gap-1">
+                                <div 
+                                  className="w-5 h-5 rounded border"
+                                  style={{ backgroundColor: (profile.color_palette as any)?.primary || "#3B82F6" }}
+                                />
+                                <div 
+                                  className="w-5 h-5 rounded border"
+                                  style={{ backgroundColor: (profile.color_palette as any)?.secondary || "#8B5CF6" }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="color-custom"
+                          name="colorMode"
+                          value="custom"
+                          checked={colorMode === "custom"}
+                          onChange={(e) => setColorMode("custom")}
+                          className="w-4 h-4"
+                        />
+                        <label htmlFor="color-custom" className="flex-1 cursor-pointer">
+                          <span className="font-medium">Custom Colors</span>
+                        </label>
+                      </div>
+                      {colorMode === "custom" && (
+                        <div className="ml-6 space-y-2 p-3 bg-muted/50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs w-16">Primary:</Label>
+                            <input
+                              type="color"
+                              value={customColors?.primary || "#3B82F6"}
+                              onChange={(e) => setCustomColors({ 
+                                primary: e.target.value, 
+                                accent: customColors?.accent || "#8B5CF6" 
+                              })}
+                              className="w-10 h-8 rounded border"
                             />
-                            <div 
-                              className="w-6 h-6 rounded border"
-                              style={{ backgroundColor: (profile.color_palette as any)?.secondary || "#8B5CF6" }}
-                              title={(profile.color_palette as any)?.secondary || "#8B5CF6"}
+                            <Input
+                              type="text"
+                              value={customColors?.primary || "#3B82F6"}
+                              onChange={(e) => setCustomColors({ 
+                                primary: e.target.value, 
+                                accent: customColors?.accent || "#8B5CF6" 
+                              })}
+                              className="w-20 h-8 text-xs"
+                              placeholder="#3B82F6"
                             />
                           </div>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Your brand's color palette</p>
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="color-custom"
-                      name="colorMode"
-                      value="custom"
-                      checked={colorMode === "custom"}
-                      onChange={(e) => setColorMode("custom")}
-                      className="w-4 h-4"
-                    />
-                    <label htmlFor="color-custom" className="flex-1 cursor-pointer">
-                      <span className="font-medium">Custom Colors</span>
-                      <p className="text-xs text-muted-foreground">Choose specific colors for this post</p>
-                    </label>
-                  </div>
-                  {colorMode === "custom" && (
-                    <div className="ml-6 space-y-2 p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs w-20">Primary:</Label>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs w-16">Accent:</Label>
+                            <input
+                              type="color"
+                              value={customColors?.accent || "#8B5CF6"}
+                              onChange={(e) => setCustomColors({ 
+                                primary: customColors?.primary || "#3B82F6", 
+                                accent: e.target.value 
+                              })}
+                              className="w-10 h-8 rounded border"
+                            />
+                            <Input
+                              type="text"
+                              value={customColors?.accent || "#8B5CF6"}
+                              onChange={(e) => setCustomColors({ 
+                                primary: customColors?.primary || "#3B82F6", 
+                                accent: e.target.value 
+                              })}
+                              className="w-20 h-8 text-xs"
+                              placeholder="#8B5CF6"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center space-x-2">
                         <input
-                          type="color"
-                          value={customColors?.primary || "#3B82F6"}
-                          onChange={(e) => setCustomColors({ 
-                            primary: e.target.value, 
-                            accent: customColors?.accent || "#8B5CF6" 
-                          })}
-                          className="w-12 h-8 rounded border"
+                          type="radio"
+                          id="color-mood"
+                          name="colorMode"
+                          value="mood"
+                          checked={colorMode === "mood"}
+                          onChange={(e) => setColorMode("mood")}
+                          className="w-4 h-4"
                         />
-                        <Input
-                          type="text"
-                          value={customColors?.primary || "#3B82F6"}
-                          onChange={(e) => setCustomColors({ 
-                            primary: e.target.value, 
-                            accent: customColors?.accent || "#8B5CF6" 
-                          })}
-                          className="w-24 h-8 text-xs"
-                          placeholder="#3B82F6"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs w-20">Accent:</Label>
-                        <input
-                          type="color"
-                          value={customColors?.accent || "#8B5CF6"}
-                          onChange={(e) => setCustomColors({ 
-                            primary: customColors?.primary || "#3B82F6", 
-                            accent: e.target.value 
-                          })}
-                          className="w-12 h-8 rounded border"
-                        />
-                        <Input
-                          type="text"
-                          value={customColors?.accent || "#8B5CF6"}
-                          onChange={(e) => setCustomColors({ 
-                            primary: customColors?.primary || "#3B82F6", 
-                            accent: e.target.value 
-                          })}
-                          className="w-24 h-8 text-xs"
-                          placeholder="#8B5CF6"
-                        />
+                        <label htmlFor="color-mood" className="flex-1 cursor-pointer">
+                          <span className="font-medium">Match Content Mood</span>
+                        </label>
                       </div>
                     </div>
-                  )}
-                  
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="color-mood"
-                      name="colorMode"
-                      value="mood"
-                      checked={colorMode === "mood"}
-                      onChange={(e) => setColorMode("mood")}
-                      className="w-4 h-4"
-                    />
-                    <label htmlFor="color-mood" className="flex-1 cursor-pointer">
-                      <span className="font-medium">Match Content Mood</span>
-                      <p className="text-xs text-muted-foreground">AI suggests colors based on post intent</p>
-                    </label>
                   </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => {
-                // If image/carousel, go back to image type selection. Otherwise go to content type.
-                if (contentType === "image" || contentType === "carousel") {
-                  setStep(3.5);
-                } else {
-                  setStep(3);
-                }
-              }}>
-                Back
-              </Button>
-              <Button 
-                className="flex-1 gap-2" 
-                onClick={() => {
-                  if (contentType === "image" || contentType === "carousel" || contentType === "video") {
-                    setStep(4.5); // Go to model selection (now step 4.5)
-                  } else {
-                    setStep(5); // Text goes directly to generation
-                  }
-                }}
-              >
-                <Sparkles className="w-4 h-4" />
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4.5: Model Selection (for image/video content) - Premium model only */}
-        {step === 4.5 && (contentType === "image" || contentType === "carousel" || contentType === "video") && (
-          <div className="space-y-4">
-            <div>
-              <Label>AI Model</Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Using premium Gemini 2.5 Flash for highest quality results
-              </p>
-            </div>
-            <Card className="ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md">
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-accent" />
-                  </div>
-                  <Badge variant="default" className="text-xs bg-accent text-accent-foreground">
-                    PREMIUM
-                  </Badge>
-                </div>
-                <p className="font-semibold text-sm">{IMAGE_MODELS[selectedModel].name}</p>
-                <p className="text-xs text-muted-foreground">{IMAGE_MODELS[selectedModel].description}</p>
-                <div className="flex items-center justify-end text-xs">
-                  <span className="text-muted-foreground">{IMAGE_MODELS[selectedModel].speed} Generation</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Advanced Options */}
-            <Accordion type="single" collapsible>
-              <AccordionItem value="advanced">
-                <AccordionTrigger className="text-sm">Advanced Options</AccordionTrigger>
-                <AccordionContent className="space-y-3 pt-2">
-              <div className="space-y-2">
-                <Label className="text-xs">Aspect Ratio</Label>
-                <Select value={aspectRatio} onValueChange={(v: any) => setAspectRatio(v)}>
-                  <SelectTrigger className="text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1:1">Square (1:1) - Feed</SelectItem>
-                    <SelectItem value="4:5">Portrait (4:5) - Feed</SelectItem>
-                    <SelectItem value="9:16">Full (9:16) - Reels/Stories</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-xs">Negative Prompt (Optional)</Label>
-                    <Textarea 
-                      placeholder="What to avoid in the image: blurry, watermark, text artifacts..."
-                      value={negativePrompt}
-                      onChange={(e) => setNegativePrompt(e.target.value)}
-                      rows={2}
-                      className="text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Helps improve quality by specifying what should NOT appear
-                    </p>
-                  </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked={consistentStyle} onChange={(e) => setConsistentStyle(e.target.checked)} />
-                  Consistent style across batch
-                </label>
-                <div className="flex items-center gap-2 text-xs">
-                  <Label>Seed</Label>
-                  <Input className="w-24 h-8 text-xs" type="number" value={seed} onChange={(e) => setSeed(parseInt(e.target.value || "0", 10) || 0)} />
-                  <Button size="sm" variant="outline" onClick={() => setSeed(Math.floor(Math.random() * 1_000_000))}>Randomize</Button>
-                </div>
-              </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
 
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(4)}>
-                Back
-              </Button>
-              <Button className="flex-1 gap-2" onClick={() => setStep(5)}>
-                <Zap className="w-4 h-4" />
-                Generate Content
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 5: Generation */}
-        {step === 5 && (
-          <div className="space-y-6 py-8">
-            {isGenerating ? (
-              <>
-                <div className="text-center">
-                  <div className="relative">
-                    <Sparkles className="w-16 h-16 mx-auto animate-pulse text-primary" />
-                    {(contentType === "image" || contentType === "carousel") && (
-                      <Badge className="absolute bottom-0 right-1/3 text-xs">
-                        {IMAGE_MODELS[selectedModel].name}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="font-semibold mt-4">Generating your content...</p>
-                  <p className="text-sm text-muted-foreground">
-                    {contentType === "image" || contentType === "carousel"
-                      ? `Using ${IMAGE_MODELS[selectedModel].name} • ~5-10s`
-                      : "AI Model • ~2-3s"}
-                  </p>
-                </div>
-                
-                {/* Progressive Status */}
-                <div className="space-y-2">
-                  <StatusLine 
-                    status={generationStatus.brandAnalysis} 
-                    text="✓ Analyzing brand voice & colors" 
-                  />
-                  <StatusLine 
-                    status={generationStatus.contentGen} 
-                    text="✓ Generating copy & hashtags" 
-                  />
-                  {(contentType === "image" || contentType === "carousel") && (
-                    <StatusLine 
-                      status={generationStatus.imageGen} 
-                      text="🎨 Creating brand-aware visuals" 
-                    />
-                  )}
-                  <StatusLine 
-                    status={generationStatus.optimization} 
-                    text="⚡ Optimizing for engagement" 
-                  />
-                </div>
-                
-                {/* Generation Info */}
-                <div className="text-center text-xs text-muted-foreground">
-                  AI-powered content generation with brand awareness
-                </div>
-              </>
-            ) : generatedContent ? (
-              <>
-                <div className="text-center text-green-600">
-                  <CheckCircle className="w-16 h-16 mx-auto" />
-                  <p className="font-semibold">Content generated successfully!</p>
-                  <p className="text-sm text-muted-foreground">
-                    {contentType === "image" || contentType === "carousel" ? `${IMAGE_MODELS[selectedModel].name} • ` : ""}
-                    Generated in {generationTime.toFixed(1)}s
-                  </p>
-                </div>
-                <Button onClick={() => setStep(5)} className="w-full">
-                  Preview & Edit
-                </Button>
-              </>
-            ) : null}
-
-            {/* Navigation controls */}
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setStep((contentType === "image" || contentType === "carousel" || contentType === "video") ? 4.5 : 4)}
-                disabled={isGenerating}
-              >
-                Back
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Slides Tray for Carousel - visible only after generation flow begins */}
-        {step >= 4 && (contentType === "carousel" || contentType === "video") && (
-          <div className="space-y-4 mt-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Slides ({slides.length}/{contentType === "video" ? 16 : 10})</p>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Prompt for new slide"
-                  value={newSlidePrompt}
-                  onChange={(e) => setNewSlidePrompt(e.target.value)}
-                  className="w-64"
-                />
-                <Button size="sm" onClick={addSlideFromPrompt} disabled={slideActionsBusy !== null || slides.length >= (contentType === "video" ? 16 : 10)}>
-                  <Sparkles className="w-4 h-4 mr-1" /> Add Slide
-                </Button>
-                <Button size="sm" variant="outline" onClick={generateSlidesFromKeyPoints} disabled={batchGenerating || slides.length >= (contentType === "video" ? 16 : 10)}>
-                  Generate from Key Points
-                </Button>
-                {contentType === "video" && (
-                  <Button size="sm" variant="secondary" onClick={() => {
-                    const storyboard = {
-                      slides: (slides.length ? slides : [{ url: generatedImageUrl || "", prompt: headline, aspectRatio }]).filter(s => s.url).map(s => ({ imageUrl: s.url, durationSec: 2.5, overlayText: headline }))
-                    };
-                    setReelStoryboard(storyboard);
-                    toast.success("Reel storyboard generated");
-                  }}>
-                    Generate Reel Storyboard
-                  </Button>
-                )}
-              </div>
-            </div>
-            {batchGenerating && (
-              <div className="text-xs text-muted-foreground">Generating {batchProgress.completed}/{batchProgress.total} slides…</div>
-            )}
-            {slides.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No slides yet. Generate an image or add from prompt.</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {slides.map((s, idx) => (
-                  <Card key={idx} className="overflow-hidden">
-                    <CardContent className="p-0">
-                      <div className="aspect-square bg-muted relative">
-                        <img src={s.url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
-                        {slideStatuses[idx] && slideStatuses[idx] !== "done" && (
-                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center text-xs text-white">
-                            {slideStatuses[idx]}
-                          </div>
-                        )}
-                        <div className="absolute top-2 left-2 text-xs bg-background/80 px-2 py-0.5 rounded">
-                          #{idx + 1}
-                        </div>
-                      </div>
-                      <div className="p-2 flex items-center justify-between gap-2">
-                        <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => moveSlide(idx, "up")} disabled={idx === 0 || slideActionsBusy !== null}>
-                            ↑
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => moveSlide(idx, "down")} disabled={idx === slides.length - 1 || slideActionsBusy !== null}>
-                            ↓
-                          </Button>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button size="sm" variant="outline" onClick={() => regenerateSlide(idx)} disabled={slideActionsBusy !== null}>
-                            Regenerate
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => deleteSlide(idx)} disabled={slideActionsBusy !== null}>
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-            {contentType === "video" && reelStoryboard && (
-              <div className="p-3 border rounded-lg">
-                <p className="text-sm font-medium mb-2">Storyboard Preview</p>
-                <div className="flex gap-2 overflow-x-auto">
-                  {reelStoryboard.slides.map((sl, i) => (
-                    <div key={i} className="w-24 flex-shrink-0">
-                      <div className="aspect-[9/16] bg-muted rounded overflow-hidden">
-                        <img src={sl.imageUrl} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="text-[10px] text-muted-foreground mt-1 text-center">{sl.durationSec}s</div>
-                    </div>
+            {/* Generate Button with Image Count */}
+            <div className="flex items-center gap-3 pt-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Generate:</Label>
+                <div className="flex gap-1 border rounded-md">
+                  {[1, 2, 3].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setImageCount(count as 1 | 2 | 3)}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        imageCount === count
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      {count}
+                    </button>
                   ))}
                 </div>
+                <span className="text-xs text-muted-foreground">image(s)</span>
               </div>
+              <Button 
+                size="lg" 
+                className="flex-1 gap-2"
+                onClick={() => {
+                  // Validate required fields
+                  const errors: Record<string, string> = {};
+                  if (!accountType) errors.accountType = "Account type is required";
+                  if (!platform) errors.platform = "Platform is required";
+                  if (!headline.trim()) errors.headline = "Headline is required";
+                  if (!aspectRatio) errors.aspectRatio = "Aspect ratio is required";
+                  if (!imageType) errors.imageType = "Image type is required";
+                  
+                  setValidationErrors(errors);
+                  
+                  if (Object.keys(errors).length === 0) {
+                    setStep(2);
+                  } else {
+                    toast.error("Please fill in all required fields");
+                  }
+                }}
+                disabled={!accountType || !platform || !headline.trim() || !aspectRatio || !imageType}
+              >
+                <Sparkles className="w-5 h-5" />
+                Generate Image
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Image Selection */}
+        {step === 2 && (
+          <div className="space-y-6">
+            {/* Loading State */}
+            {imageGenerationStatus === "generating" && (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+                <div className="text-center">
+                  <p className="font-medium">Generating your images...</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {generationProgress.completed > 0 
+                      ? `Generated ${generationProgress.completed} of ${generationProgress.total}...`
+                      : "Starting generation..."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Error State */}
+            {imageGenerationStatus === "error" && (
+              <div className="p-4 border border-red-500 rounded-lg bg-red-50 dark:bg-red-950 space-y-3">
+                <p className="font-medium text-red-700 dark:text-red-400">Generation Failed</p>
+                <p className="text-sm text-red-600 dark:text-red-300">{generationError || "Unknown error occurred"}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleGenerateImagesAndCaption}
+                >
+                  Retry Generation
+                </Button>
+              </div>
+            )}
+
+            {/* Image Grid */}
+            {imageGenerationStatus === "complete" && generatedImages.length > 0 && (
+              <>
+                <div className={`grid gap-4 ${
+                  generatedImages.length === 1 ? "grid-cols-1 max-w-md mx-auto" :
+                  generatedImages.length === 2 ? "grid-cols-2" :
+                  "grid-cols-3"
+                }`}>
+                  {generatedImages.map((image, index) => {
+                    const styleLabels: Record<"minimal" | "bold" | "elegant", string> = {
+                      minimal: "Modern Minimal",
+                      bold: "Bold Graphic",
+                      elegant: "Elegant Professional",
+                    };
+                    
+                    const isSelected = selectedImageUrl === image.url;
+                    
+                    return (
+                      <Card 
+                        key={index}
+                        className={`cursor-pointer transition-all hover:shadow-lg ${
+                          isSelected 
+                            ? "ring-2 ring-accent border-2 border-accent shadow-lg" 
+                            : "border hover:border-accent/50"
+                        }`}
+                        onClick={() => handleSelectImage(image.url)}
+                      >
+                        <CardContent className="p-0">
+                          <div className="relative aspect-square overflow-hidden rounded-t-lg bg-muted">
+                            <img 
+                              src={image.url} 
+                              alt={`Generated image ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {isSelected && (
+                              <div className="absolute top-2 right-2 w-8 h-8 bg-accent rounded-full flex items-center justify-center">
+                                <CheckCircle className="w-5 h-5 text-accent-foreground" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-4 space-y-2">
+                            <p className="text-sm font-medium text-center">{styleLabels[image.style]}</p>
+                            <Button 
+                              className="w-full"
+                              variant={isSelected ? "default" : "outline"}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectImage(image.url);
+                              }}
+                            >
+                              {isSelected ? "Selected" : "Select"}
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* Caption Preview */}
+                {generatedCaption && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <Label>Generated Caption Preview:</Label>
+                    <Textarea 
+                      value={generatedCaption.caption || ""}
+                      readOnly
+                      rows={6}
+                      className="font-mono text-sm"
+                    />
+                    {generatedCaption.hashtags && generatedCaption.hashtags.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {generatedCaption.hashtags.map((tag, idx) => (
+                          <Badge key={idx} variant="secondary">
+                            #{tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => setStep(1)}
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={handleGenerateMore}
+                    disabled={isGenerating}
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate More
+                  </Button>
+                  <Button 
+                    className="flex-1"
+                    onClick={() => setStep(3)}
+                    disabled={!selectedImageUrl}
+                  >
+                    Continue
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         )}
 
-        {/* Step 5: Preview */}
-        {step === 5 && (
-          <div className="space-y-4">
-            {generatedContent ? (
-              <Card>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold">
-                        {profile?.startup_name?.[0] || "B"}
-                      </div>
-                      <div>
-                        <p className="font-semibold">{profile?.startup_name || "Your Brand"}</p>
-                        <p className="text-xs text-muted-foreground">Just now • {platform}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <p className="whitespace-pre-wrap">{generatedContent.caption}</p>
-                    </div>
-                    
-                    {generatedImageUrl && (
-                      <div className="space-y-2">
-                        <div className="aspect-video rounded-lg overflow-hidden">
-                          <img 
-                            src={generatedImageUrl} 
-                            alt="Generated content" 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        {/* Quick Edit Options */}
-                        <div className="space-y-2">
-                          <Label>Quick Edits</Label>
-                          <div className="flex gap-2 flex-wrap">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => handleQuickEdit("change_background")}
-                              disabled={isGenerating || !generatedImageUrl || !imageType}
-                            >
-                              Change Background
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => handleQuickEdit("adjust_colors")}
-                              disabled={isGenerating || !generatedImageUrl || !imageType}
-                            >
-                              Adjust Colors
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => handleQuickEdit("add_text_space")}
-                              disabled={isGenerating || !generatedImageUrl || !imageType}
-                            >
-                              Add Text Space
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={async () => {
-                                await handleGeneration();
-                              }}
-                              disabled={isGenerating || !imageType}
-                            >
-                              Regenerate
-                            </Button>
-                          </div>
+        {/* Step 3: Refinement Screen */}
+        {step === 3 && currentImageUrl && (
+          <div className="space-y-6">
+            {/* Selected Image Display */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-lg">Your Image</Label>
+                {refinementCount > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    Refinements: {refinementCount}/2
+                  </span>
+                )}
+              </div>
+              <Card className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className={`relative ${aspectRatio === "1:1" ? "aspect-square" : aspectRatio === "4:5" ? "aspect-[4/5]" : aspectRatio === "16:9" ? "aspect-video" : "aspect-[9/16]"} bg-muted`}>
+                    <img 
+                      src={currentImageUrl} 
+                      alt="Selected or refined image"
+                      className="w-full h-full object-cover"
+                    />
+                    {isRefining && (
+                      <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                        <div className="text-center space-y-2">
+                          <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
+                          <p className="text-sm text-muted-foreground">Refining image...</p>
                         </div>
                       </div>
                     )}
-                    
-                    <div className="flex flex-wrap gap-2">
-                      {generatedContent.hashtags.map((tag, i) => (
-                        <Badge key={i} variant="secondary">#{tag}</Badge>
-                      ))}
-                    </div>
-
-                    {generatedContent.callToAction && (
-                      <div className="p-3 bg-muted/50 rounded-lg text-sm">
-                        <strong>CTA:</strong> {generatedContent.callToAction}
-                      </div>
-                    )}
-
-                    {/* AI Reasoning */}
-                    <Accordion type="single" collapsible>
-                      <AccordionItem value="reasoning">
-                        <AccordionTrigger className="text-sm">AI Strategy Reasoning</AccordionTrigger>
-                        <AccordionContent className="text-sm text-muted-foreground">
-                          {generatedContent.aiReasoning}
-                        </AccordionContent>
-                      </AccordionItem>
-                      {generatedContent.alternativeVersions.length > 0 && (
-                        <AccordionItem value="alternatives">
-                          <AccordionTrigger className="text-sm">Alternative Versions</AccordionTrigger>
-                          <AccordionContent className="space-y-3">
-                            {generatedContent.alternativeVersions.map((alt, i) => (
-                              <div key={i} className="p-3 bg-muted/30 rounded text-sm">
-                                <strong>Version {i + 1}:</strong>
-                                <p className="mt-1 whitespace-pre-wrap">{alt}</p>
-                              </div>
-                            ))}
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                    </Accordion>
                   </div>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="text-sm text-muted-foreground">No generated content yet. You can go back and generate, or add slides and save as draft.</div>
+            </div>
+
+            {/* Refinement Controls */}
+            <div className="space-y-6 pt-4 border-t">
+              {/* Style Slider */}
+              <div className="space-y-3">
+                <Label>Style</Label>
+                <div className="space-y-2">
+                  <Slider
+                    value={[styleSliderValue]}
+                    onValueChange={(value) => setStyleSliderValue(value[0])}
+                    min={0}
+                    max={100}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>More Professional</span>
+                    <span>More Casual</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Color Buttons */}
+              <div className="space-y-3">
+                <Label>Colors</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={refinementColorMode === "warmer" ? "default" : "outline"}
+                    onClick={() => setRefinementColorMode("warmer")}
+                    className="w-full"
+                  >
+                    Warmer
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={refinementColorMode === "cooler" ? "default" : "outline"}
+                    onClick={() => setRefinementColorMode("cooler")}
+                    className="w-full"
+                  >
+                    Cooler
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={refinementColorMode === "brand" ? "default" : "outline"}
+                    onClick={() => setRefinementColorMode("brand")}
+                    className="w-full"
+                  >
+                    Brand
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={refinementColorMode === "custom" ? "default" : "outline"}
+                    onClick={() => setRefinementColorMode("custom")}
+                    className="w-full"
+                  >
+                    Custom
+                  </Button>
+                </div>
+                {refinementColorMode === "custom" && (
+                  <div className="mt-3 space-y-2 p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs w-16">Primary:</Label>
+                      <input
+                        type="color"
+                        value={refinementCustomColors?.primary || "#3B82F6"}
+                        onChange={(e) => setRefinementCustomColors({ 
+                          primary: e.target.value, 
+                          accent: refinementCustomColors?.accent || "#8B5CF6" 
+                        })}
+                        className="w-10 h-8 rounded border"
+                      />
+                      <Input
+                        type="text"
+                        value={refinementCustomColors?.primary || "#3B82F6"}
+                        onChange={(e) => setRefinementCustomColors({ 
+                          primary: e.target.value, 
+                          accent: refinementCustomColors?.accent || "#8B5CF6" 
+                        })}
+                        className="w-20 h-8 text-xs"
+                        placeholder="#3B82F6"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs w-16">Accent:</Label>
+                      <input
+                        type="color"
+                        value={refinementCustomColors?.accent || "#8B5CF6"}
+                        onChange={(e) => setRefinementCustomColors({ 
+                          primary: refinementCustomColors?.primary || "#3B82F6", 
+                          accent: e.target.value 
+                        })}
+                        className="w-10 h-8 rounded border"
+                      />
+                      <Input
+                        type="text"
+                        value={refinementCustomColors?.accent || "#8B5CF6"}
+                        onChange={(e) => setRefinementCustomColors({ 
+                          primary: refinementCustomColors?.primary || "#3B82F6", 
+                          accent: e.target.value 
+                        })}
+                        className="w-20 h-8 text-xs"
+                        placeholder="#8B5CF6"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Layout Note */}
+              <div className="text-sm text-muted-foreground">
+                Layout: Centered composition (works for both platforms)
+              </div>
+            </div>
+
+            {/* Generated Caption Section */}
+            {generatedCaption && (
+              <div className="space-y-3 pt-4 border-t">
+                <Label>Generated Caption</Label>
+                <Textarea 
+                  value={editedCaption}
+                  onChange={(e) => setEditedCaption(e.target.value)}
+                  rows={6}
+                  placeholder="Edit your caption..."
+                />
+                {generatedCaption.hashtags && generatedCaption.hashtags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {generatedCaption.hashtags.map((tag, idx) => (
+                      <Badge key={idx} variant="secondary">
+                        #{tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(5)}>
-                Back
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={() => setStep(4)}>
-                Edit
-              </Button>
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
               <Button 
                 variant="outline" 
                 className="flex-1"
-                onClick={handleSaveDraft}
-                disabled={createPostMutation.isPending || (!generatedContent && !generatedImageUrl && slides.length === 0)}
+                onClick={() => setStep(2)}
               >
-                {createPostMutation.isPending ? "Saving..." : "Save Draft"}
+                Back
               </Button>
-              <Button className="flex-1" onClick={resetAndClose}>
-                Schedule
+              <Button 
+                variant="outline"
+                onClick={handleRefineImage}
+                disabled={isRefining || refinementCount >= 2}
+                className="flex-1"
+              >
+                {isRefining ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                    Refining...
+                  </>
+                ) : refinementCount >= 2 ? (
+                  "Maximum refinements reached"
+                ) : (
+                  "Apply Changes"
+                )}
+              </Button>
+              <Button 
+                className="flex-1"
+                onClick={handleFinalizePost}
+              >
+                Use This Image
+              </Button>
+              <Button 
+                variant="default"
+                onClick={handleFinalizePost}
+              >
+                Schedule Post
               </Button>
             </div>
+            
+            {refinementCount >= 2 && (
+              <p className="text-xs text-muted-foreground text-center">
+                Maximum refinements reached
+              </p>
+            )}
           </div>
         )}
+
+        {/* Old wizard steps (3.5, 4, 4.5, 5) removed - using new 3-step flow */}
       </DialogContent>
     </Dialog>
   );
 };
 
-// Helper component for status lines
-function StatusLine({ status, text }: { status: string; text: string }) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className={status === "complete" ? "text-green-600" : ""}>
-        {status === "complete" ? "✓" : status === "in-progress" ? "⏳" : "○"} {text}
-      </span>
-      <span className={
-        status === "complete" ? "text-green-600" :
-        status === "in-progress" ? "text-primary" :
-        status === "skipped" ? "text-muted-foreground" :
-        "text-muted-foreground"
-      }>
-        {status === "complete" ? "Complete" :
-         status === "in-progress" ? "In progress..." :
-         status === "skipped" ? "Skipped" :
-         "Pending"}
-      </span>
-    </div>
-  );
-}

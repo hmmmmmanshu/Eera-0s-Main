@@ -160,14 +160,7 @@ function getColorIntelligence(
   const complementary: string[] = [];
   
   // Calculate lighter/darker variations
-  function hexToRgb(hex: string) {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16)
-    } : null;
-  }
+  const hexToRgb = hexToRgbHelper;
 
   function rgbToHex(r: number, g: number, b: number) {
     return "#" + [r, g, b].map(x => {
@@ -385,6 +378,308 @@ function generateNegativePrompt(
     : "";
 
   return `${baseNegative}, ${intentNegative}, ${brandNegativeStr}, watermark, text artifacts, distorted, low quality, blurry`.replace(/,\s*,/g, ",").trim();
+}
+
+/**
+ * Convert hex color code to color name
+ * Simple mapping for common colors used in brand palettes
+ */
+function hexToColorName(hex: string): string {
+  const normalizedHex = hex.toUpperCase().trim();
+  
+  // Common color mappings
+  const colorMap: Record<string, string> = {
+    "#3B82F6": "blue",
+    "#2563EB": "blue",
+    "#1E40AF": "dark blue",
+    "#8B5CF6": "purple",
+    "#7C3AED": "purple",
+    "#6366F1": "indigo",
+    "#EC4899": "pink",
+    "#F43F5E": "rose",
+    "#EF4444": "red",
+    "#F59E0B": "amber",
+    "#F97316": "orange",
+    "#10B981": "green",
+    "#059669": "emerald",
+    "#14B8A6": "teal",
+    "#06B6D4": "cyan",
+    "#0EA5E9": "sky blue",
+    "#FFD93D": "yellow",
+    "#FBBF24": "gold",
+    "#64748B": "slate",
+    "#475569": "dark slate",
+    "#1E293B": "dark",
+    "#FFFFFF": "white",
+    "#000000": "black",
+    "#F3F4F6": "light gray",
+    "#E5E7EB": "gray",
+  };
+  
+  // Exact match
+  if (colorMap[normalizedHex]) {
+    return colorMap[normalizedHex];
+  }
+  
+  // Try to match by RGB values for common colors
+  const rgb = hexToRgbHelper(hex);
+  if (rgb) {
+    // Blue range
+    if (rgb.b > rgb.r && rgb.b > rgb.g && rgb.b > 150) {
+      if (rgb.b > 200) return "bright blue";
+      return "blue";
+    }
+    // Green range
+    if (rgb.g > rgb.r && rgb.g > rgb.b && rgb.g > 150) {
+      if (rgb.g > 200) return "bright green";
+      return "green";
+    }
+    // Red/Pink range
+    if (rgb.r > rgb.g && rgb.r > rgb.b && rgb.r > 150) {
+      if (rgb.r > 200 && rgb.b > 100) return "pink";
+      if (rgb.r > 200) return "red";
+      return "coral";
+    }
+    // Purple range
+    if (rgb.r > 100 && rgb.b > 100 && rgb.g < 100) {
+      return "purple";
+    }
+    // Yellow/Orange range
+    if (rgb.r > 150 && rgb.g > 150 && rgb.b < 100) {
+      if (rgb.r > rgb.g) return "orange";
+      return "yellow";
+    }
+  }
+  
+  // Fallback: return generic description
+  return "brand color";
+}
+
+/**
+ * Helper function to convert hex to RGB
+ * Shared utility for color conversions
+ */
+function hexToRgbHelper(hex: string): { r: number; g: number; b: number } | null {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+}
+
+/**
+ * Get mood-based color description
+ */
+function getMoodColors(imageType: ImageType | null, tone: string): string {
+  const moodMap: Record<string, string> = {
+    celebratory: "warm celebratory colors",
+    milestone: "warm celebratory colors",
+    announcement: "vibrant energetic colors",
+    product: "modern innovative colors",
+    quote: "sophisticated thoughtful colors",
+    educational: "clear professional colors",
+    social_proof: "trustworthy authentic colors",
+    comparison: "contrasting dynamic colors",
+    event: "energetic engaging colors",
+  };
+  
+  const toneMap: Record<string, string> = {
+    professional: "professional blue tones",
+    casual: "warm approachable colors",
+    humble: "muted authentic colors",
+    inspirational: "uplifting vibrant colors",
+    witty: "playful energetic colors",
+  };
+  
+  if (imageType && moodMap[imageType]) {
+    return moodMap[imageType];
+  }
+  
+  if (tone && toneMap[tone.toLowerCase()]) {
+    return toneMap[tone.toLowerCase()];
+  }
+  
+  return "professional brand colors";
+}
+
+/**
+ * Get what to show based on headline and image type
+ */
+function getWhatToShow(headline: string, imageType: ImageType | null, keyPoints?: string): string {
+  if (!imageType) {
+    return headline.toLowerCase();
+  }
+  
+  const typeMap: Record<ImageType, string> = {
+    announcement: "milestone celebration or achievement",
+    product: "product feature or innovation",
+    quote: "inspiring quote or insight",
+    infographic: "data visualization or process",
+    educational: "instructional content or guide",
+    social_proof: "customer success or testimonial",
+    comparison: "before and after comparison",
+    event: "upcoming event or webinar",
+  };
+  
+  return typeMap[imageType] || headline.toLowerCase();
+}
+
+/**
+ * Get atmosphere based on image type and tone
+ */
+function getAtmosphere(imageType: ImageType | null, tone: string): string {
+  const atmosphereMap: Record<string, string> = {
+    announcement: "celebratory but humble atmosphere",
+    milestone: "celebratory but humble atmosphere",
+    product: "exciting and innovative atmosphere",
+    quote: "inspirational and thoughtful atmosphere",
+    infographic: "clear and informative atmosphere",
+    educational: "helpful and instructive atmosphere",
+    social_proof: "trustworthy and authentic atmosphere",
+    comparison: "analytical and clear atmosphere",
+    event: "energetic and engaging atmosphere",
+  };
+  
+  if (imageType && atmosphereMap[imageType]) {
+    return atmosphereMap[imageType];
+  }
+  
+  // Fallback to tone-based atmosphere
+  const toneAtmosphere: Record<string, string> = {
+    professional: "professional and polished atmosphere",
+    casual: "relaxed and approachable atmosphere",
+    humble: "authentic and genuine atmosphere",
+    inspirational: "uplifting and motivating atmosphere",
+    witty: "playful and engaging atmosphere",
+  };
+  
+  return toneAtmosphere[tone.toLowerCase()] || "professional atmosphere";
+}
+
+/**
+ * Build simple, concise prompt for Gemini image generation (50-80 words)
+ * Optimized for founder/startup content with natural language
+ */
+export function buildSimpleGeminiPrompt(params: {
+  accountType: "personal" | "company";
+  platform: "linkedin" | "instagram";
+  imageType: ImageType | null;
+  headline: string;
+  keyPoints?: string;
+  colorMode: "brand" | "custom" | "mood";
+  customColors?: { primary: string; accent: string };
+  brandColors?: { primary: string; accent: string };
+  tone: string;
+  styleVariation: "minimal" | "bold" | "elegant";
+  aspectRatio: "1:1" | "4:5" | "16:9" | "9:16";
+}): string {
+  const {
+    accountType,
+    platform,
+    imageType,
+    headline,
+    keyPoints,
+    colorMode,
+    customColors,
+    brandColors,
+    tone,
+    styleVariation,
+  } = params;
+  
+  // 1. Opening: Professional [image type] for [platform], showing [what to show]
+  const imageTypeLabel = imageType || "social media image";
+  const whatToShow = getWhatToShow(headline, imageType, keyPoints);
+  const opening = `Professional ${imageTypeLabel} for ${platform}, showing ${whatToShow}`;
+  
+  // 2. Account Type Context
+  const accountContext = accountType === "personal"
+    ? "Authentic founder moment, relatable and human"
+    : "Polished corporate brand style";
+  
+  // 3. Style based on styleVariation
+  const styleMap: Record<"minimal" | "bold" | "elegant", string> = {
+    minimal: "Modern minimal style, clean centered composition",
+    bold: "Bold graphic style, vibrant colors, eye-catching design",
+    elegant: "Elegant professional style, sophisticated design",
+  };
+  const style = styleMap[styleVariation];
+  
+  // 4. Colors based on colorMode
+  let colors = "";
+  if (colorMode === "brand" && brandColors) {
+    const primaryColor = hexToColorName(brandColors.primary);
+    const accentColor = brandColors.accent ? hexToColorName(brandColors.accent) : null;
+    colors = accentColor 
+      ? `${primaryColor} and ${accentColor} brand colors`
+      : `${primaryColor} brand colors`;
+  } else if (colorMode === "custom" && customColors) {
+    const primaryColor = hexToColorName(customColors.primary);
+    const accentColor = customColors.accent ? hexToColorName(customColors.accent) : null;
+    colors = accentColor
+      ? `${primaryColor} and ${accentColor} colors`
+      : `${primaryColor} colors`;
+  } else {
+    // mood mode
+    colors = getMoodColors(imageType, tone);
+  }
+  
+  // 5. Mood/Atmosphere
+  const atmosphere = getAtmosphere(imageType, tone);
+  
+  // 6. Layout Hint
+  const layoutHint = "Clean space for headline text overlay on top";
+  
+  // 7. Quality
+  const quality = imageType === "product" || imageType === "social_proof"
+    ? "High-quality professional photography quality"
+    : "High-quality professional design quality";
+  
+  // Assemble the prompt
+  const promptParts = [
+    opening,
+    accountContext,
+    style,
+    `with ${colors}`,
+    atmosphere,
+    layoutHint,
+    quality,
+  ];
+  
+  let prompt = promptParts.join(". ") + ".";
+  
+  // Ensure word count is between 50-80 words
+  const wordCount = prompt.split(/\s+/).length;
+  
+  if (wordCount > 80) {
+    // Trim if too long - remove less critical parts
+    prompt = [
+      opening,
+      accountContext,
+      style,
+      `with ${colors}`,
+      atmosphere,
+      quality,
+    ].join(". ") + ".";
+  }
+  
+  if (wordCount < 50) {
+    // Add more detail if too short
+    const additionalDetail = keyPoints 
+      ? ` Highlighting ${keyPoints.split(/[,\n]/)[0].trim().toLowerCase()}`
+      : "";
+    prompt = [
+      opening,
+      accountContext,
+      style,
+      `with ${colors}`,
+      atmosphere,
+      layoutHint,
+      quality + additionalDetail,
+    ].join(". ") + ".";
+  }
+  
+  return prompt;
 }
 
 /**
