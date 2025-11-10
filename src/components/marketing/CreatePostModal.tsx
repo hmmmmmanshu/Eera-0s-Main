@@ -155,7 +155,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(draftData));
     }
   }, [open, accountType, colorMode, customColors, platform, imageType, headline, keyPoints, tone, objective, aspectRatio, imageCount]);
-  
+
   // Auto-select aspect ratio based on image type
   useEffect(() => {
     if (imageType) {
@@ -186,7 +186,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setIsGenerating(false);
     }
   }, [open]);
-  
+
   // Initialize current image and caption when Step 3 is reached
   useEffect(() => {
     if (step === 3 && selectedImageUrl && !currentImageUrl) {
@@ -211,12 +211,12 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       toast.error("Missing required information");
       return;
     }
-    
+
     setIsGenerating(true);
     setImageGenerationStatus("generating");
     setGenerationProgress({ completed: 0, total: imageCount });
     setGenerationError(null);
-    
+
     try {
       const brandContext = assembleBrandContext(profile);
       
@@ -284,15 +284,18 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setImageGenerationStatus("complete");
       setGenerationProgress({ completed: images.length, total: imageCount });
       
-      // Update post with generated images
+      // Update post with generated images - all three images are automatically saved
       const imageUrls = images.map(img => img.url);
       await updatePostMutation.mutateAsync({
         id: createdPost.id,
         updates: {
-          generated_images: imageUrls,
+          generated_images: imageUrls, // Save all generated images
           media_urls: imageUrls, // Also update media_urls for compatibility
+          status: "draft", // Change from "generating" to "draft" when images are ready
         },
       });
+      
+      console.log("[Step 2] All", imageUrls.length, "images saved automatically to database");
       
       console.log("[Step 2] Images and caption generated successfully");
     } catch (error) {
@@ -335,7 +338,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     }
     
     setIsRefining(true);
-    
+
     try {
       const brandContext = assembleBrandContext(profile);
       const brandColors = profile.color_palette ? {
@@ -421,7 +424,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       toast.error("Missing post or image");
       return;
     }
-    
+
     try {
       // Update post with final image and caption
       const finalCaption = editedCaption || generatedCaption?.caption || headline;
@@ -563,50 +566,50 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             {/* Account Type Selection */}
             <div className="space-y-2">
               <Label>Account Type *</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <Card 
-                  className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                    accountType === "personal" 
-                      ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                      : "border-2 border-border hover:border-accent/50"
-                  }`}
+            <div className="grid grid-cols-2 gap-4">
+              <Card 
+                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                  accountType === "personal" 
+                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                    : "border-2 border-border hover:border-accent/50"
+                }`}
                   onClick={() => {
                     setAccountType("personal");
                     setValidationErrors(prev => ({ ...prev, accountType: "" }));
                   }}
-                >
+              >
                   <CardContent className="p-4 text-center space-y-2">
                     <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
-                      accountType === "personal" ? "bg-accent/20" : "bg-primary/10"
-                    }`}>
+                    accountType === "personal" ? "bg-accent/20" : "bg-primary/10"
+                  }`}>
                       <Settings className={`w-5 h-5 ${accountType === "personal" ? "text-accent" : "text-primary"}`} />
-                    </div>
+                  </div>
                     <p className="font-semibold text-sm">Personal</p>
                     <p className="text-xs text-muted-foreground">Founder's brand</p>
-                  </CardContent>
-                </Card>
-                <Card 
-                  className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                    accountType === "company" 
-                      ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                      : "border-2 border-border hover:border-accent/50"
-                  }`}
+                </CardContent>
+              </Card>
+              <Card 
+                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                  accountType === "company" 
+                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                    : "border-2 border-border hover:border-accent/50"
+                }`}
                   onClick={() => {
                     setAccountType("company");
                     setValidationErrors(prev => ({ ...prev, accountType: "" }));
                   }}
-                >
+              >
                   <CardContent className="p-4 text-center space-y-2">
                     <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
-                      accountType === "company" ? "bg-accent/20" : "bg-primary/10"
-                    }`}>
+                    accountType === "company" ? "bg-accent/20" : "bg-primary/10"
+                  }`}>
                       <FileText className={`w-5 h-5 ${accountType === "company" ? "text-accent" : "text-primary"}`} />
-                    </div>
+                  </div>
                     <p className="font-semibold text-sm">Company</p>
                     <p className="text-xs text-muted-foreground">Official brand</p>
-                  </CardContent>
-                </Card>
-              </div>
+                </CardContent>
+              </Card>
+            </div>
               {validationErrors.accountType && (
                 <p className="text-xs text-red-500">{validationErrors.accountType}</p>
               )}
@@ -615,13 +618,13 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             {/* Platform Selection */}
             <div className="space-y-2">
               <Label>Platform *</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <Card 
-                  className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                    platform === "linkedin" 
-                      ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                      : "border-2 border-border hover:border-accent/50"
-                  }`}
+            <div className="grid grid-cols-2 gap-4">
+              <Card 
+                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                  platform === "linkedin" 
+                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                    : "border-2 border-border hover:border-accent/50"
+                }`}
                   onClick={() => {
                     setPlatform("linkedin");
                     setValidationErrors(prev => ({ ...prev, platform: "" }));
@@ -633,19 +636,19 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 >
                   <CardContent className="p-4 text-center space-y-2">
                     <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
-                      platform === "linkedin" ? "bg-accent/20" : "bg-primary/10"
-                    }`}>
+                    platform === "linkedin" ? "bg-accent/20" : "bg-primary/10"
+                  }`}>
                       <FileText className={`w-5 h-5 ${platform === "linkedin" ? "text-accent" : "text-primary"}`} />
-                    </div>
+                  </div>
                     <p className="font-semibold text-sm">LinkedIn</p>
-                  </CardContent>
-                </Card>
-                <Card 
-                  className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                    platform === "instagram" 
-                      ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                      : "border-2 border-border hover:border-accent/50"
-                  }`}
+                </CardContent>
+              </Card>
+              <Card 
+                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                  platform === "instagram" 
+                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
+                    : "border-2 border-border hover:border-accent/50"
+                }`}
                   onClick={() => {
                     setPlatform("instagram");
                     setValidationErrors(prev => ({ ...prev, platform: "" }));
@@ -657,18 +660,18 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 >
                   <CardContent className="p-4 text-center space-y-2">
                     <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
-                      platform === "instagram" ? "bg-accent/20" : "bg-primary/10"
-                    }`}>
+                    platform === "instagram" ? "bg-accent/20" : "bg-primary/10"
+                  }`}>
                       <ImageIcon className={`w-5 h-5 ${platform === "instagram" ? "text-accent" : "text-primary"}`} />
-                    </div>
+                  </div>
                     <p className="font-semibold text-sm">Instagram</p>
-                  </CardContent>
-                </Card>
-              </div>
+                </CardContent>
+              </Card>
+            </div>
               {validationErrors.platform && (
                 <p className="text-xs text-red-500">{validationErrors.platform}</p>
               )}
-            </div>
+                        </div>
 
             {/* Headline Input */}
             <div className="space-y-2">
@@ -689,20 +692,20 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             </div>
 
             {/* Key Points Input (Optional) */}
-            <div className="space-y-2">
+                <div className="space-y-2">
               <Label htmlFor="keypoints">Additional details (optional)</Label>
-              <Textarea 
+                  <Textarea 
                 id="keypoints" 
                 placeholder="Thank you to everyone who believed in us"
                 rows={3}
                 value={keyPoints}
                 onChange={(e) => setKeyPoints(e.target.value)}
               />
-            </div>
+                </div>
 
             {/* Aspect Ratio and Image Type in a row */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+                <div className="space-y-2">
                 <Label htmlFor="aspectRatio">Aspect Ratio *</Label>
                 <Select 
                   value={aspectRatio} 
@@ -723,8 +726,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 </Select>
                 {validationErrors.aspectRatio && (
                   <p className="text-xs text-red-500">{validationErrors.aspectRatio}</p>
-                )}
-              </div>
+                  )}
+                </div>
 
               <div className="space-y-2">
                 <Label htmlFor="imageType">Image Type *</Label>
@@ -748,7 +751,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                             <div className="flex items-center gap-2">
                               <Icon className="w-4 h-4" />
                               <span>{type.label}</span>
-                            </div>
+              </div>
                           </SelectItem>
                         );
                       })}
@@ -766,134 +769,134 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 <AccordionTrigger>Advanced Options</AccordionTrigger>
                 <AccordionContent className="space-y-4 pt-4">
                   {/* Tone Dropdown */}
-                  <div className="space-y-2">
-                    <Label htmlFor="tone">Tone</Label>
-                    <Select value={tone} onValueChange={(v: typeof tone) => setTone(v)}>
+              <div className="space-y-2">
+                <Label htmlFor="tone">Tone</Label>
+                <Select value={tone} onValueChange={(v: typeof tone) => setTone(v)}>
                       <SelectTrigger id="tone">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="quirky">Quirky</SelectItem>
-                        <SelectItem value="humble">Humble</SelectItem>
-                        <SelectItem value="inspirational">Inspirational</SelectItem>
-                        <SelectItem value="professional">Professional</SelectItem>
-                        <SelectItem value="witty">Witty</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="quirky">Quirky</SelectItem>
+                    <SelectItem value="humble">Humble</SelectItem>
+                    <SelectItem value="inspirational">Inspirational</SelectItem>
+                    <SelectItem value="professional">Professional</SelectItem>
+                    <SelectItem value="witty">Witty</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
                   {/* Color Mode Selection */}
-                  <div className="space-y-2">
-                    <Label>Image Colors</Label>
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id="color-brand"
-                          name="colorMode"
-                          value="brand"
-                          checked={colorMode === "brand"}
-                          onChange={(e) => setColorMode("brand")}
-                          className="w-4 h-4"
-                        />
-                        <label htmlFor="color-brand" className="flex-1 cursor-pointer">
-                          <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <Label>Image Colors</Label>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="color-brand"
+                      name="colorMode"
+                      value="brand"
+                      checked={colorMode === "brand"}
+                      onChange={(e) => setColorMode("brand")}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="color-brand" className="flex-1 cursor-pointer">
+                      <div className="flex items-center justify-between">
                             <span className="font-medium">Brand Colors</span>
-                            {profile?.color_palette && (
-                              <div className="flex gap-1">
-                                <div 
+                        {profile?.color_palette && (
+                          <div className="flex gap-1">
+                            <div 
                                   className="w-5 h-5 rounded border"
-                                  style={{ backgroundColor: (profile.color_palette as any)?.primary || "#3B82F6" }}
-                                />
-                                <div 
+                              style={{ backgroundColor: (profile.color_palette as any)?.primary || "#3B82F6" }}
+                            />
+                            <div 
                                   className="w-5 h-5 rounded border"
-                                  style={{ backgroundColor: (profile.color_palette as any)?.secondary || "#8B5CF6" }}
-                                />
-                              </div>
-                            )}
+                              style={{ backgroundColor: (profile.color_palette as any)?.secondary || "#8B5CF6" }}
+                            />
                           </div>
-                        </label>
+                        )}
                       </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="radio"
-                          id="color-custom"
-                          name="colorMode"
-                          value="custom"
-                          checked={colorMode === "custom"}
-                          onChange={(e) => setColorMode("custom")}
-                          className="w-4 h-4"
-                        />
-                        <label htmlFor="color-custom" className="flex-1 cursor-pointer">
-                          <span className="font-medium">Custom Colors</span>
-                        </label>
-                      </div>
-                      {colorMode === "custom" && (
-                        <div className="ml-6 space-y-2 p-3 bg-muted/50 rounded-lg">
-                          <div className="flex items-center gap-2">
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="color-custom"
+                      name="colorMode"
+                      value="custom"
+                      checked={colorMode === "custom"}
+                      onChange={(e) => setColorMode("custom")}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="color-custom" className="flex-1 cursor-pointer">
+                      <span className="font-medium">Custom Colors</span>
+                    </label>
+                  </div>
+                  {colorMode === "custom" && (
+                    <div className="ml-6 space-y-2 p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2">
                             <Label className="text-xs w-16">Primary:</Label>
-                            <input
-                              type="color"
-                              value={customColors?.primary || "#3B82F6"}
-                              onChange={(e) => setCustomColors({ 
-                                primary: e.target.value, 
-                                accent: customColors?.accent || "#8B5CF6" 
-                              })}
-                              className="w-10 h-8 rounded border"
-                            />
-                            <Input
-                              type="text"
-                              value={customColors?.primary || "#3B82F6"}
-                              onChange={(e) => setCustomColors({ 
-                                primary: e.target.value, 
-                                accent: customColors?.accent || "#8B5CF6" 
-                              })}
-                              className="w-20 h-8 text-xs"
-                              placeholder="#3B82F6"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs w-16">Accent:</Label>
-                            <input
-                              type="color"
-                              value={customColors?.accent || "#8B5CF6"}
-                              onChange={(e) => setCustomColors({ 
-                                primary: customColors?.primary || "#3B82F6", 
-                                accent: e.target.value 
-                              })}
-                              className="w-10 h-8 rounded border"
-                            />
-                            <Input
-                              type="text"
-                              value={customColors?.accent || "#8B5CF6"}
-                              onChange={(e) => setCustomColors({ 
-                                primary: customColors?.primary || "#3B82F6", 
-                                accent: e.target.value 
-                              })}
-                              className="w-20 h-8 text-xs"
-                              placeholder="#8B5CF6"
-                            />
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center space-x-2">
                         <input
-                          type="radio"
-                          id="color-mood"
-                          name="colorMode"
-                          value="mood"
-                          checked={colorMode === "mood"}
-                          onChange={(e) => setColorMode("mood")}
-                          className="w-4 h-4"
+                          type="color"
+                          value={customColors?.primary || "#3B82F6"}
+                          onChange={(e) => setCustomColors({ 
+                            primary: e.target.value, 
+                            accent: customColors?.accent || "#8B5CF6" 
+                          })}
+                              className="w-10 h-8 rounded border"
                         />
-                        <label htmlFor="color-mood" className="flex-1 cursor-pointer">
-                          <span className="font-medium">Match Content Mood</span>
-                        </label>
+                        <Input
+                          type="text"
+                          value={customColors?.primary || "#3B82F6"}
+                          onChange={(e) => setCustomColors({ 
+                            primary: e.target.value, 
+                            accent: customColors?.accent || "#8B5CF6" 
+                          })}
+                              className="w-20 h-8 text-xs"
+                          placeholder="#3B82F6"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                            <Label className="text-xs w-16">Accent:</Label>
+                        <input
+                          type="color"
+                          value={customColors?.accent || "#8B5CF6"}
+                          onChange={(e) => setCustomColors({ 
+                            primary: customColors?.primary || "#3B82F6", 
+                            accent: e.target.value 
+                          })}
+                              className="w-10 h-8 rounded border"
+                        />
+                        <Input
+                          type="text"
+                          value={customColors?.accent || "#8B5CF6"}
+                          onChange={(e) => setCustomColors({ 
+                            primary: customColors?.primary || "#3B82F6", 
+                            accent: e.target.value 
+                          })}
+                              className="w-20 h-8 text-xs"
+                          placeholder="#8B5CF6"
+                        />
                       </div>
                     </div>
+                  )}
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="color-mood"
+                      name="colorMode"
+                      value="mood"
+                      checked={colorMode === "mood"}
+                      onChange={(e) => setColorMode("mood")}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="color-mood" className="flex-1 cursor-pointer">
+                      <span className="font-medium">Match Content Mood</span>
+                    </label>
                   </div>
+                </div>
+              </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -922,7 +925,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               </div>
               <Button 
                 size="lg" 
-                className="flex-1 gap-2"
+                className="flex-1 gap-2" 
                 onClick={() => {
                   // Validate required fields
                   const errors: Record<string, string> = {};
@@ -962,9 +965,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     {generationProgress.completed > 0 
                       ? `Generated ${generationProgress.completed} of ${generationProgress.total}...`
                       : "Starting generation..."}
-                  </p>
-                </div>
-              </div>
+              </p>
+            </div>
+                  </div>
             )}
 
             {/* Error State */}
@@ -1019,9 +1022,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                             {isSelected && (
                               <div className="absolute top-2 right-2 w-8 h-8 bg-accent rounded-full flex items-center justify-center">
                                 <CheckCircle className="w-5 h-5 text-accent-foreground" />
-                              </div>
+                  </div>
                             )}
-                          </div>
+                </div>
                           <div className="p-4 space-y-2">
                             <p className="text-sm font-medium text-center">{styleLabels[image.style]}</p>
                             <Button 
@@ -1033,13 +1036,13 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                               }}
                             >
                               {isSelected ? "Selected" : "Select"}
-                            </Button>
-                          </div>
+              </Button>
+            </div>
                         </CardContent>
                       </Card>
                     );
                   })}
-                </div>
+          </div>
 
                 {/* Caption Preview */}
                 {generatedCaption && (
@@ -1056,22 +1059,22 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                         {generatedCaption.hashtags.map((tag, idx) => (
                           <Badge key={idx} variant="secondary">
                             #{tag}
-                          </Badge>
+                      </Badge>
                         ))}
-                      </div>
-                    )}
                   </div>
+                    )}
+                </div>
                 )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1"
+              <Button
+                variant="outline"
+                className="flex-1"
                     onClick={() => setStep(1)}
-                  >
-                    Back
-                  </Button>
+              >
+                Back
+              </Button>
                   <Button 
                     variant="outline"
                     onClick={handleGenerateMore}
@@ -1086,8 +1089,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     disabled={!selectedImageUrl}
                   >
                     Continue
-                  </Button>
-                </div>
+              </Button>
+            </div>
               </>
             )}
           </div>
@@ -1098,7 +1101,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           <div className="space-y-6">
             {/* Selected Image Display */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <Label className="text-lg">Your Image</Label>
                 {refinementCount > 0 && (
                   <span className="text-xs text-muted-foreground">
@@ -1107,7 +1110,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 )}
               </div>
               <Card className="overflow-hidden">
-                <CardContent className="p-0">
+                    <CardContent className="p-0">
                   <div className={`relative ${aspectRatio === "1:1" ? "aspect-square" : aspectRatio === "4:5" ? "aspect-[4/5]" : aspectRatio === "16:9" ? "aspect-video" : "aspect-[9/16]"} bg-muted`}>
                     <img 
                       src={currentImageUrl} 
@@ -1120,12 +1123,12 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                           <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
                           <p className="text-sm text-muted-foreground">Refining image...</p>
                         </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                    </CardContent>
+                  </Card>
+              </div>
 
             {/* Refinement Controls */}
             <div className="space-y-6 pt-4 border-t">
@@ -1144,47 +1147,47 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>More Professional</span>
                     <span>More Casual</span>
-                  </div>
-                </div>
-              </div>
-
+                      </div>
+                      </div>
+                    </div>
+                    
               {/* Color Buttons */}
               <div className="space-y-3">
                 <Label>Colors</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button
+                            <Button 
                     type="button"
                     variant={refinementColorMode === "warmer" ? "default" : "outline"}
                     onClick={() => setRefinementColorMode("warmer")}
                     className="w-full"
                   >
                     Warmer
-                  </Button>
-                  <Button
+                            </Button>
+                            <Button 
                     type="button"
                     variant={refinementColorMode === "cooler" ? "default" : "outline"}
                     onClick={() => setRefinementColorMode("cooler")}
                     className="w-full"
                   >
                     Cooler
-                  </Button>
-                  <Button
+                            </Button>
+                            <Button 
                     type="button"
                     variant={refinementColorMode === "brand" ? "default" : "outline"}
                     onClick={() => setRefinementColorMode("brand")}
                     className="w-full"
                   >
                     Brand
-                  </Button>
-                  <Button
+                            </Button>
+                            <Button 
                     type="button"
                     variant={refinementColorMode === "custom" ? "default" : "outline"}
                     onClick={() => setRefinementColorMode("custom")}
                     className="w-full"
                   >
                     Custom
-                  </Button>
-                </div>
+                            </Button>
+                          </div>
                 {refinementColorMode === "custom" && (
                   <div className="mt-3 space-y-2 p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-2">
@@ -1230,16 +1233,16 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                         className="w-20 h-8 text-xs"
                         placeholder="#8B5CF6"
                       />
+                        </div>
+                      </div>
+                    )}
                     </div>
-                  </div>
-                )}
-              </div>
 
               {/* Layout Note */}
               <div className="text-sm text-muted-foreground">
                 Layout: Centered composition (works for both platforms)
-              </div>
-            </div>
+                      </div>
+                              </div>
 
             {/* Generated Caption Section */}
             {generatedCaption && (
@@ -1260,7 +1263,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     ))}
                   </div>
                 )}
-              </div>
+                  </div>
             )}
 
             {/* Action Buttons */}
@@ -1273,7 +1276,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 Back
               </Button>
               <Button 
-                variant="outline"
+                variant="outline" 
                 onClick={handleRefineImage}
                 disabled={isRefining || refinementCount >= 2}
                 className="flex-1"

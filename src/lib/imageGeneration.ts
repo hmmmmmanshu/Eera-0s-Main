@@ -287,8 +287,8 @@ function mapAspectRatioForGemini(aspectRatio: AspectRatio): "1:1" | "16:9" | "9:
 }
 
 /**
- * Google Gemini 2.5 Flash with Imagen 3.0
- * Native image generation using imagen-3.0-generate-001 model
+ * Google Gemini 2.5 Flash Image (nano-banana)
+ * Native image generation using gemini-2.5-flash-image-exp model
  * Uses simplified prompts via buildSimpleGeminiPrompt() when full parameters are provided
  * Reference: https://aistudio.google.com/models/gemini-2-5-flash-image
  */
@@ -305,9 +305,9 @@ async function generateWithGemini(
   const geminiAspectRatio = mapAspectRatioForGemini(params.aspectRatio);
   
   try {
-    // Use Gemini 2.5 Flash with Imagen 3.0 for native image generation
+    // Use Gemini 2.5 Flash Image (nano-banana) for native image generation
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateContent?key=${API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-exp:generateContent?key=${API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -420,7 +420,7 @@ async function generateWithGemini(
 /**
  * Generate image with Gemini using simplified prompts
  * Uses buildSimpleGeminiPrompt() for concise, natural language prompts (50-80 words)
- * Direct Gemini API call to imagen-3.0-generate-001 model
+ * Direct Gemini API call to gemini-2.5-flash-image-exp model (nano-banana)
  */
 export async function generateWithGeminiSimple(params: {
   accountType: "personal" | "company";
@@ -462,9 +462,9 @@ export async function generateWithGeminiSimple(params: {
   const { width, height } = getDimensions(params.aspectRatio);
 
   try {
-    // Direct Gemini API call
+    // Direct Gemini API call to Gemini 2.5 Flash Image (nano-banana)
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:generateContent?key=${API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-exp:generateContent?key=${API_KEY}`,
       {
         method: "POST",
         headers: {
