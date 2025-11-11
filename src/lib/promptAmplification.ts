@@ -471,19 +471,21 @@ function hexToRgbHelper(hex: string): { r: number; g: number; b: number } | null
 /**
  * Get mood-based color description
  */
-function getMoodColors(imageType: ImageType | null, tone: string): string {
-  const moodMap: Record<string, string> = {
-    celebratory: "warm celebratory colors",
-    milestone: "warm celebratory colors",
-    announcement: "vibrant energetic colors",
-    product: "modern innovative colors",
-    quote: "sophisticated thoughtful colors",
-    educational: "clear professional colors",
-    social_proof: "trustworthy authentic colors",
-    comparison: "contrasting dynamic colors",
-    event: "energetic engaging colors",
-  };
+function getMoodColors(headline: string, tone: string): string {
+  const headlineLower = headline.toLowerCase();
   
+  // Detect mood from headline content
+  if (headlineLower.includes("diwali") || headlineLower.includes("celebration") || headlineLower.includes("festival") || headlineLower.includes("milestone")) {
+    return "warm celebratory colors";
+  }
+  if (headlineLower.includes("product") || headlineLower.includes("launch") || headlineLower.includes("innovation")) {
+    return "modern innovative colors";
+  }
+  if (headlineLower.includes("quote") || headlineLower.includes("inspire") || headlineLower.includes("wisdom")) {
+    return "sophisticated thoughtful colors";
+  }
+  
+  // Fallback to tone-based colors
   const toneMap: Record<string, string> = {
     professional: "professional blue tones",
     casual: "warm approachable colors",
@@ -506,43 +508,33 @@ function getMoodColors(imageType: ImageType | null, tone: string): string {
 /**
  * Get what to show based on headline and image type
  */
-function getWhatToShow(headline: string, imageType: ImageType | null, keyPoints?: string): string {
-  if (!imageType) {
-    return headline.toLowerCase();
+function getWhatToShow(headline: string, keyPoints?: string): string {
+  // Use the actual headline content directly - prioritize user input
+  // Combine with keyPoints if available for richer context
+  if (keyPoints && keyPoints.trim()) {
+    return `${headline.toLowerCase()}, ${keyPoints.toLowerCase()}`;
   }
-  
-  const typeMap: Record<ImageType, string> = {
-    announcement: "milestone celebration or achievement",
-    product: "product feature or innovation",
-    quote: "inspiring quote or insight",
-    infographic: "data visualization or process",
-    educational: "instructional content or guide",
-    social_proof: "customer success or testimonial",
-    comparison: "before and after comparison",
-    event: "upcoming event or webinar",
-  };
-  
-  return typeMap[imageType] || headline.toLowerCase();
+  return headline.toLowerCase();
 }
 
 /**
- * Get atmosphere based on image type and tone
+ * Get atmosphere based on headline content and tone
  */
-function getAtmosphere(imageType: ImageType | null, tone: string): string {
-  const atmosphereMap: Record<string, string> = {
-    announcement: "celebratory but humble atmosphere",
-    milestone: "celebratory but humble atmosphere",
-    product: "exciting and innovative atmosphere",
-    quote: "inspirational and thoughtful atmosphere",
-    infographic: "clear and informative atmosphere",
-    educational: "helpful and instructive atmosphere",
-    social_proof: "trustworthy and authentic atmosphere",
-    comparison: "analytical and clear atmosphere",
-    event: "energetic and engaging atmosphere",
-  };
+function getAtmosphere(headline: string, tone: string): string {
+  const headlineLower = headline.toLowerCase();
   
-  if (imageType && atmosphereMap[imageType]) {
-    return atmosphereMap[imageType];
+  // Detect content type from headline keywords
+  if (headlineLower.includes("diwali") || headlineLower.includes("celebration") || headlineLower.includes("festival")) {
+    return "celebratory but humble atmosphere";
+  }
+  if (headlineLower.includes("product") || headlineLower.includes("launch") || headlineLower.includes("feature")) {
+    return "exciting and innovative atmosphere";
+  }
+  if (headlineLower.includes("quote") || headlineLower.includes("inspire") || headlineLower.includes("wisdom")) {
+    return "inspirational and thoughtful atmosphere";
+  }
+  if (headlineLower.includes("milestone") || headlineLower.includes("achievement") || headlineLower.includes("success")) {
+    return "celebratory but humble atmosphere";
   }
   
   // Fallback to tone-based atmosphere
@@ -564,7 +556,6 @@ function getAtmosphere(imageType: ImageType | null, tone: string): string {
 export function buildSimpleGeminiPrompt(params: {
   accountType: "personal" | "company";
   platform: "linkedin" | "instagram";
-  imageType: ImageType | null;
   headline: string;
   keyPoints?: string;
   colorMode: "brand" | "custom" | "mood";
@@ -577,7 +568,6 @@ export function buildSimpleGeminiPrompt(params: {
   const {
     accountType,
     platform,
-    imageType,
     headline,
     keyPoints,
     colorMode,
@@ -588,10 +578,9 @@ export function buildSimpleGeminiPrompt(params: {
     aspectRatio,
   } = params;
   
-  // 1. Opening: Professional [image type] for [platform], showing [what to show]
-  const imageTypeLabel = imageType || "social media image";
-  const whatToShow = getWhatToShow(headline, imageType, keyPoints);
-  const opening = `Professional ${imageTypeLabel} for ${platform}, showing ${whatToShow}`;
+  // 1. Opening: Professional social media image for [platform], showing [actual headline content]
+  const whatToShow = getWhatToShow(headline, keyPoints);
+  const opening = `Professional social media image for ${platform}, showing ${whatToShow}`;
   
   // 2. Account Type Context
   const accountContext = accountType === "personal"
@@ -622,11 +611,11 @@ export function buildSimpleGeminiPrompt(params: {
       : `${primaryColor} colors`;
   } else {
     // mood mode
-    colors = getMoodColors(imageType, tone);
+    colors = getMoodColors(headline, tone);
   }
   
   // 5. Mood/Atmosphere
-  const atmosphere = getAtmosphere(imageType, tone);
+  const atmosphere = getAtmosphere(headline, tone);
   
   // 6. Layout Hint
   const layoutHint = "Clean space for headline text overlay on top";
@@ -640,8 +629,9 @@ export function buildSimpleGeminiPrompt(params: {
     ? "landscape format (16:9 aspect ratio)"
     : "vertical format (9:16 aspect ratio)";
   
-  // 8. Quality
-  const quality = imageType === "product" || imageType === "social_proof"
+  // 8. Quality - detect from headline content
+  const headlineLower = headline.toLowerCase();
+  const quality = headlineLower.includes("product") || headlineLower.includes("photo") || headlineLower.includes("showcase")
     ? "High-quality professional photography quality"
     : "High-quality professional design quality";
   

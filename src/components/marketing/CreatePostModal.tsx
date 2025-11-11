@@ -32,14 +32,6 @@ import {
   CheckCircle, 
   Settings,
   Palette,
-  BarChart3,
-  Package,
-  MessageSquareQuote,
-  Megaphone,
-  BookOpen,
-  Award,
-  GitCompare,
-  Calendar
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -53,9 +45,7 @@ import { assembleBrandContext } from "@/lib/brandContext";
 import { generatePostContent, type GeneratedPostContent } from "@/lib/gemini";
 import { generateImageVariations, generateWithGeminiSimple } from "@/lib/imageGeneration";
 
-// Image Type System
-import type { ImageType } from "@/types/imageTypes";
-import { IMAGE_TYPE_PRESETS } from "@/lib/imageTypePresets";
+// Image Type System - REMOVED (no longer using image types)
 
 interface CreatePostModalProps {
   open: boolean;
@@ -91,7 +81,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   
   // Form data with auto-restore
   const [platform, setPlatform] = useState<"linkedin" | "instagram">(savedDraft?.platform || "linkedin");
-  const [imageType, setImageType] = useState<ImageType | null>(savedDraft?.imageType || "announcement");
   const [headline, setHeadline] = useState(savedDraft?.headline || "");
   const [keyPoints, setKeyPoints] = useState(savedDraft?.keyPoints || "");
   const [tone, setTone] = useState<"quirky" | "humble" | "inspirational" | "professional" | "witty">(savedDraft?.tone || "professional");
@@ -143,7 +132,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         colorMode,
         customColors,
         platform,
-        imageType,
         headline,
         keyPoints,
         tone,
@@ -154,15 +142,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       };
       localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(draftData));
     }
-  }, [open, accountType, colorMode, customColors, platform, imageType, headline, keyPoints, tone, objective, aspectRatio, imageCount]);
-
-  // Auto-select aspect ratio based on image type
-  useEffect(() => {
-    if (imageType) {
-      const preset = IMAGE_TYPE_PRESETS[imageType];
-      setAspectRatio(preset.aspectRatio);
-    }
-  }, [imageType]);
+  }, [open, accountType, colorMode, customColors, platform, headline, keyPoints, tone, objective, aspectRatio, imageCount]);
 
   // Reset wizard when modal opens - Always start fresh at Step 1
   useEffect(() => {
@@ -199,7 +179,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   
   // Auto-generate images and caption when Step 2 is reached
   useEffect(() => {
-    if (step === 2 && imageGenerationStatus === "idle" && accountType && platform && headline && imageType && aspectRatio && profile) {
+    if (step === 2 && imageGenerationStatus === "idle" && accountType && platform && headline && aspectRatio && profile) {
       handleGenerateImagesAndCaption();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,7 +187,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   
   // Function to generate images and caption
   const handleGenerateImagesAndCaption = async () => {
-    if (!profile || !accountType || !platform || !headline || !imageType) {
+    if (!profile || !accountType || !platform || !headline) {
       toast.error("Missing required information");
       return;
     }
@@ -266,7 +246,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         count: imageCount,
         accountType,
         platform,
-        imageType,
         headline,
         keyPoints: keyPoints || undefined,
         colorMode,
@@ -333,7 +312,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   
   // Handle refinement - Apply changes to image
   const handleRefineImage = async () => {
-    if (!profile || !accountType || !platform || !headline || !imageType || !currentImageUrl || refinementCount >= 2) {
+    if (!profile || !accountType || !platform || !headline || !currentImageUrl || refinementCount >= 2) {
       return;
     }
     
@@ -380,7 +359,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       const refinedResult = await generateWithGeminiSimple({
         accountType,
         platform,
-        imageType,
         headline,
         keyPoints: enhancedKeyPoints || undefined,
         colorMode: finalColorMode,
@@ -452,7 +430,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   
   // Handle generate more (3 new variations)
   const handleGenerateMore = async () => {
-    if (!profile || !accountType || !platform || !headline || !imageType) {
+    if (!profile || !accountType || !platform || !headline) {
       return;
     }
     
@@ -474,7 +452,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         count: 3,
         accountType,
         platform,
-        imageType,
         headline,
         keyPoints: keyPoints || undefined,
         colorMode,
@@ -534,16 +511,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     onOpenChange(false);
   };
 
-  const imageTypes = [
-    { id: "infographic" as const, icon: BarChart3, label: "Infographic", desc: "Stats, process flows, data viz", platforms: ["linkedin", "instagram"] },
-    { id: "product" as const, icon: Package, label: "Product Shot", desc: "Hero images, features, mockups", platforms: ["linkedin", "instagram"] },
-    { id: "quote" as const, icon: MessageSquareQuote, label: "Quote Card", desc: "Testimonials, insights, wisdom", platforms: ["linkedin", "instagram"] },
-    { id: "announcement" as const, icon: Megaphone, label: "Announcement", desc: "Launches, milestones, news", platforms: ["linkedin", "instagram"] },
-    { id: "educational" as const, icon: BookOpen, label: "Educational", desc: "How-to guides, tips, tutorials", platforms: ["linkedin"] },
-    { id: "social_proof" as const, icon: Award, label: "Social Proof", desc: "Reviews, case studies, trust", platforms: ["linkedin", "instagram"] },
-    { id: "comparison" as const, icon: GitCompare, label: "Comparison", desc: "Before/after, us vs them", platforms: ["linkedin"] },
-    { id: "event" as const, icon: Calendar, label: "Event/Webinar", desc: "Registrations, live sessions", platforms: ["linkedin", "instagram"] },
-  ];
 
 
   return (
@@ -566,47 +533,45 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             {/* Account Type Selection */}
             <div className="space-y-2">
               <Label>Account Type *</Label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2">
               <Card 
-                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                className={`cursor-pointer transition-all hover:shadow-sm ${
                   accountType === "personal" 
-                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                    : "border-2 border-border hover:border-accent/50"
+                    ? "ring-1 ring-accent border-accent bg-accent/5" 
+                    : "border hover:border-accent/30"
                 }`}
                   onClick={() => {
                     setAccountType("personal");
                     setValidationErrors(prev => ({ ...prev, accountType: "" }));
                   }}
               >
-                  <CardContent className="p-4 text-center space-y-2">
-                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
+                  <CardContent className="p-3 text-center space-y-1">
+                    <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                     accountType === "personal" ? "bg-accent/20" : "bg-primary/10"
                   }`}>
-                      <Settings className={`w-5 h-5 ${accountType === "personal" ? "text-accent" : "text-primary"}`} />
+                      <Settings className={`w-4 h-4 ${accountType === "personal" ? "text-accent" : "text-primary"}`} />
                   </div>
-                    <p className="font-semibold text-sm">Personal</p>
-                    <p className="text-xs text-muted-foreground">Founder's brand</p>
+                    <p className="font-medium text-xs">Personal</p>
                 </CardContent>
               </Card>
               <Card 
-                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                className={`cursor-pointer transition-all hover:shadow-sm ${
                   accountType === "company" 
-                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                    : "border-2 border-border hover:border-accent/50"
+                    ? "ring-1 ring-accent border-accent bg-accent/5" 
+                    : "border hover:border-accent/30"
                 }`}
                   onClick={() => {
                     setAccountType("company");
                     setValidationErrors(prev => ({ ...prev, accountType: "" }));
                   }}
               >
-                  <CardContent className="p-4 text-center space-y-2">
-                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
+                  <CardContent className="p-3 text-center space-y-1">
+                    <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                     accountType === "company" ? "bg-accent/20" : "bg-primary/10"
                   }`}>
-                      <FileText className={`w-5 h-5 ${accountType === "company" ? "text-accent" : "text-primary"}`} />
+                      <FileText className={`w-4 h-4 ${accountType === "company" ? "text-accent" : "text-primary"}`} />
                   </div>
-                    <p className="font-semibold text-sm">Company</p>
-                    <p className="text-xs text-muted-foreground">Official brand</p>
+                    <p className="font-medium text-xs">Company</p>
                 </CardContent>
               </Card>
             </div>
@@ -618,53 +583,45 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             {/* Platform Selection */}
             <div className="space-y-2">
               <Label>Platform *</Label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2">
               <Card 
-                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                className={`cursor-pointer transition-all hover:shadow-sm ${
                   platform === "linkedin" 
-                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                    : "border-2 border-border hover:border-accent/50"
+                    ? "ring-1 ring-accent border-accent bg-accent/5" 
+                    : "border hover:border-accent/30"
                 }`}
                   onClick={() => {
                     setPlatform("linkedin");
                     setValidationErrors(prev => ({ ...prev, platform: "" }));
-                    // Reset image type if it's not available for LinkedIn
-                    if (imageType && !imageTypes.find(it => it.id === imageType && it.platforms.includes("linkedin"))) {
-                      setImageType("announcement"); // Default to announcement which is available for both platforms
-                    }
                   }}
                 >
-                  <CardContent className="p-4 text-center space-y-2">
-                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
+                  <CardContent className="p-3 text-center space-y-1">
+                    <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                     platform === "linkedin" ? "bg-accent/20" : "bg-primary/10"
                   }`}>
-                      <FileText className={`w-5 h-5 ${platform === "linkedin" ? "text-accent" : "text-primary"}`} />
+                      <FileText className={`w-4 h-4 ${platform === "linkedin" ? "text-accent" : "text-primary"}`} />
                   </div>
-                    <p className="font-semibold text-sm">LinkedIn</p>
+                    <p className="font-medium text-xs">LinkedIn</p>
                 </CardContent>
               </Card>
               <Card 
-                className={`cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                className={`cursor-pointer transition-all hover:shadow-sm ${
                   platform === "instagram" 
-                    ? "ring-2 ring-accent border-2 border-accent bg-accent/10 shadow-md" 
-                    : "border-2 border-border hover:border-accent/50"
+                    ? "ring-1 ring-accent border-accent bg-accent/5" 
+                    : "border hover:border-accent/30"
                 }`}
                   onClick={() => {
                     setPlatform("instagram");
                     setValidationErrors(prev => ({ ...prev, platform: "" }));
-                    // Reset image type if it's not available for Instagram
-                    if (imageType && !imageTypes.find(it => it.id === imageType && it.platforms.includes("instagram"))) {
-                      setImageType("announcement"); // Default to announcement which is available for both platforms
-                    }
                   }}
                 >
-                  <CardContent className="p-4 text-center space-y-2">
-                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center ${
+                  <CardContent className="p-3 text-center space-y-1">
+                    <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                     platform === "instagram" ? "bg-accent/20" : "bg-primary/10"
                   }`}>
-                      <ImageIcon className={`w-5 h-5 ${platform === "instagram" ? "text-accent" : "text-primary"}`} />
+                      <ImageIcon className={`w-4 h-4 ${platform === "instagram" ? "text-accent" : "text-primary"}`} />
                   </div>
-                    <p className="font-semibold text-sm">Instagram</p>
+                    <p className="font-medium text-xs">Instagram</p>
                 </CardContent>
               </Card>
             </div>
@@ -703,71 +660,36 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
               />
                 </div>
 
-            {/* Aspect Ratio and Image Type in a row */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                <Label htmlFor="aspectRatio">Aspect Ratio *</Label>
-                <Select 
-                  value={aspectRatio} 
-                  onValueChange={(v: "1:1" | "4:5" | "16:9" | "9:16") => {
-                    setAspectRatio(v);
-                    setValidationErrors(prev => ({ ...prev, aspectRatio: "" }));
-                  }}
-                >
-                  <SelectTrigger id="aspectRatio" className={validationErrors.aspectRatio ? "border-red-500" : ""}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1:1">1:1 (Square)</SelectItem>
-                    <SelectItem value="4:5">4:5 (Portrait)</SelectItem>
-                    <SelectItem value="16:9">16:9 (Landscape)</SelectItem>
-                    <SelectItem value="9:16">9:16 (Vertical)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {validationErrors.aspectRatio && (
-                  <p className="text-xs text-red-500">{validationErrors.aspectRatio}</p>
-                  )}
-                </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="imageType">Image Type *</Label>
-                <Select 
-                  value={imageType || ""} 
-                  onValueChange={(v: ImageType) => {
-                    setImageType(v);
-                    setValidationErrors(prev => ({ ...prev, imageType: "" }));
-                  }}
-                >
-                  <SelectTrigger id="imageType" className={validationErrors.imageType ? "border-red-500" : ""}>
-                    <SelectValue placeholder="Select image type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {imageTypes
-                      .filter(type => type.platforms.includes(platform))
-                      .map((type) => {
-                        const Icon = type.icon;
-                        return (
-                          <SelectItem key={type.id} value={type.id}>
-                            <div className="flex items-center gap-2">
-                              <Icon className="w-4 h-4" />
-                              <span>{type.label}</span>
-              </div>
-                          </SelectItem>
-                        );
-                      })}
-                  </SelectContent>
-                </Select>
-                {validationErrors.imageType && (
-                  <p className="text-xs text-red-500">{validationErrors.imageType}</p>
-                )}
-              </div>
+            {/* Aspect Ratio */}
+            <div className="space-y-2">
+              <Label htmlFor="aspectRatio">Aspect Ratio *</Label>
+              <Select 
+                value={aspectRatio} 
+                onValueChange={(v: "1:1" | "4:5" | "16:9" | "9:16") => {
+                  setAspectRatio(v);
+                  setValidationErrors(prev => ({ ...prev, aspectRatio: "" }));
+                }}
+              >
+                <SelectTrigger id="aspectRatio" className={validationErrors.aspectRatio ? "border-red-500" : ""}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1:1">1:1 (Square)</SelectItem>
+                  <SelectItem value="4:5">4:5 (Portrait)</SelectItem>
+                  <SelectItem value="16:9">16:9 (Landscape)</SelectItem>
+                  <SelectItem value="9:16">9:16 (Vertical)</SelectItem>
+                </SelectContent>
+              </Select>
+              {validationErrors.aspectRatio && (
+                <p className="text-xs text-red-500">{validationErrors.aspectRatio}</p>
+              )}
             </div>
 
             {/* Advanced Options Accordion */}
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="advanced">
-                <AccordionTrigger>Advanced Options</AccordionTrigger>
-                <AccordionContent className="space-y-4 pt-4">
+                <AccordionTrigger className="text-sm py-2">Advanced Options</AccordionTrigger>
+                <AccordionContent className="space-y-3 pt-3">
                   {/* Tone Dropdown */}
               <div className="space-y-2">
                 <Label htmlFor="tone">Tone</Label>
@@ -933,7 +855,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   if (!platform) errors.platform = "Platform is required";
                   if (!headline.trim()) errors.headline = "Headline is required";
                   if (!aspectRatio) errors.aspectRatio = "Aspect ratio is required";
-                  if (!imageType) errors.imageType = "Image type is required";
                   
                   setValidationErrors(errors);
                   
@@ -943,7 +864,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     toast.error("Please fill in all required fields");
                   }
                 }}
-                disabled={!accountType || !platform || !headline.trim() || !aspectRatio || !imageType}
+                disabled={!accountType || !platform || !headline.trim() || !aspectRatio}
               >
                 <Sparkles className="w-5 h-5" />
                 Generate Image

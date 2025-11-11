@@ -425,7 +425,6 @@ async function generateWithGemini(
 export async function generateWithGeminiSimple(params: {
   accountType: "personal" | "company";
   platform: "linkedin" | "instagram";
-  imageType: ImageType | null;
   headline: string;
   keyPoints?: string;
   colorMode: "brand" | "custom" | "mood";
@@ -444,7 +443,6 @@ export async function generateWithGeminiSimple(params: {
   const simplePrompt = buildSimpleGeminiPrompt({
     accountType: params.accountType,
     platform: params.platform,
-    imageType: params.imageType,
     headline: params.headline,
     keyPoints: params.keyPoints,
     colorMode: params.colorMode,
@@ -569,7 +567,6 @@ export async function generateImageVariations(params: {
   count: 1 | 2 | 3;
   accountType: "personal" | "company";
   platform: "linkedin" | "instagram";
-  imageType: ImageType | null;
   headline: string;
   keyPoints?: string;
   colorMode: "brand" | "custom" | "mood";
