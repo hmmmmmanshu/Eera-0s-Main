@@ -80,10 +80,6 @@ const MarketingHub = () => {
                   <Plus className="h-5 w-5" />
                   Create Post
                 </Button>
-                <Button size="lg" className="gap-2">
-                  <Zap className="h-5 w-5" />
-                  Run Next Action
-                </Button>
               </div>
             </div>
 

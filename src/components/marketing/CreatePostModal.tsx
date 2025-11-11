@@ -205,7 +205,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         primary: (profile.color_palette as any)?.primary,
         accent: (profile.color_palette as any)?.secondary,
       } : undefined;
-      
+
       // Create post record in database with "generating" status
       const postData = {
         platform,
@@ -251,7 +251,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         colorMode,
         customColors: colorMode === "custom" ? customColors || undefined : undefined,
         brandColors: colorMode === "brand" ? brandColors : undefined,
-        tone,
+            tone,
         aspectRatio,
       });
       
@@ -286,23 +286,28 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setIsGenerating(false);
     }
   };
-  
+
   // Handle image selection
   const handleSelectImage = async (imageUrl: string) => {
     setSelectedImageUrl(imageUrl);
     
     if (currentPostId) {
       try {
+        // Only save selected_image_url, NOT final_image_url
+        // final_image_url will be set only when user finalizes in Step 3
+        // This keeps the post in "Drafts" until finalized
         await updatePostMutation.mutateAsync({
           id: currentPostId,
           updates: {
             selected_image_url: imageUrl,
-            final_image_url: imageUrl,
-            status: "draft",
-            media_urls: [imageUrl], // Update media_urls to selected image
+            // Keep generated_images array intact - all images remain visible
+            // Don't set final_image_url here - only in Step 3 when finalizing
+            status: "draft", // Keep as draft until finalized
+            media_urls: [imageUrl], // Update media_urls to selected image for preview
           },
         });
-        console.log("[Step 2] Image selected and saved:", imageUrl);
+        console.log("[Step 2] Image selected (not finalized yet):", imageUrl);
+        console.log("[Step 2] Post remains in Drafts until finalized in Step 3");
       } catch (error) {
         console.error("[Step 2] Failed to save selected image:", error);
         toast.error("Failed to save selection");
@@ -375,16 +380,21 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setRefinementCount(newRefinementCount);
       
       // Update post in database
+      // Refined images should move to "Ready" section
       if (currentPostId) {
         await updatePostMutation.mutateAsync({
           id: currentPostId,
           updates: {
             refined_image_url: refinedResult.url,
             refinement_count: newRefinementCount,
-            final_image_url: refinedResult.url, // Also update final_image_url
+            final_image_url: refinedResult.url, // This moves post to "Ready" section
+            selected_image_url: refinedResult.url, // Also update selected
             media_urls: [refinedResult.url], // Update media_urls
+            // Keep generated_images array intact - all original images remain visible
           } as any,
         });
+        
+        console.log("[Step 3] Image refined - post moved to Ready section");
       }
       
       toast.success(`Image refined! (${newRefinementCount}/2)`);
@@ -395,7 +405,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setIsRefining(false);
     }
   };
-  
+
   // Handle finalization - Use This Image or Schedule Post
   const handleFinalizePost = async () => {
     if (!currentPostId || !currentImageUrl) {
@@ -405,14 +415,17 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
     try {
       // Update post with final image and caption
+      // Setting final_image_url moves the post to "Ready" section
       const finalCaption = editedCaption || generatedCaption?.caption || headline;
       await updatePostMutation.mutateAsync({
         id: currentPostId,
         updates: {
-          final_image_url: currentImageUrl,
-          status: "draft",
+          final_image_url: currentImageUrl, // This moves post to "Ready"
+          selected_image_url: currentImageUrl, // Also update selected_image_url
+          status: "draft", // Keep as draft (not published yet)
           media_urls: [currentImageUrl],
           content: finalCaption,
+          // Keep generated_images array intact - all images remain visible
           // Store caption in content field (final_caption field doesn't exist in schema)
           ...({
             final_caption: finalCaption,
@@ -420,6 +433,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         } as any,
       });
       
+      console.log("[Step 3] Post finalized - moved to Ready section");
       toast.success("Post saved successfully!");
       resetAndClose();
     } catch (error) {
@@ -594,7 +608,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     setPlatform("linkedin");
                     setValidationErrors(prev => ({ ...prev, platform: "" }));
                   }}
-                >
+              >
                   <CardContent className="p-3 text-center space-y-1">
                     <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                     platform === "linkedin" ? "bg-accent/20" : "bg-primary/10"
@@ -614,7 +628,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     setPlatform("instagram");
                     setValidationErrors(prev => ({ ...prev, platform: "" }));
                   }}
-                >
+              >
                   <CardContent className="p-3 text-center space-y-1">
                     <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                     platform === "instagram" ? "bg-accent/20" : "bg-primary/10"
@@ -651,14 +665,14 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             {/* Key Points Input (Optional) */}
                 <div className="space-y-2">
               <Label htmlFor="keypoints">Additional details (optional)</Label>
-                  <Textarea 
-                id="keypoints" 
+                <Textarea 
+                  id="keypoints" 
                 placeholder="Thank you to everyone who believed in us"
                 rows={3}
-                value={keyPoints}
-                onChange={(e) => setKeyPoints(e.target.value)}
-              />
-                </div>
+                  value={keyPoints}
+                  onChange={(e) => setKeyPoints(e.target.value)}
+                />
+              </div>
 
             {/* Aspect Ratio */}
             <div className="space-y-2">
@@ -939,7 +953,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                               src={image.url} 
                               alt={`Generated image ${index + 1}`}
                               className="w-full h-full object-cover"
-                            />
+                    />
                             {isSelected && (
                               <div className="absolute top-2 right-2 w-8 h-8 bg-accent rounded-full flex items-center justify-center">
                                 <CheckCircle className="w-5 h-5 text-accent-foreground" />
@@ -986,7 +1000,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     )}
                 </div>
                 )}
-
+                
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4">
               <Button
@@ -1081,7 +1095,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     variant={refinementColorMode === "warmer" ? "default" : "outline"}
                     onClick={() => setRefinementColorMode("warmer")}
                     className="w-full"
-                  >
+                            >
                     Warmer
                             </Button>
                             <Button 
@@ -1089,7 +1103,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     variant={refinementColorMode === "cooler" ? "default" : "outline"}
                     onClick={() => setRefinementColorMode("cooler")}
                     className="w-full"
-                  >
+                            >
                     Cooler
                             </Button>
                             <Button 
@@ -1097,7 +1111,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     variant={refinementColorMode === "brand" ? "default" : "outline"}
                     onClick={() => setRefinementColorMode("brand")}
                     className="w-full"
-                  >
+                            >
                     Brand
                             </Button>
                             <Button 
