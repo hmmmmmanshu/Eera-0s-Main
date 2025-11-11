@@ -494,10 +494,6 @@ function getMoodColors(headline: string, tone: string): string {
     witty: "playful energetic colors",
   };
   
-  if (imageType && moodMap[imageType]) {
-    return moodMap[imageType];
-  }
-  
   if (tone && toneMap[tone.toLowerCase()]) {
     return toneMap[tone.toLowerCase()];
   }
