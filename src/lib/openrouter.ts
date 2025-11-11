@@ -326,7 +326,7 @@ export async function generateImage(
 ): Promise<GeneratedImage> {
   const { model, prompt, aspectRatio = "1:1", brandContext, imageType, accountType, colorConfig, objective, tone } = options;
 
-  console.log("[OpenRouter Image] Starting generation:", { model, prompt, aspectRatio, imageType, accountType, colorConfig });
+  console.log("[OpenRouter Image] Starting generation:", { model, prompt, aspectRatio, accountType, colorConfig });
 
   const startTime = Date.now();
   const apiKey = getOpenRouterKey();
@@ -337,7 +337,7 @@ export async function generateImage(
     prompt, 
     brandContext, 
     platform, 
-    imageType,
+    undefined, // imageType removed - no longer used
     {
       accountType,
       colorConfig,
@@ -528,7 +528,7 @@ export async function generateImageWithFallback(
       const result = await generateWithGeminiSimple({
         accountType: options.accountType,
         platform: options.platform,
-        imageType: options.imageType as any,
+        // imageType removed - no longer used
         headline: headline,
         keyPoints: keyPoints,
         colorMode: options.colorConfig?.mode || "brand",
