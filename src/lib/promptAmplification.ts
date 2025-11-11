@@ -11,7 +11,7 @@ import { IMAGE_TYPE_PRESETS } from "./imageTypePresets";
 export interface AmplificationContext {
   accountType: "personal" | "company";
   platform: "linkedin" | "instagram";
-  imageType: ImageType | null;
+  imageType?: ImageType | null; // Made optional since we removed imageType feature
   userInput: {
     headline: string;
     keyPoints?: string;
@@ -696,7 +696,7 @@ export async function amplifyPromptForNanoBanana(
   visualCues: string[];
   mood: string;
 }> {
-  const { userInput, imageType, platform } = context;
+  const { userInput, imageType = null, platform } = context; // Default to null if not provided
 
   // Step 1: Extract intent
   const { intent, visualCues, mood, narrative } = extractIntent(

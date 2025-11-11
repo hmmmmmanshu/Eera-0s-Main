@@ -799,7 +799,7 @@ export async function enhanceImagePrompt(
       const amplified = await amplifyPromptForNanoBanana({
         accountType: amplificationContext.accountType || "company",
         platform,
-        imageType: imageType as any,
+        // imageType removed - no longer used, function will default to null
         userInput: {
           headline,
           keyPoints,
