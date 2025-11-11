@@ -324,7 +324,8 @@ export async function generateText(
 export async function generateImage(
   options: ImageGenerationOptions
 ): Promise<GeneratedImage> {
-  const { model, prompt, aspectRatio = "1:1", brandContext, imageType, accountType, colorConfig, objective, tone } = options;
+  const { model, prompt, aspectRatio = "1:1", brandContext, accountType, colorConfig, objective, tone } = options;
+  // imageType removed - no longer used
 
   console.log("[OpenRouter Image] Starting generation:", { model, prompt, aspectRatio, accountType, colorConfig });
 
