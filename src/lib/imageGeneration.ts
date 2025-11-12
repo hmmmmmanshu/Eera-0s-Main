@@ -433,13 +433,20 @@ export async function generateWithGeminiSimple(params: {
   tone: string;
   styleVariation?: "minimal" | "bold" | "elegant";
   aspectRatio: "1:1" | "4:5" | "16:9" | "9:16";
+  professionalSettings?: import("./professionalKeywords").ProfessionalKeywordSettings;
+  imageType?: import("../types/imageTypes").ImageType | null;
+  brandProfile?: {
+    industry?: string;
+    style?: string;
+    mood?: string[];
+  };
 }): Promise<{ url: string; prompt: string }> {
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
   if (!API_KEY) {
     throw new Error("VITE_GEMINI_API_KEY is required for image generation");
   }
 
-  // Build simplified prompt (50-80 words)
+  // Build simplified prompt (50-80 words base, 80-120 words with professional enhancements)
   const simplePrompt = buildSimpleGeminiPrompt({
     accountType: params.accountType,
     platform: params.platform,
@@ -451,6 +458,9 @@ export async function generateWithGeminiSimple(params: {
     tone: params.tone,
     styleVariation: params.styleVariation || "minimal",
     aspectRatio: params.aspectRatio,
+    professionalSettings: params.professionalSettings,
+    imageType: params.imageType,
+    brandProfile: params.brandProfile,
   });
 
   console.log("[Gemini Simple] Using simplified prompt:", simplePrompt);
@@ -574,6 +584,13 @@ export async function generateImageVariations(params: {
   brandColors?: { primary: string; accent: string };
   tone: string;
   aspectRatio: "1:1" | "4:5" | "16:9" | "9:16";
+  professionalSettings?: import("./professionalKeywords").ProfessionalKeywordSettings;
+  imageType?: import("../types/imageTypes").ImageType | null;
+  brandProfile?: {
+    industry?: string;
+    style?: string;
+    mood?: string[];
+  };
 }): Promise<Array<{
   url: string;
   style: "minimal" | "bold" | "elegant";
@@ -595,6 +612,9 @@ export async function generateImageVariations(params: {
     buildSimpleGeminiPrompt({
       ...baseParams,
       styleVariation: style,
+      professionalSettings: params.professionalSettings,
+      imageType: params.imageType,
+      brandProfile: params.brandProfile,
     })
   );
   
@@ -611,6 +631,9 @@ export async function generateImageVariations(params: {
       const result = await generateWithGeminiSimple({
         ...baseParams,
         styleVariation: style,
+        professionalSettings: params.professionalSettings,
+        imageType: params.imageType,
+        brandProfile: params.brandProfile,
       });
       
       const generationTime = Date.now() - startTime;

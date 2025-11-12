@@ -7,6 +7,8 @@
 import type { ImageType } from "@/types/imageTypes";
 import type { BrandContext } from "./brandContext";
 import { IMAGE_TYPE_PRESETS } from "./imageTypePresets";
+import { getProfessionalKeywords, type ProfessionalKeywordSettings } from "./professionalKeywords";
+import { getSmartDefaults, type SmartDefaultsContext } from "./professionalDefaults";
 
 export interface AmplificationContext {
   accountType: "personal" | "company";
@@ -546,8 +548,9 @@ function getAtmosphere(headline: string, tone: string): string {
 }
 
 /**
- * Build simple, concise prompt for Gemini image generation (50-80 words)
+ * Build simple, concise prompt for Gemini image generation (50-80 words base, 80-120 words with professional enhancements)
  * Optimized for founder/startup content with natural language
+ * Supports optional professional enhancement settings for higher quality images
  */
 export function buildSimpleGeminiPrompt(params: {
   accountType: "personal" | "company";
@@ -560,6 +563,13 @@ export function buildSimpleGeminiPrompt(params: {
   tone: string;
   styleVariation: "minimal" | "bold" | "elegant";
   aspectRatio: "1:1" | "4:5" | "16:9" | "9:16";
+  professionalSettings?: ProfessionalKeywordSettings;
+  imageType?: ImageType | null;
+  brandProfile?: {
+    industry?: string;
+    style?: string;
+    mood?: string[];
+  };
 }): string {
   const {
     accountType,
@@ -572,26 +582,71 @@ export function buildSimpleGeminiPrompt(params: {
     tone,
     styleVariation,
     aspectRatio,
+    professionalSettings,
+    imageType,
+    brandProfile,
   } = params;
+  
+  // Get professional settings (use provided or smart defaults)
+  let effectiveProfessionalSettings: ProfessionalKeywordSettings | undefined = professionalSettings;
+  
+  if (!effectiveProfessionalSettings) {
+    // Use smart defaults based on context
+    const smartDefaultsContext: SmartDefaultsContext = {
+      accountType,
+      platform,
+      imageType: imageType || undefined,
+      tone,
+      brandProfile,
+    };
+    const smartDefaults = getSmartDefaults(smartDefaultsContext);
+    effectiveProfessionalSettings = smartDefaults;
+  }
+  
+  // Get professional keywords
+  const professionalKeywords = getProfessionalKeywords(effectiveProfessionalSettings);
   
   // 1. Opening: Professional social media image for [platform], showing [actual headline content]
   const whatToShow = getWhatToShow(headline, keyPoints);
   const opening = `Professional social media image for ${platform}, showing ${whatToShow}`;
   
-  // 2. Account Type Context
-  const accountContext = accountType === "personal"
+  // 2. Account Type Context (with industry aesthetic if available)
+  let accountContext = accountType === "personal"
     ? "Authentic founder moment, relatable and human"
     : "Polished corporate brand style";
   
-  // 3. Style based on styleVariation
+  // Add industry aesthetic keywords if available
+  if (effectiveProfessionalSettings?.industryAesthetic && professionalKeywords.length > 0) {
+    const industryKeywords = professionalKeywords.filter(k => 
+      k.includes("tech") || k.includes("finance") || k.includes("creative") || 
+      k.includes("healthcare") || k.includes("e-commerce") || k.includes("consulting") || 
+      k.includes("startup")
+    );
+    if (industryKeywords.length > 0) {
+      accountContext += `, ${industryKeywords.slice(0, 2).join(", ")}`;
+    }
+  }
+  
+  // 3. Style based on styleVariation (enhanced with design sophistication)
   const styleMap: Record<"minimal" | "bold" | "elegant", string> = {
     minimal: "Modern minimal style, clean centered composition",
     bold: "Bold graphic style, vibrant colors, eye-catching design",
     elegant: "Elegant professional style, sophisticated design",
   };
-  const style = styleMap[styleVariation];
+  let style = styleMap[styleVariation];
   
-  // 4. Colors based on colorMode
+  // Add design sophistication keywords
+  if (effectiveProfessionalSettings?.designSophistication && professionalKeywords.length > 0) {
+    const designKeywords = professionalKeywords.filter(k => 
+      k.includes("design") || k.includes("sophisticated") || k.includes("elegant") || 
+      k.includes("minimal") || k.includes("editorial") || k.includes("refined")
+    );
+    if (designKeywords.length > 0) {
+      style += `, ${designKeywords.slice(0, 2).join(", ")}`;
+    }
+  }
+  
+  // 4. Colors based on colorMode (enhanced with color grading)
   let colors = "";
   if (colorMode === "brand" && brandColors) {
     const primaryColor = hexToColorName(brandColors.primary);
@@ -610,8 +665,31 @@ export function buildSimpleGeminiPrompt(params: {
     colors = getMoodColors(headline, tone);
   }
   
-  // 5. Mood/Atmosphere
-  const atmosphere = getAtmosphere(headline, tone);
+  // Add color grading keywords
+  if (effectiveProfessionalSettings?.colorGrading && professionalKeywords.length > 0) {
+    const colorKeywords = professionalKeywords.filter(k => 
+      k.includes("color") || k.includes("grading") || k.includes("tones") || 
+      k.includes("warm") || k.includes("cool") || k.includes("contrast")
+    );
+    if (colorKeywords.length > 0) {
+      colors += ` with ${colorKeywords.slice(0, 2).join(", ")}`;
+    }
+  }
+  
+  // 5. Mood/Atmosphere (enhanced with photography style)
+  let atmosphere = getAtmosphere(headline, tone);
+  
+  // Add photography style keywords
+  if (effectiveProfessionalSettings?.photographyStyle && professionalKeywords.length > 0) {
+    const photoKeywords = professionalKeywords.filter(k => 
+      k.includes("lighting") || k.includes("photography") || k.includes("studio") || 
+      k.includes("natural") || k.includes("golden") || k.includes("dramatic") ||
+      k.includes("portrait") || k.includes("documentary") || k.includes("flat")
+    );
+    if (photoKeywords.length > 0) {
+      atmosphere += `, ${photoKeywords.slice(0, 3).join(", ")}`;
+    }
+  }
   
   // 6. Layout Hint
   const layoutHint = "Clean space for headline text overlay on top";
@@ -625,13 +703,25 @@ export function buildSimpleGeminiPrompt(params: {
     ? "landscape format (16:9 aspect ratio)"
     : "vertical format (9:16 aspect ratio)";
   
-  // 8. Quality - detect from headline content
-  const headlineLower = headline.toLowerCase();
-  const quality = headlineLower.includes("product") || headlineLower.includes("photo") || headlineLower.includes("showcase")
-    ? "High-quality professional photography quality"
-    : "High-quality professional design quality";
+  // 8. Quality - use professional settings quality level if available
+  let quality = "";
+  if (effectiveProfessionalSettings?.qualityLevel) {
+    const qualityKeywords = professionalKeywords.filter(k => 
+      k.includes("quality") || k.includes("professional") || k.includes("studio") || 
+      k.includes("cinematic") || k.includes("premium") || k.includes("magazine")
+    );
+    quality = qualityKeywords.length > 0 
+      ? qualityKeywords.slice(0, 2).join(", ")
+      : "High-quality professional photography quality";
+  } else {
+    // Fallback to headline-based detection
+    const headlineLower = headline.toLowerCase();
+    quality = headlineLower.includes("product") || headlineLower.includes("photo") || headlineLower.includes("showcase")
+      ? "High-quality professional photography quality"
+      : "High-quality professional design quality";
+  }
   
-  // Assemble the prompt
+  // Assemble the base prompt
   const promptParts = [
     opening,
     accountContext,
@@ -645,12 +735,49 @@ export function buildSimpleGeminiPrompt(params: {
   
   let prompt = promptParts.join(". ") + ".";
   
-  // Ensure word count is between 50-80 words
-  const wordCount = prompt.split(/\s+/).length;
+  // Add professional enhancements section if professional settings are provided
+  if (effectiveProfessionalSettings && professionalKeywords.length > 0) {
+    // Get platform standard keywords
+    const platformKeywords = professionalKeywords.filter(k => 
+      k.includes("platform") || k.includes("professional") || k.includes("B2B") || 
+      k.includes("corporate") || k.includes("Instagram") || k.includes("LinkedIn") ||
+      k.includes("authentic") || k.includes("premium")
+    );
+    
+    // Get remaining keywords (quality, post-processing, etc.)
+    const remainingKeywords = professionalKeywords.filter(k => 
+      !k.includes("lighting") && !k.includes("photography") && !k.includes("design") &&
+      !k.includes("color") && !k.includes("grading") && !k.includes("platform") &&
+      !k.includes("tech") && !k.includes("finance") && !k.includes("creative")
+    );
+    
+    // Build professional enhancements section
+    const enhancements: string[] = [];
+    
+    if (platformKeywords.length > 0) {
+      enhancements.push(platformKeywords.slice(0, 2).join(", "));
+    }
+    
+    if (remainingKeywords.length > 0) {
+      enhancements.push(remainingKeywords.slice(0, 3).join(", "));
+    }
+    
+    // Add standard post-processing keywords
+    enhancements.push("sharp focus, balanced exposure, refined contrast");
+    
+    if (enhancements.length > 0) {
+      prompt += ` Professional enhancements: ${enhancements.join("; ")}.`;
+    }
+  }
   
-  if (wordCount > 80) {
-    // Trim if too long - remove less critical parts
-    prompt = [
+  // Ensure word count is appropriate (50-80 words base, 80-120 words with enhancements)
+  const wordCount = prompt.split(/\s+/).length;
+  const targetMax = effectiveProfessionalSettings ? 120 : 80;
+  const targetMin = effectiveProfessionalSettings ? 80 : 50;
+  
+  if (wordCount > targetMax) {
+    // Trim if too long - prioritize most important keywords
+    const trimmedPrompt = [
       opening,
       accountContext,
       style,
@@ -659,14 +786,23 @@ export function buildSimpleGeminiPrompt(params: {
       aspectRatioDesc,
       quality,
     ].join(". ") + ".";
+    
+    // Add only essential professional keywords if available
+    if (effectiveProfessionalSettings && professionalKeywords.length > 0) {
+      const essentialKeywords = professionalKeywords.slice(0, 5).join(", ");
+      prompt = trimmedPrompt + ` Professional: ${essentialKeywords}.`;
+    } else {
+      prompt = trimmedPrompt;
+    }
   }
   
-  if (wordCount < 50) {
+  if (wordCount < targetMin) {
     // Add more detail if too short
     const additionalDetail = keyPoints 
       ? ` Highlighting ${keyPoints.split(/[,\n]/)[0].trim().toLowerCase()}`
       : "";
-    prompt = [
+    
+    const basePrompt = [
       opening,
       accountContext,
       style,
@@ -675,6 +811,14 @@ export function buildSimpleGeminiPrompt(params: {
       layoutHint,
       quality + additionalDetail,
     ].join(". ") + ".";
+    
+    // Add professional keywords if available
+    if (effectiveProfessionalSettings && professionalKeywords.length > 0) {
+      const extraKeywords = professionalKeywords.slice(0, 4).join(", ");
+      prompt = basePrompt + ` Enhanced with: ${extraKeywords}.`;
+    } else {
+      prompt = basePrompt;
+    }
   }
   
   return prompt;

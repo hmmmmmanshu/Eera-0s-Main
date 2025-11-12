@@ -45,6 +45,11 @@ import { assembleBrandContext } from "@/lib/brandContext";
 import { generatePostContent, type GeneratedPostContent } from "@/lib/gemini";
 import { generateImageVariations, generateWithGeminiSimple } from "@/lib/imageGeneration";
 
+// Professional Enhancement
+import { ProfessionalEnhancementDialog } from "./ProfessionalEnhancementDialog";
+import { getSmartDefaults, type ProfessionalSettings } from "@/lib/professionalDefaults";
+import type { ImageType } from "@/types/imageTypes";
+
 // Image Type System - REMOVED (no longer using image types)
 
 interface CreatePostModalProps {
@@ -124,6 +129,11 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [editedCaption, setEditedCaption] = useState<string>("");
   const [isRefining, setIsRefining] = useState(false);
 
+  // Professional Enhancement state
+  const [showProfessionalDialog, setShowProfessionalDialog] = useState(false);
+  const [professionalSettings, setProfessionalSettings] = useState<ProfessionalSettings | null>(null);
+  const [isRegeneratingWithProfessional, setIsRegeneratingWithProfessional] = useState(false);
+
   // Auto-save form data to localStorage (do not persist step to avoid auto-resume)
   useEffect(() => {
     if (open) {
@@ -164,6 +174,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setEditedCaption("");
       setIsRefining(false);
       setIsGenerating(false);
+      setShowProfessionalDialog(false);
+      setProfessionalSettings(null);
+      setIsRegeneratingWithProfessional(false);
     }
   }, [open]);
 
@@ -207,7 +220,8 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       } : undefined;
 
       // Create post record in database with "generating" status
-      const postData = {
+      // Include professional settings if available (from smart defaults or previous application)
+      const postData: any = {
         platform,
         content: headline,
         media_urls: [],
@@ -225,10 +239,22 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         refinement_count: 0,
         account_type: accountType,
       };
+
+      // Add professional settings if available
+      if (professionalSettings) {
+        postData.professional_settings = professionalSettings;
+        postData.professional_enhanced = true;
+        postData.professional_settings_applied_at = new Date().toISOString();
+      } else {
+        postData.professional_enhanced = false;
+      }
       
       const createdPost = await createPostMutation.mutateAsync(postData);
       setCurrentPostId(createdPost.id);
       console.log("[Step 2] Post created with generating status:", createdPost.id);
+      if (professionalSettings) {
+        console.log("[Step 2] Professional settings included in draft creation");
+      }
       
       // Generate caption in parallel with images
       const captionPromise = generatePostContent({
@@ -241,7 +267,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         brandContext,
       });
       
-      // Generate images
+      // Generate images (with professional settings if available)
       const imagesPromise = generateImageVariations({
         count: imageCount,
         accountType,
@@ -251,8 +277,15 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         colorMode,
         customColors: colorMode === "custom" ? customColors || undefined : undefined,
         brandColors: colorMode === "brand" ? brandColors : undefined,
-            tone,
+        tone,
         aspectRatio,
+        professionalSettings: professionalSettings || undefined,
+        imageType: null, // Image type not currently used
+        brandProfile: profile ? {
+          industry: profile.industry || undefined,
+          style: profile.design_philosophy || undefined,
+          mood: profile.tone_personality || undefined,
+        } : undefined,
       });
       
       // Wait for both to complete
@@ -271,7 +304,12 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           generated_images: imageUrls, // Save all generated images
           media_urls: imageUrls, // Also update media_urls for compatibility
           status: "draft", // Change from "generating" to "draft" when images are ready
-        },
+          // Professional settings already saved during draft creation, but ensure they're preserved
+          ...(professionalSettings ? {
+            professional_settings: professionalSettings,
+            professional_enhanced: true,
+          } : {}),
+        } as any,
       });
       
       console.log("[Step 2] All", imageUrls.length, "images saved automatically to database");
@@ -360,7 +398,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n" : "") + "Use cool color tones (blues, purples, greens)";
       }
       
-      // Generate refined image with adjusted parameters
+      // Generate refined image with adjusted parameters (include professional settings if available)
       const refinedResult = await generateWithGeminiSimple({
         accountType,
         platform,
@@ -372,6 +410,13 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         tone: adjustedTone,
         styleVariation: "minimal", // Use minimal for refinements
         aspectRatio,
+        professionalSettings: professionalSettings || undefined,
+        imageType: null,
+        brandProfile: profile ? {
+          industry: profile.industry || undefined,
+          style: profile.design_philosophy || undefined,
+          mood: profile.tone_personality || undefined,
+        } : undefined,
       });
       
       // Update current image
@@ -473,6 +518,13 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         brandColors: colorMode === "brand" ? brandColors : undefined,
         tone,
         aspectRatio,
+        professionalSettings: professionalSettings || undefined,
+        imageType: null, // Image type not currently used
+        brandProfile: profile ? {
+          industry: profile.industry || undefined,
+          style: profile.design_philosophy || undefined,
+          mood: profile.tone_personality || undefined,
+        } : undefined,
       });
       
       setGeneratedImages(images);
@@ -499,6 +551,205 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       toast.error(`Generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Handle professional enhancement apply
+  const handleProfessionalEnhancementApply = async (settings: ProfessionalSettings) => {
+    if (!profile || !accountType || !platform || !headline) {
+      toast.error("Missing required information");
+      return;
+    }
+
+    setProfessionalSettings(settings);
+    setIsRegeneratingWithProfessional(true);
+    setImageGenerationStatus("generating");
+    setGenerationProgress({ completed: 0, total: imageCount });
+    setSelectedImageUrl(null);
+    setGenerationError(null);
+    setShowProfessionalDialog(false);
+
+    try {
+      const brandContext = assembleBrandContext(profile);
+      const brandColors = profile.color_palette ? {
+        primary: (profile.color_palette as any)?.primary,
+        accent: (profile.color_palette as any)?.secondary,
+      } : undefined;
+
+      // Regenerate images with professional settings
+      const images = await generateImageVariations({
+        count: imageCount,
+        accountType,
+        platform,
+        headline,
+        keyPoints: keyPoints || undefined,
+        colorMode,
+        customColors: colorMode === "custom" ? customColors || undefined : undefined,
+        brandColors: colorMode === "brand" ? brandColors : undefined,
+        tone,
+        aspectRatio,
+        professionalSettings: settings,
+        imageType: null, // Image type not currently used
+        brandProfile: {
+          industry: profile.industry || undefined,
+          style: profile.design_philosophy || undefined,
+          mood: profile.tone_personality || undefined,
+        },
+      });
+
+      setGeneratedImages(images);
+      setImageGenerationStatus("complete");
+      setGenerationProgress({ completed: images.length, total: imageCount });
+
+      // Update post with new professional-enhanced images
+      if (currentPostId) {
+        const imageUrls = images.map(img => img.url);
+        await updatePostMutation.mutateAsync({
+          id: currentPostId,
+          updates: {
+            generated_images: imageUrls,
+            media_urls: imageUrls,
+            image_count: imageCount,
+            // Store professional settings
+            professional_settings: settings,
+            professional_enhanced: true,
+            professional_settings_applied_at: new Date().toISOString(),
+          } as any,
+        });
+      }
+
+      toast.success("Images regenerated with professional enhancements!");
+    } catch (error) {
+      console.error("[Step 2] Professional enhancement regeneration failed:", error);
+      setImageGenerationStatus("error");
+      setGenerationError(error instanceof Error ? error.message : "Failed to regenerate images");
+      toast.error(`Regeneration failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsRegeneratingWithProfessional(false);
+      setIsGenerating(false);
+    }
+  };
+
+  // Handle professional enhancement skip
+  const handleProfessionalEnhancementSkip = () => {
+    // Use smart defaults automatically
+    if (profile && accountType && platform) {
+      const smartDefaults = getSmartDefaults({
+        accountType,
+        platform,
+        imageType: null,
+        tone,
+        brandProfile: {
+          industry: profile.industry || undefined,
+          style: profile.design_philosophy || undefined,
+          mood: profile.tone_personality || undefined,
+        },
+      });
+      setProfessionalSettings(smartDefaults);
+    }
+    setShowProfessionalDialog(false);
+  };
+
+  // Handle professional enhancement apply for Step 3 (single image regeneration)
+  const handleProfessionalEnhancementApplyStep3 = async (settings: ProfessionalSettings) => {
+    if (!profile || !accountType || !platform || !headline || !currentImageUrl) {
+      toast.error("Missing required information");
+      return;
+    }
+
+    setProfessionalSettings(settings);
+    setIsRegeneratingWithProfessional(true);
+    setIsRefining(true);
+    setShowProfessionalDialog(false);
+
+    try {
+      const brandContext = assembleBrandContext(profile);
+      const brandColors = profile.color_palette ? {
+        primary: (profile.color_palette as any)?.primary,
+        accent: (profile.color_palette as any)?.secondary,
+      } : undefined;
+
+      // Determine color mode based on refinement settings
+      let finalColorMode: "brand" | "custom" | "mood" = colorMode;
+      let finalCustomColors = customColors;
+
+      if (refinementColorMode === "warmer") {
+        finalColorMode = "mood";
+      } else if (refinementColorMode === "cooler") {
+        finalColorMode = "mood";
+      } else if (refinementColorMode === "brand") {
+        finalColorMode = "brand";
+      } else if (refinementColorMode === "custom") {
+        finalColorMode = "custom";
+        finalCustomColors = refinementCustomColors || customColors || { primary: "#3B82F6", accent: "#8B5CF6" };
+      }
+
+      // Determine tone based on style slider
+      const adjustedTone = styleSliderValue < 50 
+        ? "professional" 
+        : styleSliderValue < 75 
+        ? "humble" 
+        : "quirky";
+
+      // Add color temperature context to keyPoints
+      let enhancedKeyPoints = keyPoints || "";
+      if (refinementColorMode === "warmer") {
+        enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n" : "") + "Use warm color tones (oranges, reds, yellows)";
+      } else if (refinementColorMode === "cooler") {
+        enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n" : "") + "Use cool color tones (blues, purples, greens)";
+      }
+
+      // Regenerate single image with professional settings
+      const refinedResult = await generateWithGeminiSimple({
+        accountType,
+        platform,
+        headline,
+        keyPoints: enhancedKeyPoints || undefined,
+        colorMode: finalColorMode,
+        customColors: finalColorMode === "custom" ? finalCustomColors : undefined,
+        brandColors: finalColorMode === "brand" ? brandColors : undefined,
+        tone: adjustedTone,
+        styleVariation: "minimal", // Use minimal for refinements
+        aspectRatio,
+        professionalSettings: settings,
+        imageType: null,
+        brandProfile: {
+          industry: profile.industry || undefined,
+          style: profile.design_philosophy || undefined,
+          mood: profile.tone_personality || undefined,
+        },
+      });
+
+      // Update current image
+      setCurrentImageUrl(refinedResult.url);
+
+      // Update post in database (keep refinement count, don't increment)
+      if (currentPostId) {
+        await updatePostMutation.mutateAsync({
+          id: currentPostId,
+          updates: {
+            refined_image_url: refinedResult.url,
+            final_image_url: refinedResult.url,
+            selected_image_url: refinedResult.url,
+            media_urls: [refinedResult.url],
+            // Keep refinement_count unchanged
+            // Store professional settings (will be added to schema)
+            ...({
+              professional_settings: settings,
+              professional_enhanced: true,
+              professional_settings_applied_at: new Date().toISOString(),
+            } as any),
+          } as any,
+        });
+      }
+
+      toast.success("Image regenerated with professional enhancements!");
+    } catch (error) {
+      console.error("[Step 3] Professional enhancement regeneration failed:", error);
+      toast.error(`Regeneration failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsRegeneratingWithProfessional(false);
+      setIsRefining(false);
     }
   };
 
@@ -1002,33 +1253,71 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 )}
                 
                 {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
-              <Button
-                variant="outline"
-                className="flex-1"
-                    onClick={() => setStep(1)}
-              >
-                Back
-              </Button>
+                <div className="flex flex-col gap-3 pt-4">
+                  {/* Professional Enhancement Button */}
                   <Button 
                     variant="outline"
-                    onClick={handleGenerateMore}
-                    disabled={isGenerating}
+                    onClick={() => setShowProfessionalDialog(true)}
+                    disabled={isGenerating || isRegeneratingWithProfessional}
+                    className="w-full gap-2"
                   >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Generate More
+                    <Settings className="w-4 h-4" />
+                    Enhance with Professional Settings
+                    {professionalSettings && (
+                      <Badge variant="secondary" className="ml-2">Applied</Badge>
+                    )}
                   </Button>
-                  <Button 
-                    className="flex-1"
-                    onClick={() => setStep(3)}
-                    disabled={!selectedImageUrl}
-                  >
-                    Continue
-              </Button>
-            </div>
+                  
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setStep(1)}
+                    >
+                      Back
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={handleGenerateMore}
+                      disabled={isGenerating || isRegeneratingWithProfessional}
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Generate More
+                    </Button>
+                    <Button 
+                      className="flex-1"
+                      onClick={() => setStep(3)}
+                      disabled={!selectedImageUrl || isGenerating || isRegeneratingWithProfessional}
+                    >
+                      Continue
+                    </Button>
+                  </div>
+                </div>
               </>
             )}
           </div>
+        )}
+
+        {/* Professional Enhancement Dialog */}
+        {profile && accountType && (
+          <ProfessionalEnhancementDialog
+            open={showProfessionalDialog}
+            onOpenChange={setShowProfessionalDialog}
+            onApply={step === 2 ? handleProfessionalEnhancementApply : handleProfessionalEnhancementApplyStep3}
+            onSkip={handleProfessionalEnhancementSkip}
+            initialSettings={professionalSettings || undefined}
+            context={{
+              accountType,
+              platform,
+              imageType: null, // Image type not currently used
+              tone,
+              brandProfile: {
+                industry: profile.industry || undefined,
+                style: profile.design_philosophy || undefined,
+                mood: profile.tone_personality || undefined,
+              },
+            }}
+          />
         )}
 
         {/* Step 3: Refinement Screen */}
@@ -1067,6 +1356,24 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
             {/* Refinement Controls */}
             <div className="space-y-6 pt-4 border-t">
+              {/* Professional Enhancement Button */}
+              <div className="flex items-center justify-between pb-2">
+                <Label className="text-base font-semibold">Refinement Options</Label>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowProfessionalDialog(true)}
+                  disabled={isRefining || isRegeneratingWithProfessional}
+                  className="gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  Professional Settings
+                  {professionalSettings && (
+                    <Badge variant="secondary" className="ml-1">Applied</Badge>
+                  )}
+                </Button>
+              </div>
+
               {/* Style Slider */}
               <div className="space-y-3">
                 <Label>Style</Label>

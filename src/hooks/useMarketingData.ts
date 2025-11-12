@@ -62,6 +62,10 @@ export interface MarketingPost {
   aspect_ratio?: "1:1" | "4:5" | "16:9" | "9:16" | null;
   image_count?: number;
   account_type?: "personal" | "company" | null;
+  // Professional enhancement settings
+  professional_settings?: import("../lib/professionalDefaults").ProfessionalSettings | null;
+  professional_enhanced?: boolean;
+  professional_settings_applied_at?: string | null;
 }
 
 export interface MarketingMetric {
@@ -328,6 +332,7 @@ export function useCreateDraftPost() {
       account_type: "personal" | "company";
       aspect_ratio: "1:1" | "4:5" | "16:9" | "9:16";
       image_count: number;
+      professional_settings?: import("../lib/professionalDefaults").ProfessionalSettings | null;
     }) => {
       const {
         data: { user },
@@ -337,7 +342,7 @@ export function useCreateDraftPost() {
         throw new Error("Not authenticated");
       }
 
-      const insertData = {
+      const insertData: any = {
         platform: params.platform,
         content: params.headline,
         media_urls: [],
@@ -354,6 +359,15 @@ export function useCreateDraftPost() {
         generated_images: [],
         refinement_count: 0,
       };
+
+      // Add professional settings if provided
+      if (params.professional_settings) {
+        insertData.professional_settings = params.professional_settings;
+        insertData.professional_enhanced = true;
+        insertData.professional_settings_applied_at = new Date().toISOString();
+      } else {
+        insertData.professional_enhanced = false;
+      }
 
       const { data, error } = await supabase
         .from("marketing_posts")
@@ -383,6 +397,7 @@ export function useCreateDraftPost() {
 /**
  * Updates post with generated images array
  * Updates status to "draft" when all images are complete
+ * Optionally updates professional settings if provided
  */
 export function useUpdatePostImages() {
   const queryClient = useQueryClient();
@@ -392,12 +407,27 @@ export function useUpdatePostImages() {
       post_id: string;
       generated_images: string[];
       media_urls?: string[];
+      professional_settings?: import("../lib/professionalDefaults").ProfessionalSettings | null;
     }) => {
-      const updates: Partial<MarketingPost> = {
+      const updates: any = {
         generated_images: params.generated_images,
         media_urls: params.media_urls || params.generated_images,
         status: "draft" as PostStatus, // Mark as draft when images are ready
       };
+
+      // Add professional settings if provided
+      if (params.professional_settings !== undefined) {
+        if (params.professional_settings) {
+          updates.professional_settings = params.professional_settings;
+          updates.professional_enhanced = true;
+          updates.professional_settings_applied_at = new Date().toISOString();
+        } else {
+          // Explicitly set to null/false if settings are cleared
+          updates.professional_settings = null;
+          updates.professional_enhanced = false;
+          updates.professional_settings_applied_at = null;
+        }
+      }
 
       const { data, error } = await supabase
         .from("marketing_posts")
@@ -412,6 +442,9 @@ export function useUpdatePostImages() {
       }
 
       console.log("[useUpdatePostImages] Updated with", params.generated_images.length, "images");
+      if (params.professional_settings) {
+        console.log("[useUpdatePostImages] Professional settings saved");
+      }
       return data as MarketingPost;
     },
     onSuccess: () => {
