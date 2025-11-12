@@ -35,7 +35,17 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import type {
+  QualityLevel,
+  PhotographyStyle,
+  DesignSophistication,
+  PlatformStandard,
+  IndustryAesthetic,
+  ColorGradingStyle,
+} from "@/lib/professionalKeywords";
 
 // Hooks
 import { useBrandProfile, useCreatePost, useUpdatePost } from "@/hooks/useMarketingData";
@@ -58,6 +68,57 @@ interface CreatePostModalProps {
 }
 
 const FORM_STORAGE_KEY = "eera_create_post_draft";
+
+// Prompt Enhancer Constants (same as ProfessionalEnhancementDialog)
+const PHOTOGRAPHY_STYLES: { value: PhotographyStyle; label: string }[] = [
+  { value: "natural", label: "Natural Lighting" },
+  { value: "studio", label: "Studio Lighting" },
+  { value: "goldenHour", label: "Golden Hour" },
+  { value: "dramatic", label: "Dramatic Lighting" },
+  { value: "flatLay", label: "Flat Lay" },
+  { value: "portrait", label: "Portrait Style" },
+  { value: "documentary", label: "Documentary Style" },
+];
+
+const QUALITY_LEVELS: { value: QualityLevel; label: string; description: string }[] = [
+  { value: "standard", label: "Standard", description: "Current quality" },
+  { value: "professional", label: "Professional", description: "Enhanced lighting, composition" },
+  { value: "premium", label: "Premium", description: "Cinematic, studio-grade, magazine-worthy" },
+];
+
+const DESIGN_SOPHISTICATION_OPTIONS: { value: DesignSophistication; label: string }[] = [
+  { value: "cleanSimple", label: "Clean & Simple" },
+  { value: "modernBold", label: "Modern & Bold" },
+  { value: "elegantRefined", label: "Elegant & Refined" },
+  { value: "editorial", label: "Editorial" },
+  { value: "minimalist", label: "Minimalist" },
+];
+
+const PLATFORM_STANDARD_OPTIONS: { value: PlatformStandard; label: string }[] = [
+  { value: "linkedinProfessional", label: "LinkedIn Professional" },
+  { value: "linkedinCreative", label: "LinkedIn Creative" },
+  { value: "instagramPremium", label: "Instagram Premium" },
+  { value: "instagramAuthentic", label: "Instagram Authentic" },
+];
+
+const INDUSTRY_AESTHETIC_OPTIONS: { value: IndustryAesthetic; label: string }[] = [
+  { value: "techSaaS", label: "Tech/SaaS" },
+  { value: "finance", label: "Finance" },
+  { value: "creativeAgency", label: "Creative Agency" },
+  { value: "healthcare", label: "Healthcare" },
+  { value: "ecommerce", label: "E-commerce" },
+  { value: "consulting", label: "Consulting" },
+  { value: "startup", label: "Startup" },
+];
+
+const COLOR_GRADING_OPTIONS: { value: ColorGradingStyle; label: string }[] = [
+  { value: "natural", label: "Natural" },
+  { value: "warmInviting", label: "Warm & Inviting" },
+  { value: "coolProfessional", label: "Cool & Professional" },
+  { value: "highContrast", label: "High Contrast" },
+  { value: "mutedSophisticated", label: "Muted & Sophisticated" },
+  { value: "cinematic", label: "Cinematic" },
+];
 
 export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) => {
   // Load saved draft from localStorage
@@ -134,6 +195,29 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [professionalSettings, setProfessionalSettings] = useState<ProfessionalSettings | null>(null);
   const [isRegeneratingWithProfessional, setIsRegeneratingWithProfessional] = useState(false);
 
+  // Prompt Enhancers state (Step 1)
+  const [enablePromptEnhancers, setEnablePromptEnhancers] = useState(false);
+  const [promptEnhancerQuality, setPromptEnhancerQuality] = useState<QualityLevel>("professional");
+  const [promptEnhancerPhotography, setPromptEnhancerPhotography] = useState<PhotographyStyle[]>([]);
+  const [promptEnhancerDesign, setPromptEnhancerDesign] = useState<DesignSophistication>("modernBold");
+  // Platform standard defaults based on accountType and platform
+  const getDefaultPlatformStandard = (): PlatformStandard => {
+    if (platform === "linkedin") {
+      return accountType === "company" ? "linkedinProfessional" : "linkedinCreative";
+    }
+    return accountType === "company" ? "instagramPremium" : "instagramAuthentic";
+  };
+  const [promptEnhancerPlatform, setPromptEnhancerPlatform] = useState<PlatformStandard>(getDefaultPlatformStandard());
+  const [promptEnhancerIndustry, setPromptEnhancerIndustry] = useState<IndustryAesthetic | undefined>(undefined);
+  const [promptEnhancerColor, setPromptEnhancerColor] = useState<ColorGradingStyle>("natural");
+
+  // Update platform standard when accountType or platform changes
+  useEffect(() => {
+    if (enablePromptEnhancers) {
+      setPromptEnhancerPlatform(getDefaultPlatformStandard());
+    }
+  }, [accountType, platform, enablePromptEnhancers]);
+
   // Auto-save form data to localStorage (do not persist step to avoid auto-resume)
   useEffect(() => {
     if (open) {
@@ -175,9 +259,17 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setIsRefining(false);
       setIsGenerating(false);
       setShowProfessionalDialog(false);
-      // Reset professional settings - will be auto-applied with smart defaults on first generation
+      // Reset professional settings
       setProfessionalSettings(null);
       setIsRegeneratingWithProfessional(false);
+      // Reset prompt enhancers
+      setEnablePromptEnhancers(false);
+      setPromptEnhancerQuality("professional");
+      setPromptEnhancerPhotography([]);
+      setPromptEnhancerDesign("modernBold");
+      setPromptEnhancerPlatform("linkedinProfessional");
+      setPromptEnhancerIndustry(undefined);
+      setPromptEnhancerColor("natural");
     }
   }, [open]);
 
@@ -220,24 +312,23 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         accent: (profile.color_palette as any)?.secondary,
       } : undefined;
 
-      // Automatically apply smart defaults if professional settings not already set
-      // This ensures professional enhancement is always active (with smart defaults)
-      let effectiveProfessionalSettings = professionalSettings;
-      if (!effectiveProfessionalSettings) {
-        effectiveProfessionalSettings = getSmartDefaults({
-          accountType,
-          platform,
-          imageType: null,
-          tone,
-          brandProfile: {
-            industry: profile.industry || undefined,
-            style: profile.design_philosophy || undefined,
-            mood: profile.tone_personality || undefined,
-          },
-        });
-        // Set in state so UI shows professional settings are applied
+      // Apply professional settings only if user enabled prompt enhancers in Step 1
+      // OR if they were manually set via Professional Enhancement Dialog
+      let effectiveProfessionalSettings: ProfessionalSettings | undefined = professionalSettings || undefined;
+      
+      // If prompt enhancers were enabled in Step 1, use those settings
+      if (!effectiveProfessionalSettings && enablePromptEnhancers) {
+        effectiveProfessionalSettings = {
+          qualityLevel: promptEnhancerQuality,
+          photographyStyle: promptEnhancerPhotography.length > 0 ? promptEnhancerPhotography : ["natural"],
+          designSophistication: promptEnhancerDesign,
+          platformStandard: promptEnhancerPlatform,
+          industryAesthetic: promptEnhancerIndustry,
+          colorGrading: promptEnhancerColor,
+        };
+        // Store in professionalSettings state for consistency
         setProfessionalSettings(effectiveProfessionalSettings);
-        console.log("[Step 2] Smart defaults automatically applied:", effectiveProfessionalSettings);
+        console.log("[Step 2] Prompt enhancers from Step 1 applied:", effectiveProfessionalSettings);
       }
 
       // Create post record in database with "generating" status
@@ -259,10 +350,14 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         image_count: imageCount,
         refinement_count: 0,
         account_type: accountType,
-        // Always include professional settings (smart defaults applied automatically)
-        professional_settings: effectiveProfessionalSettings,
-        professional_enhanced: true,
-        professional_settings_applied_at: new Date().toISOString(),
+        // Include professional settings only if enabled
+        ...(effectiveProfessionalSettings ? {
+          professional_settings: effectiveProfessionalSettings,
+          professional_enhanced: true,
+          professional_settings_applied_at: new Date().toISOString(),
+        } : {
+          professional_enhanced: false,
+        }),
       };
       
       const createdPost = await createPostMutation.mutateAsync(postData);
@@ -320,8 +415,12 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           media_urls: imageUrls, // Also update media_urls for compatibility
           status: "draft", // Change from "generating" to "draft" when images are ready
           // Professional settings already saved during draft creation, ensure they're preserved
-          professional_settings: effectiveProfessionalSettings,
-          professional_enhanced: true,
+          ...(effectiveProfessionalSettings ? {
+            professional_settings: effectiveProfessionalSettings,
+            professional_enhanced: true,
+          } : {
+            professional_enhanced: false,
+          }),
         } as any,
       });
       
@@ -1097,6 +1196,182 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   </div>
                 </div>
               </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            {/* Prompt Enhancers Section */}
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="prompt-enhancers">
+                <AccordionTrigger className="text-sm py-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Prompt Enhancers (Optional)</span>
+                    {enablePromptEnhancers && (
+                      <Badge variant="secondary" className="ml-2">Enabled</Badge>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pt-3">
+                  {/* Enable Toggle */}
+                  <div className="flex items-center space-x-2 pb-3 border-b">
+                    <Checkbox
+                      id="enable-prompt-enhancers"
+                      checked={enablePromptEnhancers}
+                      onCheckedChange={(checked) => {
+                        setEnablePromptEnhancers(checked === true);
+                        // Auto-fill with smart defaults when enabled
+                        if (checked === true && profile && accountType && platform) {
+                          const smartDefaults = getSmartDefaults({
+                            accountType,
+                            platform,
+                            imageType: null,
+                            tone,
+                            brandProfile: {
+                              industry: profile.industry || undefined,
+                              style: profile.design_philosophy || undefined,
+                              mood: profile.tone_personality || undefined,
+                            },
+                          });
+                          setPromptEnhancerQuality(smartDefaults.qualityLevel);
+                          setPromptEnhancerPhotography(smartDefaults.photographyStyle || []);
+                          setPromptEnhancerDesign(smartDefaults.designSophistication);
+                          setPromptEnhancerPlatform(smartDefaults.platformStandard);
+                          setPromptEnhancerIndustry(smartDefaults.industryAesthetic);
+                          setPromptEnhancerColor(smartDefaults.colorGrading);
+                        }
+                      }}
+                    />
+                    <Label htmlFor="enable-prompt-enhancers" className="font-medium cursor-pointer">
+                      Enable prompt enhancers for better image quality
+                    </Label>
+                  </div>
+
+                  {enablePromptEnhancers && (
+                    <div className="space-y-4">
+                      {/* Quality Level */}
+                      <div className="space-y-2">
+                        <Label>Visual Quality Level</Label>
+                        <RadioGroup
+                          value={promptEnhancerQuality}
+                          onValueChange={(value) => setPromptEnhancerQuality(value as QualityLevel)}
+                        >
+                          {QUALITY_LEVELS.map((option) => (
+                            <div key={option.value} className="flex items-start space-x-2">
+                              <RadioGroupItem value={option.value} id={`enhancer-quality-${option.value}`} />
+                              <div className="flex-1">
+                                <Label htmlFor={`enhancer-quality-${option.value}`} className="font-medium cursor-pointer">
+                                  {option.label}
+                                </Label>
+                                <p className="text-xs text-muted-foreground">{option.description}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      </div>
+
+                      {/* Photography Style */}
+                      <div className="space-y-2">
+                        <Label>Photography Style</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {PHOTOGRAPHY_STYLES.map((style) => (
+                            <div key={style.value} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`enhancer-photo-${style.value}`}
+                                checked={promptEnhancerPhotography.includes(style.value)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setPromptEnhancerPhotography([...promptEnhancerPhotography, style.value]);
+                                  } else {
+                                    setPromptEnhancerPhotography(promptEnhancerPhotography.filter(s => s !== style.value));
+                                  }
+                                }}
+                              />
+                              <Label htmlFor={`enhancer-photo-${style.value}`} className="text-sm font-normal cursor-pointer">
+                                {style.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Design Sophistication */}
+                      <div className="space-y-2">
+                        <Label>Design Sophistication</Label>
+                        <RadioGroup
+                          value={promptEnhancerDesign}
+                          onValueChange={(value) => setPromptEnhancerDesign(value as DesignSophistication)}
+                        >
+                          {DESIGN_SOPHISTICATION_OPTIONS.map((option) => (
+                            <div key={option.value} className="flex items-center space-x-2">
+                              <RadioGroupItem value={option.value} id={`enhancer-design-${option.value}`} />
+                              <Label htmlFor={`enhancer-design-${option.value}`} className="font-medium cursor-pointer">
+                                {option.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      </div>
+
+                      {/* Platform Standard */}
+                      <div className="space-y-2">
+                        <Label>Platform Professional Standards</Label>
+                        <RadioGroup
+                          value={promptEnhancerPlatform}
+                          onValueChange={(value) => setPromptEnhancerPlatform(value as PlatformStandard)}
+                        >
+                          {PLATFORM_STANDARD_OPTIONS.map((option) => (
+                            <div key={option.value} className="flex items-center space-x-2">
+                              <RadioGroupItem value={option.value} id={`enhancer-platform-${option.value}`} />
+                              <Label htmlFor={`enhancer-platform-${option.value}`} className="font-medium cursor-pointer">
+                                {option.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      </div>
+
+                      {/* Industry Aesthetic (if brand profile has industry) */}
+                      {profile?.industry && (
+                        <div className="space-y-2">
+                          <Label>Industry Aesthetic</Label>
+                          <Select
+                            value={promptEnhancerIndustry || "startup"}
+                            onValueChange={(value) => setPromptEnhancerIndustry(value as IndustryAesthetic)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select industry aesthetic" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INDUSTRY_AESTHETIC_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* Color Grading */}
+                      <div className="space-y-2">
+                        <Label>Color Treatment</Label>
+                        <RadioGroup
+                          value={promptEnhancerColor}
+                          onValueChange={(value) => setPromptEnhancerColor(value as ColorGradingStyle)}
+                        >
+                          {COLOR_GRADING_OPTIONS.map((option) => (
+                            <div key={option.value} className="flex items-center space-x-2">
+                              <RadioGroupItem value={option.value} id={`enhancer-color-${option.value}`} />
+                              <Label htmlFor={`enhancer-color-${option.value}`} className="font-medium cursor-pointer">
+                                {option.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      </div>
+                    </div>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
