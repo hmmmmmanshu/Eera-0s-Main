@@ -175,6 +175,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setIsRefining(false);
       setIsGenerating(false);
       setShowProfessionalDialog(false);
+      // Reset professional settings - will be auto-applied with smart defaults on first generation
       setProfessionalSettings(null);
       setIsRegeneratingWithProfessional(false);
     }
@@ -219,8 +220,28 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         accent: (profile.color_palette as any)?.secondary,
       } : undefined;
 
+      // Automatically apply smart defaults if professional settings not already set
+      // This ensures professional enhancement is always active (with smart defaults)
+      let effectiveProfessionalSettings = professionalSettings;
+      if (!effectiveProfessionalSettings) {
+        effectiveProfessionalSettings = getSmartDefaults({
+          accountType,
+          platform,
+          imageType: null,
+          tone,
+          brandProfile: {
+            industry: profile.industry || undefined,
+            style: profile.design_philosophy || undefined,
+            mood: profile.tone_personality || undefined,
+          },
+        });
+        // Set in state so UI shows professional settings are applied
+        setProfessionalSettings(effectiveProfessionalSettings);
+        console.log("[Step 2] Smart defaults automatically applied:", effectiveProfessionalSettings);
+      }
+
       // Create post record in database with "generating" status
-      // Include professional settings if available (from smart defaults or previous application)
+      // Include professional settings (always present now, either user-selected or smart defaults)
       const postData: any = {
         platform,
         content: headline,
@@ -238,23 +259,17 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         image_count: imageCount,
         refinement_count: 0,
         account_type: accountType,
+        // Always include professional settings (smart defaults applied automatically)
+        professional_settings: effectiveProfessionalSettings,
+        professional_enhanced: true,
+        professional_settings_applied_at: new Date().toISOString(),
       };
-
-      // Add professional settings if available
-      if (professionalSettings) {
-        postData.professional_settings = professionalSettings;
-        postData.professional_enhanced = true;
-        postData.professional_settings_applied_at = new Date().toISOString();
-      } else {
-        postData.professional_enhanced = false;
-      }
       
       const createdPost = await createPostMutation.mutateAsync(postData);
       setCurrentPostId(createdPost.id);
       console.log("[Step 2] Post created with generating status:", createdPost.id);
-      if (professionalSettings) {
-        console.log("[Step 2] Professional settings included in draft creation");
-      }
+      console.log("[Step 2] Professional settings included in draft creation:", effectiveProfessionalSettings);
+      console.log("[Step 2] Professional enhancement is active (smart defaults or user-selected)");
       
       // Generate caption in parallel with images
       const captionPromise = generatePostContent({
@@ -267,7 +282,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         brandContext,
       });
       
-      // Generate images (with professional settings if available)
+      // Generate images with professional settings (always present now)
       const imagesPromise = generateImageVariations({
         count: imageCount,
         accountType,
@@ -279,7 +294,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         brandColors: colorMode === "brand" ? brandColors : undefined,
         tone,
         aspectRatio,
-        professionalSettings: professionalSettings || undefined,
+        professionalSettings: effectiveProfessionalSettings, // Always present (smart defaults or user-selected)
         imageType: null, // Image type not currently used
         brandProfile: profile ? {
           industry: profile.industry || undefined,
@@ -304,11 +319,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           generated_images: imageUrls, // Save all generated images
           media_urls: imageUrls, // Also update media_urls for compatibility
           status: "draft", // Change from "generating" to "draft" when images are ready
-          // Professional settings already saved during draft creation, but ensure they're preserved
-          ...(professionalSettings ? {
-            professional_settings: professionalSettings,
-            professional_enhanced: true,
-          } : {}),
+          // Professional settings already saved during draft creation, ensure they're preserved
+          professional_settings: effectiveProfessionalSettings,
+          professional_enhanced: true,
         } as any,
       });
       
