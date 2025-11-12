@@ -388,6 +388,7 @@ export const ProfessionalEnhancementDialog = ({
                   </div>
               </AccordionContent>
             </AccordionItem>
+            )}
 
             {/* Section 6: Color Grading */}
             <AccordionItem value="color">
