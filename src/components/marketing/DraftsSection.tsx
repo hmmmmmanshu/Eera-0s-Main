@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Trash2, Send, Eye, CheckCircle } from "lucide-react";
+import { FileText, Trash2, Send, Eye, CheckCircle, Download } from "lucide-react";
 import { useMarketingPosts, useUpdatePost, useDeletePost } from "@/hooks/useMarketingData";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -19,9 +19,16 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 
-export const DraftsSection = () => {
-  const { data: allDrafts = [], isLoading } = useMarketingPosts(undefined, "draft");
-  const { data: generatingPosts = [] } = useMarketingPosts(undefined, "generating");
+interface DraftsSectionProps {
+  platform?: "linkedin" | "instagram" | "all";
+}
+
+export const DraftsSection = ({ platform }: DraftsSectionProps) => {
+  // Filter by platform if specified (excluding "all")
+  const platformFilter = platform && platform !== "all" ? platform : undefined;
+  
+  const { data: allDrafts = [], isLoading } = useMarketingPosts(platformFilter, "draft");
+  const { data: generatingPosts = [] } = useMarketingPosts(platformFilter, "generating");
   const updatePostMutation = useUpdatePost();
   const deletePostMutation = useDeletePost();
   
@@ -257,10 +264,13 @@ export const DraftsSection = () => {
                         <div className="flex flex-col gap-3">
                           {/* Image - Show final image */}
                           {(() => {
-                            const imageUrl = (post as any).final_image_url || 
-                                            (post.media_urls && Array.isArray(post.media_urls) && post.media_urls.length > 0 
-                                              ? post.media_urls[0] 
-                                              : null);
+                            // Priority: final_image_url > selected_image_url > media_urls[0]
+                            const finalImageUrl = (post as any).final_image_url;
+                            const selectedImageUrl = (post as any).selected_image_url;
+                            const mediaUrl = post.media_urls && Array.isArray(post.media_urls) && post.media_urls.length > 0 
+                              ? post.media_urls[0] 
+                              : null;
+                            const imageUrl = finalImageUrl || selectedImageUrl || mediaUrl;
                             
                             return imageUrl ? (
                               <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted">
@@ -347,48 +357,106 @@ export const DraftsSection = () => {
             <DialogTitle>Draft Preview</DialogTitle>
           </DialogHeader>
           
-          {previewPost && (
-            <div className="space-y-4">
-              <Badge className="capitalize">{previewPost.platform}</Badge>
-              
-              {previewPost.media_urls && Array.isArray(previewPost.media_urls) && previewPost.media_urls.length > 0 && (
-                <div className="aspect-video rounded-lg overflow-hidden bg-muted">
-                  <img
-                    src={previewPost.media_urls[0] as string}
-                    alt="Post preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      console.error("[DraftsSection Preview] Image load error:", previewPost.media_urls[0]);
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+          {previewPost && (() => {
+            // Get the best image to display (final_image_url > selected_image_url > media_urls[0])
+            const finalImageUrl = (previewPost as any).final_image_url;
+            const selectedImageUrl = (previewPost as any).selected_image_url;
+            const mediaUrl = previewPost.media_urls && Array.isArray(previewPost.media_urls) && previewPost.media_urls.length > 0 
+              ? previewPost.media_urls[0] 
+              : null;
+            const imageUrl = finalImageUrl || selectedImageUrl || mediaUrl;
+            
+            return (
+              <div className="space-y-4">
+                <Badge className="capitalize">{previewPost.platform}</Badge>
+                
+                {imageUrl && (
+                  <div className="relative aspect-video rounded-lg overflow-hidden bg-muted group">
+                    <img
+                      src={imageUrl as string}
+                      alt="Post preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error("[DraftsSection Preview] Image load error:", imageUrl);
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(imageUrl as string);
+                            const blob = await response.blob();
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `post-image-${previewPost.id}.${blob.type.includes('png') ? 'png' : 'jpg'}`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            toast.success("Image downloaded");
+                          } catch (error) {
+                            console.error("Failed to download image:", error);
+                            toast.error("Failed to download image");
+                          }
+                        }}
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1" />
+                        Download Image
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="whitespace-pre-wrap">{previewPost.content || "No caption available"}</p>
                 </div>
-              )}
-              
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="whitespace-pre-wrap">{previewPost.content}</p>
+                
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      // Download caption as text file
+                      const caption = previewPost.content || "";
+                      const blob = new Blob([caption], { type: "text/plain" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `post-caption-${previewPost.id}.txt`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast.success("Caption downloaded");
+                    }}
+                    disabled={!previewPost.content}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Caption
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setPreviewPost(null)}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      handlePublish(previewPost.id);
+                      setPreviewPost(null);
+                    }}
+                    disabled={updatePostMutation.isPending}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Publish Now
+                  </Button>
+                </div>
               </div>
-              
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setPreviewPost(null)}
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={() => {
-                    handlePublish(previewPost.id);
-                    setPreviewPost(null);
-                  }}
-                  disabled={updatePostMutation.isPending}
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Publish Now
-                </Button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </>

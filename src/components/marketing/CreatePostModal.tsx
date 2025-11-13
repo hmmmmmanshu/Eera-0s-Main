@@ -443,25 +443,49 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     
     if (currentPostId) {
       try {
-        // Only save selected_image_url, NOT final_image_url
-        // final_image_url will be set only when user finalizes in Step 3
-        // This keeps the post in "Drafts" until finalized
+        // Save selected_image_url for preview
         await updatePostMutation.mutateAsync({
           id: currentPostId,
           updates: {
             selected_image_url: imageUrl,
-            // Keep generated_images array intact - all images remain visible
-            // Don't set final_image_url here - only in Step 3 when finalizing
-            status: "draft", // Keep as draft until finalized
+            status: "draft", // Keep as draft until finalized or saved
             media_urls: [imageUrl], // Update media_urls to selected image for preview
           },
         });
-        console.log("[Step 2] Image selected (not finalized yet):", imageUrl);
-        console.log("[Step 2] Post remains in Drafts until finalized in Step 3");
+        console.log("[Step 2] Image selected:", imageUrl);
       } catch (error) {
         console.error("[Step 2] Failed to save selected image:", error);
         toast.error("Failed to save selection");
       }
+    }
+  };
+
+  // Handle save post directly from Step 2 (moves to Ready section)
+  const handleSavePostFromStep2 = async () => {
+    if (!currentPostId || !selectedImageUrl) {
+      toast.error("Please select an image first");
+      return;
+    }
+
+    try {
+      const finalCaption = generatedCaption?.caption || headline;
+      await updatePostMutation.mutateAsync({
+        id: currentPostId,
+        updates: {
+          final_image_url: selectedImageUrl, // This moves post to "Ready" section
+          selected_image_url: selectedImageUrl,
+          media_urls: [selectedImageUrl],
+          content: finalCaption, // Save caption
+          status: "draft", // Keep as draft (not published yet)
+        } as any,
+      });
+      
+      console.log("[Step 2] Post saved to Ready section");
+      toast.success("Post saved successfully!");
+      resetAndClose();
+    } catch (error) {
+      console.error("[Step 2] Failed to save post:", error);
+      toast.error(`Failed to save post: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
   
@@ -1214,7 +1238,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4 pt-3">
                   {/* Enable Toggle */}
-                  <div className="flex items-center space-x-2 pb-3 border-b">
+                  <div className="flex items-center space-x-3 pb-3 border-b">
                     <Checkbox
                       id="enable-prompt-enhancers"
                       checked={enablePromptEnhancers}
@@ -1241,8 +1265,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                           setPromptEnhancerColor(smartDefaults.colorGrading);
                         }
                       }}
+                      className="h-5 w-5 border-2 border-foreground/40 data-[state=checked]:bg-accent data-[state=checked]:border-accent"
                     />
-                    <Label htmlFor="enable-prompt-enhancers" className="font-medium cursor-pointer">
+                    <Label htmlFor="enable-prompt-enhancers" className="font-medium cursor-pointer text-base">
                       Enable prompt enhancers for better image quality
                     </Label>
                   </div>
@@ -1250,84 +1275,142 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                   {enablePromptEnhancers && (
                     <div className="space-y-4">
                       {/* Quality Level */}
-                      <div className="space-y-2">
-                        <Label>Visual Quality Level</Label>
+                      <div className="space-y-3">
+                        <Label className="text-base font-semibold">Visual Quality Level</Label>
                         <RadioGroup
                           value={promptEnhancerQuality}
                           onValueChange={(value) => setPromptEnhancerQuality(value as QualityLevel)}
+                          className="space-y-2"
                         >
-                          {QUALITY_LEVELS.map((option) => (
-                            <div key={option.value} className="flex items-start space-x-2">
-                              <RadioGroupItem value={option.value} id={`enhancer-quality-${option.value}`} />
-                              <div className="flex-1">
-                                <Label htmlFor={`enhancer-quality-${option.value}`} className="font-medium cursor-pointer">
-                                  {option.label}
-                                </Label>
-                                <p className="text-xs text-muted-foreground">{option.description}</p>
+                          {QUALITY_LEVELS.map((option) => {
+                            const isSelected = promptEnhancerQuality === option.value;
+                            return (
+                              <div
+                                key={option.value}
+                                className={`flex items-start space-x-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                  isSelected
+                                    ? "border-accent bg-accent/10"
+                                    : "border-border hover:border-accent/50 hover:bg-muted/50"
+                                }`}
+                                onClick={() => setPromptEnhancerQuality(option.value as QualityLevel)}
+                              >
+                                <RadioGroupItem
+                                  value={option.value}
+                                  id={`enhancer-quality-${option.value}`}
+                                  className="mt-0.5"
+                                />
+                                <div className="flex-1">
+                                  <Label htmlFor={`enhancer-quality-${option.value}`} className="font-medium cursor-pointer text-sm">
+                                    {option.label}
+                                  </Label>
+                                  <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </RadioGroup>
                       </div>
 
                       {/* Photography Style */}
-                      <div className="space-y-2">
-                        <Label>Photography Style</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {PHOTOGRAPHY_STYLES.map((style) => (
-                            <div key={style.value} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`enhancer-photo-${style.value}`}
-                                checked={promptEnhancerPhotography.includes(style.value)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setPromptEnhancerPhotography([...promptEnhancerPhotography, style.value]);
-                                  } else {
+                      <div className="space-y-3">
+                        <Label className="text-base font-semibold">Photography Style</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {PHOTOGRAPHY_STYLES.map((style) => {
+                            const isChecked = promptEnhancerPhotography.includes(style.value);
+                            return (
+                              <div
+                                key={style.value}
+                                className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                  isChecked
+                                    ? "border-accent bg-accent/10"
+                                    : "border-border hover:border-accent/50 hover:bg-muted/50"
+                                }`}
+                                onClick={() => {
+                                  if (isChecked) {
                                     setPromptEnhancerPhotography(promptEnhancerPhotography.filter(s => s !== style.value));
+                                  } else {
+                                    setPromptEnhancerPhotography([...promptEnhancerPhotography, style.value]);
                                   }
                                 }}
-                              />
-                              <Label htmlFor={`enhancer-photo-${style.value}`} className="text-sm font-normal cursor-pointer">
-                                {style.label}
-                              </Label>
-                            </div>
-                          ))}
+                              >
+                                <Checkbox
+                                  id={`enhancer-photo-${style.value}`}
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setPromptEnhancerPhotography([...promptEnhancerPhotography, style.value]);
+                                    } else {
+                                      setPromptEnhancerPhotography(promptEnhancerPhotography.filter(s => s !== style.value));
+                                    }
+                                  }}
+                                  className="h-5 w-5 border-2 border-foreground/40 data-[state=checked]:bg-accent data-[state=checked]:border-accent shrink-0"
+                                />
+                                <Label htmlFor={`enhancer-photo-${style.value}`} className="text-sm font-medium cursor-pointer flex-1">
+                                  {style.label}
+                                </Label>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
                       {/* Design Sophistication */}
-                      <div className="space-y-2">
-                        <Label>Design Sophistication</Label>
+                      <div className="space-y-3">
+                        <Label className="text-base font-semibold">Design Sophistication</Label>
                         <RadioGroup
                           value={promptEnhancerDesign}
                           onValueChange={(value) => setPromptEnhancerDesign(value as DesignSophistication)}
+                          className="space-y-2"
                         >
-                          {DESIGN_SOPHISTICATION_OPTIONS.map((option) => (
-                            <div key={option.value} className="flex items-center space-x-2">
-                              <RadioGroupItem value={option.value} id={`enhancer-design-${option.value}`} />
-                              <Label htmlFor={`enhancer-design-${option.value}`} className="font-medium cursor-pointer">
-                                {option.label}
-                              </Label>
-                            </div>
-                          ))}
+                          {DESIGN_SOPHISTICATION_OPTIONS.map((option) => {
+                            const isSelected = promptEnhancerDesign === option.value;
+                            return (
+                              <div
+                                key={option.value}
+                                className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                  isSelected
+                                    ? "border-accent bg-accent/10"
+                                    : "border-border hover:border-accent/50 hover:bg-muted/50"
+                                }`}
+                                onClick={() => setPromptEnhancerDesign(option.value as DesignSophistication)}
+                              >
+                                <RadioGroupItem value={option.value} id={`enhancer-design-${option.value}`} />
+                                <Label htmlFor={`enhancer-design-${option.value}`} className="font-medium cursor-pointer text-sm flex-1">
+                                  {option.label}
+                                </Label>
+                              </div>
+                            );
+                          })}
                         </RadioGroup>
                       </div>
 
                       {/* Platform Standard */}
-                      <div className="space-y-2">
-                        <Label>Platform Professional Standards</Label>
+                      <div className="space-y-3">
+                        <Label className="text-base font-semibold">Platform Professional Standards</Label>
                         <RadioGroup
                           value={promptEnhancerPlatform}
                           onValueChange={(value) => setPromptEnhancerPlatform(value as PlatformStandard)}
+                          className="space-y-2"
                         >
-                          {PLATFORM_STANDARD_OPTIONS.map((option) => (
-                            <div key={option.value} className="flex items-center space-x-2">
-                              <RadioGroupItem value={option.value} id={`enhancer-platform-${option.value}`} />
-                              <Label htmlFor={`enhancer-platform-${option.value}`} className="font-medium cursor-pointer">
-                                {option.label}
-                              </Label>
-                            </div>
-                          ))}
+                          {PLATFORM_STANDARD_OPTIONS.map((option) => {
+                            const isSelected = promptEnhancerPlatform === option.value;
+                            return (
+                              <div
+                                key={option.value}
+                                className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                  isSelected
+                                    ? "border-accent bg-accent/10"
+                                    : "border-border hover:border-accent/50 hover:bg-muted/50"
+                                }`}
+                                onClick={() => setPromptEnhancerPlatform(option.value as PlatformStandard)}
+                              >
+                                <RadioGroupItem value={option.value} id={`enhancer-platform-${option.value}`} />
+                                <Label htmlFor={`enhancer-platform-${option.value}`} className="font-medium cursor-pointer text-sm flex-1">
+                                  {option.label}
+                                </Label>
+                              </div>
+                            );
+                          })}
                         </RadioGroup>
                       </div>
 
@@ -1354,20 +1437,32 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                       )}
 
                       {/* Color Grading */}
-                      <div className="space-y-2">
-                        <Label>Color Treatment</Label>
+                      <div className="space-y-3">
+                        <Label className="text-base font-semibold">Color Treatment</Label>
                         <RadioGroup
                           value={promptEnhancerColor}
                           onValueChange={(value) => setPromptEnhancerColor(value as ColorGradingStyle)}
+                          className="space-y-2"
                         >
-                          {COLOR_GRADING_OPTIONS.map((option) => (
-                            <div key={option.value} className="flex items-center space-x-2">
-                              <RadioGroupItem value={option.value} id={`enhancer-color-${option.value}`} />
-                              <Label htmlFor={`enhancer-color-${option.value}`} className="font-medium cursor-pointer">
-                                {option.label}
-                              </Label>
-                            </div>
-                          ))}
+                          {COLOR_GRADING_OPTIONS.map((option) => {
+                            const isSelected = promptEnhancerColor === option.value;
+                            return (
+                              <div
+                                key={option.value}
+                                className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                  isSelected
+                                    ? "border-accent bg-accent/10"
+                                    : "border-border hover:border-accent/50 hover:bg-muted/50"
+                                }`}
+                                onClick={() => setPromptEnhancerColor(option.value as ColorGradingStyle)}
+                              >
+                                <RadioGroupItem value={option.value} id={`enhancer-color-${option.value}`} />
+                                <Label htmlFor={`enhancer-color-${option.value}`} className="font-medium cursor-pointer text-sm flex-1">
+                                  {option.label}
+                                </Label>
+                              </div>
+                            );
+                          })}
                         </RadioGroup>
                       </div>
                     </div>
@@ -1571,6 +1666,15 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
                       Generate More
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={handleSavePostFromStep2}
+                      disabled={!selectedImageUrl || isGenerating || isRegeneratingWithProfessional}
+                      className="flex-1"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Save Post
                     </Button>
                     <Button 
                       className="flex-1"

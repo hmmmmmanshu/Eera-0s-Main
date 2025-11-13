@@ -108,7 +108,7 @@ const MarketingHub = () => {
                 </div>
 
                 {/* Drafts Section */}
-                <DraftsSection />
+                <DraftsSection platform={platform} />
 
                 {/* Targets Progress */}
                 <TargetsProgress />
