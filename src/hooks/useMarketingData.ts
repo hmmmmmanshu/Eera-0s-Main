@@ -750,21 +750,80 @@ export function useMarketingTargets() {
   return useQuery({
     queryKey: ["marketing-targets"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: targets, error } = await supabase
         .from("marketing_targets")
         .select("*")
         .order("deadline", { ascending: true });
 
       if (error) throw error;
 
-      // Calculate progress for each target
-      return (data as MarketingTarget[]).map((target) => ({
-        ...target,
-        progress:
-          target.target_value > 0
-            ? (target.current_value / target.target_value) * 100
-            : 0,
-      }));
+      // Get current date range for weekly/monthly calculations
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      // Fetch posts for calculating current values
+      const { data: posts } = await supabase
+        .from("marketing_posts")
+        .select("id, platform, published_time, views, likes, comments, shares, created_at")
+        .eq("status", "published")
+        .not("published_time", "is", null);
+
+      // Calculate current values for each target
+      const targetsWithCurrentValues = (targets as MarketingTarget[]).map((target) => {
+        let currentValue = 0;
+        const targetName = target.name.toLowerCase();
+        const isWeekly = targetName.includes("weekly");
+        const isMonthly = targetName.includes("monthly");
+        
+        // Determine date range
+        const startDate = isWeekly ? startOfWeek : isMonthly ? startOfMonth : null;
+        
+        if (startDate && posts) {
+          // Filter posts within the target period
+          const periodPosts = posts.filter((post) => {
+            if (!post.published_time) return false;
+            const postDate = new Date(post.published_time);
+            return postDate >= startDate && postDate <= now;
+          });
+
+          // Calculate based on target type
+          if (targetName.includes("posts")) {
+            currentValue = periodPosts.length;
+          } else if (targetName.includes("impressions") || targetName.includes("reach")) {
+            currentValue = periodPosts.reduce((sum, p) => sum + (p.views || 0), 0);
+          } else if (targetName.includes("likes")) {
+            currentValue = periodPosts.reduce((sum, p) => sum + (p.likes || 0), 0);
+          } else if (targetName.includes("comments")) {
+            currentValue = periodPosts.reduce((sum, p) => sum + (p.comments || 0), 0);
+          } else if (targetName.includes("shares")) {
+            currentValue = periodPosts.reduce((sum, p) => sum + (p.shares || 0), 0);
+          } else if (targetName.includes("engagement")) {
+            currentValue = periodPosts.reduce(
+              (sum, p) => sum + (p.likes || 0) + (p.comments || 0) + (p.shares || 0),
+              0
+            );
+          } else if (targetName.includes("clicks")) {
+            // Clicks would come from marketing_metrics table if available
+            currentValue = 0; // Placeholder - would need to fetch from metrics
+          }
+        }
+
+        return {
+          ...target,
+          current_value: currentValue,
+          progress:
+            target.target_value > 0
+              ? (currentValue / target.target_value) * 100
+              : 0,
+        };
+      });
+
+      return targetsWithCurrentValues;
     },
   });
 }

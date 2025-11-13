@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { FileText, Trash2, Send, Eye, CheckCircle, Download } from "lucide-react";
 import { useMarketingPosts, useUpdatePost, useDeletePost } from "@/hooks/useMarketingData";
 import { toast } from "sonner";
@@ -411,8 +412,14 @@ export const DraftsSection = ({ platform }: DraftsSectionProps) => {
                   </div>
                 )}
                 
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="whitespace-pre-wrap">{previewPost.content || "No caption available"}</p>
+                {/* Caption Section - More Prominent */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Caption</Label>
+                  <div className="p-4 bg-muted/50 rounded-lg border border-border min-h-[100px]">
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {previewPost.content || "No caption available"}
+                    </p>
+                  </div>
                 </div>
                 
                 <div className="flex gap-2 justify-end">
@@ -421,6 +428,10 @@ export const DraftsSection = ({ platform }: DraftsSectionProps) => {
                     onClick={() => {
                       // Download caption as text file
                       const caption = previewPost.content || "";
+                      if (!caption) {
+                        toast.error("No caption to download");
+                        return;
+                      }
                       const blob = new Blob([caption], { type: "text/plain" });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement("a");
