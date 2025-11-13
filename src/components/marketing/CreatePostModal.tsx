@@ -187,6 +187,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [styleSliderValue, setStyleSliderValue] = useState(50); // 0 = More Professional, 100 = More Casual
   const [refinementColorMode, setRefinementColorMode] = useState<"warmer" | "cooler" | "brand" | "custom">("brand");
   const [refinementCustomColors, setRefinementCustomColors] = useState<{ primary: string; accent: string } | null>(null);
+  const [refinementComments, setRefinementComments] = useState<string>(""); // User comments for prompt enhancement
   const [editedCaption, setEditedCaption] = useState<string>("");
   const [isRefining, setIsRefining] = useState(false);
 
@@ -255,6 +256,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setStyleSliderValue(50);
       setRefinementColorMode("brand");
       setRefinementCustomColors(null);
+      setRefinementComments("");
       setEditedCaption("");
       setIsRefining(false);
       setIsGenerating(false);
@@ -537,6 +539,12 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n" : "") + "Use warm color tones (oranges, reds, yellows)";
       } else if (refinementColorMode === "cooler") {
         enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n" : "") + "Use cool color tones (blues, purples, greens)";
+      }
+      
+      // Add user refinement comments to keyPoints if provided
+      if (refinementComments && refinementComments.trim()) {
+        enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n\n" : "") + 
+          "User enhancement instructions: " + refinementComments.trim();
       }
       
       // Generate refined image with adjusted parameters (include professional settings if available)
@@ -840,6 +848,12 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n" : "") + "Use warm color tones (oranges, reds, yellows)";
       } else if (refinementColorMode === "cooler") {
         enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n" : "") + "Use cool color tones (blues, purples, greens)";
+      }
+
+      // Add user refinement comments to keyPoints if provided
+      if (refinementComments && refinementComments.trim()) {
+        enhancedKeyPoints = (enhancedKeyPoints ? enhancedKeyPoints + "\n\n" : "") + 
+          "User enhancement instructions: " + refinementComments.trim();
       }
 
       // Regenerate single image with professional settings
@@ -1865,6 +1879,21 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                       </div>
                     )}
                     </div>
+
+              {/* Prompt Enhancement Comments */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Enhancement Instructions (Optional)</Label>
+                <Textarea
+                  value={refinementComments}
+                  onChange={(e) => setRefinementComments(e.target.value)}
+                  placeholder="Describe how you want to enhance the image... (e.g., 'Add more vibrant colors', 'Make it more minimalist', 'Include more people in the background')"
+                  rows={3}
+                  className="resize-none"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Provide specific instructions about how you want the image improved. These will be incorporated into the image generation prompt.
+                </p>
+              </div>
 
               {/* Layout Note */}
               <div className="text-sm text-muted-foreground">
