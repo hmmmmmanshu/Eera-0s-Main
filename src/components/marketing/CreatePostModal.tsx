@@ -198,6 +198,11 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [showProfessionalDialog, setShowProfessionalDialog] = useState(false);
   const [professionalSettings, setProfessionalSettings] = useState<ProfessionalSettings | null>(null);
   const [isRegeneratingWithProfessional, setIsRegeneratingWithProfessional] = useState(false);
+  
+  // Text Enhancement state (Step 2)
+  const [showTextEnhancementDialog, setShowTextEnhancementDialog] = useState(false);
+  const [textEnhancementInstructions, setTextEnhancementInstructions] = useState<string>("");
+  const [isRegeneratingWithText, setIsRegeneratingWithText] = useState(false);
 
   // Prompt Enhancers state (Step 1)
   const [enablePromptEnhancers, setEnablePromptEnhancers] = useState(false);
@@ -236,6 +241,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         objective,
         aspectRatio,
         imageCount,
+        imageType,
         timestamp: Date.now(),
       };
       localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(draftData));
@@ -263,6 +269,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setEditedCaption("");
       setIsRefining(false);
       setImageType(null);
+      setShowTextEnhancementDialog(false);
+      setTextEnhancementInstructions("");
+      setIsRegeneratingWithText(false);
       setIsGenerating(false);
       setShowProfessionalDialog(false);
       // Reset professional settings
@@ -655,17 +664,24 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     }
   };
   
-  // Handle generate more (3 new variations)
-  const handleGenerateMore = async () => {
+  // Handle text enhancement regeneration (Step 2)
+  const handleTextEnhancementRegenerate = async () => {
     if (!profile || !accountType || !platform || !headline) {
+      toast.error("Missing required information");
       return;
     }
     
-    setIsGenerating(true);
+    if (!textEnhancementInstructions || !textEnhancementInstructions.trim()) {
+      toast.error("Please enter enhancement instructions");
+      return;
+    }
+    
+    setIsRegeneratingWithText(true);
     setImageGenerationStatus("generating");
-    setGenerationProgress({ completed: 0, total: 3 });
+    setGenerationProgress({ completed: 0, total: imageCount });
     setSelectedImageUrl(null);
     setGenerationError(null);
+    setShowTextEnhancementDialog(false);
     
     try {
       const brandContext = assembleBrandContext(profile);
@@ -674,20 +690,25 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         accent: (profile.color_palette as any)?.secondary,
       } : undefined;
       
-      // Generate 3 new variations
+      // Combine original keyPoints with text enhancement instructions
+      const enhancedKeyPoints = (keyPoints || "") + 
+        (keyPoints ? "\n\n" : "") + 
+        "User enhancement instructions: " + textEnhancementInstructions.trim();
+      
+      // Generate images with text enhancement
       const images = await generateImageVariations({
-        count: 3,
+        count: imageCount,
         accountType,
         platform,
         headline,
-        keyPoints: keyPoints || undefined,
+        keyPoints: enhancedKeyPoints || undefined,
         colorMode,
         customColors: colorMode === "custom" ? customColors || undefined : undefined,
         brandColors: colorMode === "brand" ? brandColors : undefined,
         tone,
         aspectRatio,
         professionalSettings: professionalSettings || undefined,
-        imageType: null, // Image type not currently used
+        imageType: imageType || null,
         brandProfile: profile ? {
           industry: profile.industry || undefined,
           style: profile.design_philosophy || undefined,
@@ -697,7 +718,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       
       setGeneratedImages(images);
       setImageGenerationStatus("complete");
-      setGenerationProgress({ completed: images.length, total: 3 });
+      setGenerationProgress({ completed: images.length, total: imageCount });
       
       // Update post with new generated images
       if (currentPostId) {
@@ -706,19 +727,20 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           id: currentPostId,
           updates: {
             generated_images: imageUrls,
-            image_count: 3,
+            image_count: imageCount,
           },
         });
       }
       
-      toast.success("Generated 3 new variations!");
+      toast.success("Images regenerated with your enhancements!");
+      setTextEnhancementInstructions(""); // Clear after successful regeneration
     } catch (error) {
-      console.error("[Step 2] Generate more failed:", error);
+      console.error("[Step 2] Text enhancement regeneration failed:", error);
       setImageGenerationStatus("error");
-      setGenerationError(error instanceof Error ? error.message : "Failed to generate images");
-      toast.error(`Generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      setGenerationError(error instanceof Error ? error.message : "Failed to regenerate images");
+      toast.error(`Regeneration failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
-      setIsGenerating(false);
+      setIsRegeneratingWithText(false);
     }
   };
 
@@ -1696,7 +1718,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     <Button 
                       variant="outline"
                       onClick={() => setShowProfessionalDialog(true)}
-                      disabled={isGenerating || isRegeneratingWithProfessional}
+                      disabled={isGenerating || isRegeneratingWithProfessional || isRegeneratingWithText}
                       className="flex-1 gap-2"
                     >
                       <Settings className="w-4 h-4" />
@@ -1707,12 +1729,12 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     </Button>
                     <Button 
                       variant="outline"
-                      onClick={handleGenerateMore}
-                      disabled={isGenerating || isRegeneratingWithProfessional}
+                      onClick={() => setShowTextEnhancementDialog(true)}
+                      disabled={isGenerating || isRegeneratingWithProfessional || isRegeneratingWithText}
                       className="flex-1 gap-2"
                     >
                       <Sparkles className="w-4 h-4" />
-                      Generate More
+                      Text Enhancement
                     </Button>
                   </div>
                   
@@ -1728,7 +1750,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     <Button 
                       variant="outline"
                       onClick={handleSavePostFromStep2}
-                      disabled={!selectedImageUrl || isGenerating || isRegeneratingWithProfessional}
+                      disabled={!selectedImageUrl || isGenerating || isRegeneratingWithProfessional || isRegeneratingWithText}
                       className="flex-1 gap-2"
                     >
                       <FileText className="w-4 h-4" />
@@ -1744,7 +1766,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                           toast.error("Please select an image first");
                         }
                       }}
-                      disabled={!selectedImageUrl || isGenerating || isRegeneratingWithProfessional}
+                      disabled={!selectedImageUrl || isGenerating || isRegeneratingWithProfessional || isRegeneratingWithText}
                     >
                       Continue to Finalize
                     </Button>
@@ -1766,7 +1788,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             context={{
               accountType,
               platform,
-              imageType: null, // Image type not currently used
+              imageType: imageType || null,
               tone,
               brandProfile: {
                 industry: profile.industry || undefined,
@@ -1776,6 +1798,67 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
             }}
           />
         )}
+
+        {/* Text Enhancement Dialog */}
+        <Dialog open={showTextEnhancementDialog} onOpenChange={setShowTextEnhancementDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Text Enhancement
+              </DialogTitle>
+              <DialogDescription>
+                Describe how you want to enhance or modify the images. Your instructions will be incorporated into the image generation.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="text-enhancement">Enhancement Instructions</Label>
+                <Textarea
+                  id="text-enhancement"
+                  value={textEnhancementInstructions}
+                  onChange={(e) => setTextEnhancementInstructions(e.target.value)}
+                  placeholder="E.g., 'Add more vibrant colors', 'Make it more minimalist', 'Include more people in the background', 'Use warmer tones', 'Add a sunset in the background'"
+                  rows={6}
+                  className="resize-none"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Be specific about what changes you want. The AI will regenerate all images based on your instructions.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowTextEnhancementDialog(false);
+                  setTextEnhancementInstructions("");
+                }}
+                disabled={isRegeneratingWithText}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleTextEnhancementRegenerate}
+                disabled={!textEnhancementInstructions?.trim() || isRegeneratingWithText}
+              >
+                {isRegeneratingWithText ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                    Regenerating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Regenerate Images
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Step 3: Final Step - Schedule or Save */}
         {step === 3 && currentImageUrl && (
