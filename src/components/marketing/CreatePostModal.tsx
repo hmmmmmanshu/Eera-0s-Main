@@ -333,8 +333,10 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
       // Create post record in database with "generating" status
       // Include professional settings (always present now, either user-selected or smart defaults)
+      // Ensure platform is saved correctly (lowercase to match database expectations)
+      const normalizedPlatform = platform.toLowerCase() as "linkedin" | "instagram";
       const postData: any = {
-        platform,
+        platform: normalizedPlatform,
         content: headline,
         media_urls: [],
         status: "generating" as const, // Status while images are being generated
@@ -363,6 +365,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       const createdPost = await createPostMutation.mutateAsync(postData);
       setCurrentPostId(createdPost.id);
       console.log("[Step 2] Post created with generating status:", createdPost.id);
+      console.log("[Step 2] Platform saved:", normalizedPlatform);
       console.log("[Step 2] Professional settings included in draft creation:", effectiveProfessionalSettings);
       console.log("[Step 2] Professional enhancement is active (smart defaults or user-selected)");
       
@@ -469,9 +472,11 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
     try {
       const finalCaption = generatedCaption?.caption || headline;
+      const normalizedPlatform = platform.toLowerCase() as "linkedin" | "instagram";
       await updatePostMutation.mutateAsync({
         id: currentPostId,
         updates: {
+          platform: normalizedPlatform, // Ensure platform is preserved
           final_image_url: selectedImageUrl, // This moves post to "Ready" section
           selected_image_url: selectedImageUrl,
           media_urls: [selectedImageUrl],
@@ -480,7 +485,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         } as any,
       });
       
-      console.log("[Step 2] Post saved to Ready section");
+      console.log("[Step 2] Post saved to Ready section with platform:", normalizedPlatform);
       toast.success("Post saved successfully!");
       resetAndClose();
     } catch (error) {
@@ -598,9 +603,11 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       // Update post with final image and caption
       // Setting final_image_url moves the post to "Ready" section
       const finalCaption = editedCaption || generatedCaption?.caption || headline;
+      const normalizedPlatform = platform.toLowerCase() as "linkedin" | "instagram";
       await updatePostMutation.mutateAsync({
         id: currentPostId,
         updates: {
+          platform: normalizedPlatform, // Ensure platform is preserved
           final_image_url: currentImageUrl, // This moves post to "Ready"
           selected_image_url: currentImageUrl, // Also update selected_image_url
           status: "draft", // Keep as draft (not published yet)
@@ -614,7 +621,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         } as any,
       });
       
-      console.log("[Step 3] Post finalized - moved to Ready section");
+      console.log("[Step 3] Post finalized - moved to Ready section with platform:", normalizedPlatform);
       toast.success("Post saved successfully!");
       resetAndClose();
     } catch (error) {

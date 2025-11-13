@@ -15,12 +15,21 @@ interface TopPostsCarouselProps {
 }
 
 export const TopPostsCarousel = ({ platform }: TopPostsCarouselProps) => {
-  const { data: posts = [], isLoading } = useMarketingPosts(platform, "published");
+  // Normalize platform for filtering (ensure lowercase)
+  const normalizedPlatform = platform 
+    ? (platform.toLowerCase() as "linkedin" | "instagram" | "twitter" | "facebook")
+    : undefined;
+  
+  const { data: posts = [], isLoading } = useMarketingPosts(normalizedPlatform, "published");
 
   // Sort by engagement (likes + comments) and take top posts
   const topPosts = [...posts]
     .sort((a, b) => (b.likes + b.comments) - (a.likes + a.comments))
     .slice(0, 6);
+  
+  console.log("[TopPostsCarousel] Platform filter:", normalizedPlatform);
+  console.log("[TopPostsCarousel] Posts found:", posts.length);
+  console.log("[TopPostsCarousel] Top posts:", topPosts.length);
 
   if (isLoading) {
     return (

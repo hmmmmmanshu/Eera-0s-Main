@@ -26,7 +26,10 @@ interface DraftsSectionProps {
 
 export const DraftsSection = ({ platform }: DraftsSectionProps) => {
   // Filter by platform if specified (excluding "all")
-  const platformFilter = platform && platform !== "all" ? platform : undefined;
+  // Normalize platform to lowercase for consistent filtering
+  const platformFilter = platform && platform !== "all" 
+    ? (platform.toLowerCase() as "linkedin" | "instagram" | "twitter" | "facebook")
+    : undefined;
   
   const { data: allDrafts = [], isLoading } = useMarketingPosts(platformFilter, "draft");
   const { data: generatingPosts = [] } = useMarketingPosts(platformFilter, "generating");

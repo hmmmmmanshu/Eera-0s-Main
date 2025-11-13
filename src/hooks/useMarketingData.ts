@@ -195,15 +195,28 @@ export function useMarketingPosts(platform?: Platform, status?: PostStatus) {
         .order("created_at", { ascending: false });
 
       if (platform) {
-        query = query.eq("platform", platform);
+        // Normalize platform to lowercase for consistent filtering
+        const normalizedPlatform = platform.toLowerCase();
+        query = query.eq("platform", normalizedPlatform);
+        console.log("[useMarketingPosts] Filtering by platform:", normalizedPlatform);
       }
 
       if (status) {
         query = query.eq("status", status);
+        console.log("[useMarketingPosts] Filtering by status:", status);
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error("[useMarketingPosts] Query error:", error);
+        throw error;
+      }
+      
+      console.log("[useMarketingPosts] Found posts:", data?.length || 0);
+      if (data && data.length > 0) {
+        console.log("[useMarketingPosts] Sample post platforms:", data.slice(0, 3).map(p => p.platform));
+      }
+      
       return data as MarketingPost[];
     },
   });
