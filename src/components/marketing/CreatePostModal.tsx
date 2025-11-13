@@ -198,7 +198,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   // Prompt Enhancers state (Step 1)
   const [enablePromptEnhancers, setEnablePromptEnhancers] = useState(false);
   const [promptEnhancerQuality, setPromptEnhancerQuality] = useState<QualityLevel>("professional");
-  const [promptEnhancerPhotography, setPromptEnhancerPhotography] = useState<PhotographyStyle[]>([]);
+  const [promptEnhancerPhotography, setPromptEnhancerPhotography] = useState<PhotographyStyle | null>(null);
   const [promptEnhancerDesign, setPromptEnhancerDesign] = useState<DesignSophistication>("modernBold");
   // Platform standard defaults based on accountType and platform
   const getDefaultPlatformStandard = (): PlatformStandard => {
@@ -265,7 +265,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       // Reset prompt enhancers
       setEnablePromptEnhancers(false);
       setPromptEnhancerQuality("professional");
-      setPromptEnhancerPhotography([]);
+      setPromptEnhancerPhotography(null);
       setPromptEnhancerDesign("modernBold");
       setPromptEnhancerPlatform("linkedinProfessional");
       setPromptEnhancerIndustry(undefined);
@@ -320,7 +320,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       if (!effectiveProfessionalSettings && enablePromptEnhancers) {
         effectiveProfessionalSettings = {
           qualityLevel: promptEnhancerQuality,
-          photographyStyle: promptEnhancerPhotography.length > 0 ? promptEnhancerPhotography : ["natural"],
+          photographyStyle: promptEnhancerPhotography ? [promptEnhancerPhotography] : ["natural"],
           designSophistication: promptEnhancerDesign,
           platformStandard: promptEnhancerPlatform,
           industryAesthetic: promptEnhancerIndustry,
@@ -1265,7 +1265,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                             },
                           });
                           setPromptEnhancerQuality(smartDefaults.qualityLevel);
-                          setPromptEnhancerPhotography(smartDefaults.photographyStyle || []);
+                          setPromptEnhancerPhotography(smartDefaults.photographyStyle?.[0] || null);
                           setPromptEnhancerDesign(smartDefaults.designSophistication);
                           setPromptEnhancerPlatform(smartDefaults.platformStandard);
                           setPromptEnhancerIndustry(smartDefaults.industryAesthetic);
@@ -1321,44 +1321,31 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                       {/* Photography Style */}
                       <div className="space-y-3">
                         <Label className="text-base font-semibold">Photography Style</Label>
-                        <div className="grid grid-cols-2 gap-3">
+                        <RadioGroup
+                          value={promptEnhancerPhotography || ""}
+                          onValueChange={(value) => setPromptEnhancerPhotography(value as PhotographyStyle)}
+                          className="space-y-2"
+                        >
                           {PHOTOGRAPHY_STYLES.map((style) => {
-                            const isChecked = promptEnhancerPhotography.includes(style.value);
+                            const isSelected = promptEnhancerPhotography === style.value;
                             return (
                               <div
                                 key={style.value}
                                 className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                                  isChecked
+                                  isSelected
                                     ? "border-accent bg-accent/10"
                                     : "border-border hover:border-accent/50 hover:bg-muted/50"
                                 }`}
-                                onClick={() => {
-                                  if (isChecked) {
-                                    setPromptEnhancerPhotography(promptEnhancerPhotography.filter(s => s !== style.value));
-                                  } else {
-                                    setPromptEnhancerPhotography([...promptEnhancerPhotography, style.value]);
-                                  }
-                                }}
+                                onClick={() => setPromptEnhancerPhotography(style.value)}
                               >
-                                <Checkbox
-                                  id={`enhancer-photo-${style.value}`}
-                                  checked={isChecked}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setPromptEnhancerPhotography([...promptEnhancerPhotography, style.value]);
-                                    } else {
-                                      setPromptEnhancerPhotography(promptEnhancerPhotography.filter(s => s !== style.value));
-                                    }
-                                  }}
-                                  className="h-5 w-5 border-2 border-foreground/40 data-[state=checked]:bg-accent data-[state=checked]:border-accent shrink-0"
-                                />
+                                <RadioGroupItem value={style.value} id={`enhancer-photo-${style.value}`} />
                                 <Label htmlFor={`enhancer-photo-${style.value}`} className="text-sm font-medium cursor-pointer flex-1">
                                   {style.label}
                                 </Label>
                               </div>
                             );
                           })}
-                        </div>
+                        </RadioGroup>
                       </div>
 
                       {/* Design Sophistication */}
