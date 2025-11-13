@@ -152,6 +152,9 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [tone, setTone] = useState<"quirky" | "humble" | "inspirational" | "professional" | "witty">(savedDraft?.tone || "professional");
   const [objective, setObjective] = useState<"awareness" | "leads" | "engagement" | "recruitment">(savedDraft?.objective || "engagement");
   
+  // Image type/announcement option (moved to Step 2)
+  const [imageType, setImageType] = useState<ImageType | null>(savedDraft?.imageType || null);
+  
   // Image generation - Always use Gemini
   const [aspectRatio, setAspectRatio] = useState<"1:1" | "4:5" | "16:9" | "9:16">("1:1");
   const [imageCount, setImageCount] = useState<1 | 2 | 3>(savedDraft?.imageCount || 1);
@@ -237,7 +240,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       };
       localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(draftData));
     }
-  }, [open, accountType, colorMode, customColors, platform, headline, keyPoints, tone, objective, aspectRatio, imageCount]);
+  }, [open, accountType, colorMode, customColors, platform, headline, keyPoints, tone, objective, aspectRatio, imageCount, imageType]);
 
   // Reset wizard when modal opens - Always start fresh at Step 1
   useEffect(() => {
@@ -259,6 +262,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setRefinementComments("");
       setEditedCaption("");
       setIsRefining(false);
+      setImageType(null);
       setIsGenerating(false);
       setShowProfessionalDialog(false);
       // Reset professional settings
@@ -277,13 +281,13 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
 
   // Initialize current image and caption when Step 3 is reached
   useEffect(() => {
-    if (step === 3 && selectedImageUrl && !currentImageUrl) {
+    if (step === 3 && selectedImageUrl) {
       setCurrentImageUrl(selectedImageUrl);
-      if (generatedCaption?.caption) {
+      if (generatedCaption?.caption && !editedCaption) {
         setEditedCaption(generatedCaption.caption);
       }
     }
-  }, [step, selectedImageUrl, currentImageUrl, generatedCaption]);
+  }, [step, selectedImageUrl, generatedCaption]);
   
   // Auto-generate images and caption when Step 2 is reached
   useEffect(() => {
@@ -395,7 +399,7 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         tone,
         aspectRatio,
         professionalSettings: effectiveProfessionalSettings, // Always present (smart defaults or user-selected)
-        imageType: null, // Image type not currently used
+        imageType: imageType || null, // Use selected image type
         brandProfile: profile ? {
           industry: profile.industry || undefined,
           style: profile.design_philosophy || undefined,
@@ -1545,6 +1549,35 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
         {/* Step 2: Image Selection */}
         {step === 2 && (
           <div className="space-y-6">
+            {/* Image Type/Announcement Selection (before generation) */}
+            {imageGenerationStatus === "idle" && (
+              <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                <Label className="text-base font-semibold">Post Type (Optional)</Label>
+                <Select
+                  value={imageType || "none"}
+                  onValueChange={(value) => setImageType(value === "none" ? null : value as ImageType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select post type (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">General Post</SelectItem>
+                    <SelectItem value="announcement">Announcement</SelectItem>
+                    <SelectItem value="product">Product Launch</SelectItem>
+                    <SelectItem value="quote">Quote/Inspiration</SelectItem>
+                    <SelectItem value="educational">Educational/How-to</SelectItem>
+                    <SelectItem value="social_proof">Social Proof/Testimonial</SelectItem>
+                    <SelectItem value="comparison">Comparison</SelectItem>
+                    <SelectItem value="event">Event/Webinar</SelectItem>
+                    <SelectItem value="infographic">Infographic</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select a post type to optimize image generation for your content style.
+                </p>
+              </div>
+            )}
+
             {/* Loading State */}
             {imageGenerationStatus === "generating" && (
               <div className="flex flex-col items-center justify-center py-12 space-y-4">
@@ -1658,20 +1691,32 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 
                 {/* Action Buttons */}
                 <div className="flex flex-col gap-3 pt-4">
-                  {/* Professional Enhancement Button */}
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowProfessionalDialog(true)}
-                    disabled={isGenerating || isRegeneratingWithProfessional}
-                    className="w-full gap-2"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Enhance with Professional Settings
-                    {professionalSettings && (
-                      <Badge variant="secondary" className="ml-2">Applied</Badge>
-                    )}
-                  </Button>
+                  {/* Regenerate/Remake Options */}
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline"
+                      onClick={() => setShowProfessionalDialog(true)}
+                      disabled={isGenerating || isRegeneratingWithProfessional}
+                      className="flex-1 gap-2"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Remake with Settings
+                      {professionalSettings && (
+                        <Badge variant="secondary" className="ml-1">Applied</Badge>
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={handleGenerateMore}
+                      disabled={isGenerating || isRegeneratingWithProfessional}
+                      className="flex-1 gap-2"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Generate More
+                    </Button>
+                  </div>
                   
+                  {/* Navigation and Save */}
                   <div className="flex gap-3">
                     <Button
                       variant="outline"
@@ -1682,27 +1727,26 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     </Button>
                     <Button 
                       variant="outline"
-                      onClick={handleGenerateMore}
-                      disabled={isGenerating || isRegeneratingWithProfessional}
-                    >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Generate More
-                    </Button>
-                    <Button 
-                      variant="outline"
                       onClick={handleSavePostFromStep2}
                       disabled={!selectedImageUrl || isGenerating || isRegeneratingWithProfessional}
-                      className="flex-1"
+                      className="flex-1 gap-2"
                     >
-                      <FileText className="w-4 h-4 mr-2" />
+                      <FileText className="w-4 h-4" />
                       Save Post
                     </Button>
                     <Button 
                       className="flex-1"
-                      onClick={() => setStep(3)}
+                      onClick={() => {
+                        if (selectedImageUrl) {
+                          setCurrentImageUrl(selectedImageUrl);
+                          setStep(3);
+                        } else {
+                          toast.error("Please select an image first");
+                        }
+                      }}
                       disabled={!selectedImageUrl || isGenerating || isRegeneratingWithProfessional}
                     >
-                      Continue
+                      Continue to Finalize
                     </Button>
                   </div>
                 </div>
@@ -1733,196 +1777,35 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
           />
         )}
 
-        {/* Step 3: Refinement Screen */}
+        {/* Step 3: Final Step - Schedule or Save */}
         {step === 3 && currentImageUrl && (
           <div className="space-y-6">
             {/* Selected Image Display */}
             <div className="space-y-2">
-            <div className="flex items-center justify-between">
-                <Label className="text-lg">Your Image</Label>
-                {refinementCount > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    Refinements: {refinementCount}/2
-                  </span>
-                )}
-              </div>
+              <Label className="text-lg font-semibold">Final Review</Label>
               <Card className="overflow-hidden">
-                    <CardContent className="p-0">
+                <CardContent className="p-0">
                   <div className={`relative ${aspectRatio === "1:1" ? "aspect-square" : aspectRatio === "4:5" ? "aspect-[4/5]" : aspectRatio === "16:9" ? "aspect-video" : "aspect-[9/16]"} bg-muted`}>
                     <img 
                       src={currentImageUrl} 
-                      alt="Selected or refined image"
+                      alt="Final selected image"
                       className="w-full h-full object-cover"
                     />
-                    {isRefining && (
-                      <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                        <div className="text-center space-y-2">
-                          <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
-                          <p className="text-sm text-muted-foreground">Refining image...</p>
-                        </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-              </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-            {/* Refinement Controls */}
-            <div className="space-y-6 pt-4 border-t">
-              {/* Professional Enhancement Button */}
-              <div className="flex items-center justify-between pb-2">
-                <Label className="text-base font-semibold">Refinement Options</Label>
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowProfessionalDialog(true)}
-                  disabled={isRefining || isRegeneratingWithProfessional}
-                  className="gap-2"
-                >
-                  <Settings className="w-4 h-4" />
-                  Professional Settings
-                  {professionalSettings && (
-                    <Badge variant="secondary" className="ml-1">Applied</Badge>
-                  )}
-                </Button>
-              </div>
-
-              {/* Style Slider */}
-              <div className="space-y-3">
-                <Label>Style</Label>
-                <div className="space-y-2">
-                  <Slider
-                    value={[styleSliderValue]}
-                    onValueChange={(value) => setStyleSliderValue(value[0])}
-                    min={0}
-                    max={100}
-                    step={1}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>More Professional</span>
-                    <span>More Casual</span>
-                      </div>
-                      </div>
-                    </div>
-                    
-              {/* Color Buttons */}
-              <div className="space-y-3">
-                <Label>Colors</Label>
-                <div className="grid grid-cols-2 gap-2">
-                            <Button 
-                    type="button"
-                    variant={refinementColorMode === "warmer" ? "default" : "outline"}
-                    onClick={() => setRefinementColorMode("warmer")}
-                    className="w-full"
-                            >
-                    Warmer
-                            </Button>
-                            <Button 
-                    type="button"
-                    variant={refinementColorMode === "cooler" ? "default" : "outline"}
-                    onClick={() => setRefinementColorMode("cooler")}
-                    className="w-full"
-                            >
-                    Cooler
-                            </Button>
-                            <Button 
-                    type="button"
-                    variant={refinementColorMode === "brand" ? "default" : "outline"}
-                    onClick={() => setRefinementColorMode("brand")}
-                    className="w-full"
-                            >
-                    Brand
-                            </Button>
-                            <Button 
-                    type="button"
-                    variant={refinementColorMode === "custom" ? "default" : "outline"}
-                    onClick={() => setRefinementColorMode("custom")}
-                    className="w-full"
-                  >
-                    Custom
-                            </Button>
-                          </div>
-                {refinementColorMode === "custom" && (
-                  <div className="mt-3 space-y-2 p-3 bg-muted/50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs w-16">Primary:</Label>
-                      <input
-                        type="color"
-                        value={refinementCustomColors?.primary || "#3B82F6"}
-                        onChange={(e) => setRefinementCustomColors({ 
-                          primary: e.target.value, 
-                          accent: refinementCustomColors?.accent || "#8B5CF6" 
-                        })}
-                        className="w-10 h-8 rounded border"
-                      />
-                      <Input
-                        type="text"
-                        value={refinementCustomColors?.primary || "#3B82F6"}
-                        onChange={(e) => setRefinementCustomColors({ 
-                          primary: e.target.value, 
-                          accent: refinementCustomColors?.accent || "#8B5CF6" 
-                        })}
-                        className="w-20 h-8 text-xs"
-                        placeholder="#3B82F6"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs w-16">Accent:</Label>
-                      <input
-                        type="color"
-                        value={refinementCustomColors?.accent || "#8B5CF6"}
-                        onChange={(e) => setRefinementCustomColors({ 
-                          primary: refinementCustomColors?.primary || "#3B82F6", 
-                          accent: e.target.value 
-                        })}
-                        className="w-10 h-8 rounded border"
-                      />
-                      <Input
-                        type="text"
-                        value={refinementCustomColors?.accent || "#8B5CF6"}
-                        onChange={(e) => setRefinementCustomColors({ 
-                          primary: refinementCustomColors?.primary || "#3B82F6", 
-                          accent: e.target.value 
-                        })}
-                        className="w-20 h-8 text-xs"
-                        placeholder="#8B5CF6"
-                      />
-                        </div>
-                      </div>
-                    )}
-                    </div>
-
-              {/* Prompt Enhancement Comments */}
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">Enhancement Instructions (Optional)</Label>
-                <Textarea
-                  value={refinementComments}
-                  onChange={(e) => setRefinementComments(e.target.value)}
-                  placeholder="Describe how you want to enhance the image... (e.g., 'Add more vibrant colors', 'Make it more minimalist', 'Include more people in the background')"
-                  rows={3}
-                  className="resize-none"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Provide specific instructions about how you want the image improved. These will be incorporated into the image generation prompt.
-                </p>
-              </div>
-
-              {/* Layout Note */}
-              <div className="text-sm text-muted-foreground">
-                Layout: Centered composition (works for both platforms)
-                      </div>
-                              </div>
-
-            {/* Generated Caption Section */}
+            {/* Caption Section */}
             {generatedCaption && (
               <div className="space-y-3 pt-4 border-t">
-                <Label>Generated Caption</Label>
+                <Label className="text-base font-semibold">Post Caption</Label>
                 <Textarea 
-                  value={editedCaption}
+                  value={editedCaption || generatedCaption.caption || ""}
                   onChange={(e) => setEditedCaption(e.target.value)}
                   rows={6}
                   placeholder="Edit your caption..."
+                  className="resize-none"
                 />
                 {generatedCaption.hashtags && generatedCaption.hashtags.length > 0 && (
                   <div className="flex flex-wrap gap-2">
@@ -1933,54 +1816,39 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                     ))}
                   </div>
                 )}
-                  </div>
+              </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
-              <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={() => setStep(2)}
-              >
-                Back
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleRefineImage}
-                disabled={isRefining || refinementCount >= 2}
-                className="flex-1"
-              >
-                {isRefining ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                    Refining...
-                  </>
-                ) : refinementCount >= 2 ? (
-                  "Maximum refinements reached"
-                ) : (
-                  "Apply Changes"
-                )}
-              </Button>
-              <Button 
-                className="flex-1"
-                onClick={handleFinalizePost}
-              >
-                Use This Image
-              </Button>
-              <Button 
-                variant="default"
-                onClick={handleFinalizePost}
-              >
-                Schedule Post
-              </Button>
-            </div>
-            
-            {refinementCount >= 2 && (
+            {/* Final Action Buttons */}
+            <div className="flex flex-col gap-3 pt-4 border-t">
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setStep(2)}
+                >
+                  Back
+                </Button>
+                <Button 
+                  variant="default"
+                  className="flex-1"
+                  onClick={handleFinalizePost}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Save Post
+                </Button>
+                <Button 
+                  variant="default"
+                  className="flex-1"
+                  onClick={handleFinalizePost}
+                >
+                  Schedule Post
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground text-center">
-                Maximum refinements reached
+                Save to drafts or schedule for later publishing
               </p>
-            )}
+            </div>
           </div>
         )}
 
