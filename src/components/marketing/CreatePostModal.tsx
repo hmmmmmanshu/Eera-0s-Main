@@ -498,11 +498,24 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   
   // Handle refinement - Apply changes to image
   const handleRefineImage = async () => {
-    if (!profile || !accountType || !platform || !headline || !currentImageUrl || refinementCount >= 2) {
+    if (!profile || !accountType || !platform || !headline || !currentImageUrl) {
+      toast.error("Missing required information for refinement");
+      console.error("[Step 3] Missing required info:", { profile: !!profile, accountType, platform, headline, currentImageUrl });
+      return;
+    }
+    
+    if (refinementCount >= 2) {
+      toast.error("Maximum refinements reached (2/2)");
       return;
     }
     
     setIsRefining(true);
+    console.log("[Step 3] Starting refinement with:", { 
+      refinementComments, 
+      refinementColorMode, 
+      styleSliderValue,
+      refinementCount 
+    });
 
     try {
       const brandContext = assembleBrandContext(profile);

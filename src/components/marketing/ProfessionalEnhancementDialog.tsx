@@ -231,8 +231,8 @@ export const ProfessionalEnhancementDialog = ({
             <AccordionItem value="quality">
               <AccordionTrigger>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Visual Quality Level</span>
-                  <Badge variant="secondary">{qualityLevel}</Badge>
+                  <span className="text-sm font-medium">Visual Quality Level</span>
+                  <Badge variant="secondary" className="text-xs">{qualityLevel}</Badge>
                 </div>
               </AccordionTrigger>
               <AccordionContent>
@@ -247,11 +247,11 @@ export const ProfessionalEnhancementDialog = ({
                         <div className="flex-1">
                           <Label
                             htmlFor={`quality-${option.value}`}
-                            className="font-medium cursor-pointer"
+                            className="text-sm font-medium cursor-pointer"
                           >
                             {option.label}
                           </Label>
-                          <p className="text-sm text-muted-foreground">{option.description}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{option.description}</p>
                         </div>
                       </div>
                     ))}
@@ -264,8 +264,8 @@ export const ProfessionalEnhancementDialog = ({
             <AccordionItem value="photography">
               <AccordionTrigger>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Photography Style</span>
-                  <Badge variant="secondary">
+                  <span className="text-sm font-medium">Photography Style</span>
+                  <Badge variant="secondary" className="text-xs">
                     {photographyStyles.length} {photographyStyles.length === 1 ? "style" : "styles"} selected
                   </Badge>
                 </div>
@@ -300,8 +300,8 @@ export const ProfessionalEnhancementDialog = ({
             <AccordionItem value="design">
               <AccordionTrigger>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Design Sophistication</span>
-                  <Badge variant="secondary">{designSophistication}</Badge>
+                  <span className="text-sm font-medium">Design Sophistication</span>
+                  <Badge variant="secondary" className="text-xs">{designSophistication}</Badge>
                 </div>
               </AccordionTrigger>
               <AccordionContent>
@@ -316,7 +316,7 @@ export const ProfessionalEnhancementDialog = ({
                     {DESIGN_SOPHISTICATION_OPTIONS.map((option) => (
                       <div key={option.value} className="flex items-center space-x-2">
                         <RadioGroupItem value={option.value} id={`design-${option.value}`} />
-                        <Label htmlFor={`design-${option.value}`} className="font-medium cursor-pointer">
+                        <Label htmlFor={`design-${option.value}`} className="text-sm font-medium cursor-pointer">
                           {option.label}
                         </Label>
                       </div>
@@ -330,8 +330,8 @@ export const ProfessionalEnhancementDialog = ({
             <AccordionItem value="platform">
               <AccordionTrigger>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Platform Professional Standards</span>
-                  <Badge variant="secondary">{platformStandard}</Badge>
+                  <span className="text-sm font-medium">Platform Professional Standards</span>
+                  <Badge variant="secondary" className="text-xs">{platformStandard}</Badge>
                 </div>
               </AccordionTrigger>
               <AccordionContent>
@@ -346,7 +346,7 @@ export const ProfessionalEnhancementDialog = ({
                     {PLATFORM_STANDARD_OPTIONS.map((option) => (
                       <div key={option.value} className="flex items-center space-x-2">
                         <RadioGroupItem value={option.value} id={`platform-${option.value}`} />
-                        <Label htmlFor={`platform-${option.value}`} className="font-medium cursor-pointer">
+                        <Label htmlFor={`platform-${option.value}`} className="text-sm font-medium cursor-pointer">
                           {option.label}
                         </Label>
                       </div>
@@ -361,8 +361,8 @@ export const ProfessionalEnhancementDialog = ({
               <AccordionItem value="industry">
                 <AccordionTrigger>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">Industry Aesthetic</span>
-                    {industryAesthetic && <Badge variant="secondary">{industryAesthetic}</Badge>}
+                    <span className="text-sm font-medium">Industry Aesthetic</span>
+                    {industryAesthetic && <Badge variant="secondary" className="text-xs">{industryAesthetic}</Badge>}
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
@@ -394,8 +394,8 @@ export const ProfessionalEnhancementDialog = ({
             <AccordionItem value="color">
               <AccordionTrigger>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">Color Treatment</span>
-                  <Badge variant="secondary">{colorGrading}</Badge>
+                  <span className="text-sm font-medium">Color Treatment</span>
+                  <Badge variant="secondary" className="text-xs">{colorGrading}</Badge>
                 </div>
               </AccordionTrigger>
               <AccordionContent>
@@ -408,7 +408,7 @@ export const ProfessionalEnhancementDialog = ({
                     {COLOR_GRADING_OPTIONS.map((option) => (
                       <div key={option.value} className="flex items-center space-x-2">
                         <RadioGroupItem value={option.value} id={`color-${option.value}`} />
-                        <Label htmlFor={`color-${option.value}`} className="font-medium cursor-pointer">
+                        <Label htmlFor={`color-${option.value}`} className="text-sm font-medium cursor-pointer">
                           {option.label}
                         </Label>
                       </div>
