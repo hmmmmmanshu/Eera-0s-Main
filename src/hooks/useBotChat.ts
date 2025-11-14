@@ -2,8 +2,9 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useCognitiveActions } from "./useCognitive";
 import { supabase } from "@/integrations/supabase/client";
 import type { Conversation } from "@/components/cognitive/ChatTabsBar";
+import type { BotType } from "@/lib/bots/types";
 
-export type BotType = 'friend' | 'mentor' | 'ea';
+export type { BotType };
 
 export interface ChatMessage {
   id: string;
@@ -39,6 +40,9 @@ interface UseBotChatReturn {
   editMessage: (messageId: string, newContent: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
   regenerateMessage: (messageId: string) => Promise<void>;
+  inputHistory: string[];
+  addToInputHistory: (message: string) => void;
+  getInputHistoryItem: (index: number) => string | null;
 }
 
 export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatReturn {

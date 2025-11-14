@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { getSuggestedPrompts, type SuggestedPrompt } from "@/lib/bots/suggestedPrompts";
-import type { BotType } from "@/hooks/useBotChat";
+import type { BotType } from "@/lib/bots/types";
 
 interface ChatInputProps {
   botType: BotType;

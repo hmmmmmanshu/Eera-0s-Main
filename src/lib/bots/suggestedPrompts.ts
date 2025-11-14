@@ -1,4 +1,4 @@
-import type { BotType } from "@/hooks/useBotChat";
+import type { BotType } from "./types";
 
 export interface SuggestedPrompt {
   label: string;
@@ -109,23 +109,28 @@ export function getSuggestedPrompts(
   hasMessages: boolean,
   lastMessage?: string
 ): SuggestedPrompt[] {
-  // If no messages, return general prompts for this bot
-  if (!hasMessages) {
-    return GENERAL_PROMPTS[botType];
-  }
+  try {
+    // If no messages, return general prompts for this bot
+    if (!hasMessages) {
+      return GENERAL_PROMPTS[botType] || [];
+    }
 
-  // If has messages, mix general and follow-up prompts
-  // Rotate suggestions to avoid showing same ones always
-  const general = GENERAL_PROMPTS[botType];
-  const followUp = FOLLOW_UP_PROMPTS;
-  
-  // Take 2 general and 2 follow-up prompts
-  const selectedGeneral = general.slice(0, 2);
-  const selectedFollowUp = followUp.slice(0, 2);
-  
-  // Shuffle and return
-  const combined = [...selectedGeneral, ...selectedFollowUp];
-  return shuffleArray(combined).slice(0, 4);
+    // If has messages, mix general and follow-up prompts
+    // Rotate suggestions to avoid showing same ones always
+    const general = GENERAL_PROMPTS[botType] || [];
+    const followUp = FOLLOW_UP_PROMPTS;
+    
+    // Take 2 general and 2 follow-up prompts
+    const selectedGeneral = general.slice(0, 2);
+    const selectedFollowUp = followUp.slice(0, 2);
+    
+    // Shuffle and return
+    const combined = [...selectedGeneral, ...selectedFollowUp];
+    return shuffleArray(combined).slice(0, 4);
+  } catch (error) {
+    console.error("Error getting suggested prompts:", error);
+    return [];
+  }
 }
 
 /**
