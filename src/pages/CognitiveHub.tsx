@@ -25,7 +25,7 @@ const CognitiveHub = () => {
           <div className="flex flex-col h-full">
             <div className="shrink-0 pt-2 pb-1.5">
               <BotNavigationBar activeBot={activeBot} onBotChange={setActiveBot} />
-            </div>
+              </div>
             <div className="flex-1 min-h-0">
               <BotChatContainer activeBot={activeBot} onBotChange={setActiveBot} userId={user?.id} />
             </div>

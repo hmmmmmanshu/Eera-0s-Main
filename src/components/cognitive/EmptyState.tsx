@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { getEmptyStateContentData } from "@/lib/bots/emptyStateContent";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Target, Zap } from "./icons";
+import { MessageSquare, Target, Zap } from "lucide-react";
 
 interface EmptyStateProps {
   botType: 'friend' | 'mentor' | 'ea';

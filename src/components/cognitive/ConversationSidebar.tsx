@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Search, Pin, PinOff, Archive, ArchiveRestore, Trash2, MoreVertical, Clock } from "./icons";
+import { X, Search, Pin, PinOff, Archive, ArchiveRestore, Trash2, MoreVertical, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";

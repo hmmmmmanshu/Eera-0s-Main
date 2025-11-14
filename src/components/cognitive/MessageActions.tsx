@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, RotateCw, Edit, Trash2, MoreVertical, Check, X } from "./icons";
+import { Copy, RotateCw, Edit, Trash2, MoreVertical, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
