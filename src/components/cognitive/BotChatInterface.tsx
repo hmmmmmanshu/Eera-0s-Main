@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useBotChat } from "@/hooks/useBotChat";
 import { motion } from "framer-motion";
+import { ChatTabsBar } from "./ChatTabsBar";
 
 interface BotChatInterfaceProps {
   botId: 'friend' | 'mentor' | 'ea';
@@ -31,6 +32,12 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
     isLoading,
     isSending,
     sendMessage,
+    conversations,
+    activeConversationId,
+    createNewConversation,
+    switchConversation,
+    closeConversation,
+    renameConversation,
   } = useBotChat({ userId, botType: botId });
 
   // Auto-scroll to bottom when new messages arrive
@@ -60,20 +67,44 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
     }
   };
 
+  const hasMessages = messages.length > 0;
+
+  const handleNewConversation = async () => {
+    try {
+      await createNewConversation();
+    } catch (error) {
+      toast.error("Failed to create new conversation");
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full w-full bg-background overflow-hidden">
-      {/* Compact Header */}
-      <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border bg-background sticky top-0 z-10 shrink-0">
+    <div className="flex flex-col h-full w-full bg-transparent overflow-hidden">
+      {/* Slimmer Header */}
+      <div className="px-3 sm:px-4 py-2 border-b border-border/50 bg-background/95 backdrop-blur-sm sticky top-0 z-10 shrink-0">
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <h2 className="text-base sm:text-lg font-semibold text-foreground tracking-tight truncate">{botName}</h2>
-            <p className="text-xs text-muted-foreground truncate">{botSubtitle}</p>
+            <h2 className="text-[18px] font-semibold text-foreground tracking-tight truncate">{botName}</h2>
+            <p className="text-[13px] text-muted-foreground truncate">{botSubtitle}</p>
           </div>
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 py-3 sm:py-4 space-y-2 sm:space-y-3 scroll-smooth custom-scrollbar min-h-0">
+      {/* Chat Tabs Bar */}
+      <ChatTabsBar
+        botType={botId}
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        onConversationSwitch={switchConversation}
+        onNewConversation={handleNewConversation}
+        onCloseConversation={closeConversation}
+        onRenameConversation={renameConversation}
+      />
+
+      {/* Messages Area - Reduced height when empty */}
+      <div className={cn(
+        "overflow-y-auto overflow-x-hidden px-3 sm:px-4 scroll-smooth custom-scrollbar",
+        hasMessages ? "flex-1 py-3 sm:py-4 space-y-2 sm:space-y-3" : "flex-1 py-8 sm:py-12 min-h-0"
+      )}>
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <motion.div
@@ -88,9 +119,8 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-center px-4">
-            <div className="text-muted-foreground max-w-sm">
-              <p className="text-sm font-medium mb-1 text-foreground">Start a conversation</p>
-              <p className="text-xs leading-relaxed">{BOT_WELCOME_MESSAGES[botId]}</p>
+            <div className="text-muted-foreground max-w-xs">
+              <p className="text-[13px] font-normal mb-2 text-muted-foreground/80">{BOT_WELCOME_MESSAGES[botId]}</p>
             </div>
           </div>
         ) : (
@@ -103,20 +133,23 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
                   message.role === "user" ? "justify-end" : "justify-start"
                 )}
               >
-                <div
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
                   className={cn(
-                    "max-w-[85%] sm:max-w-[75%] px-3 py-2 rounded-lg text-sm leading-relaxed",
+                    "max-w-[85%] sm:max-w-[75%] px-3 py-2 rounded-lg text-[14px] leading-relaxed",
                     "break-words overflow-wrap-anywhere",
                     message.role === "user"
                       ? "bg-accent text-accent-foreground"
-                      : "bg-muted border border-border text-foreground"
+                      : "bg-muted/80 border border-border/50 text-foreground"
                   )}
                   style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                 >
                   {message.content || (message.streaming && (
                     <TypingIndicator />
                   ))}
-                </div>
+                </motion.div>
               </div>
             ))}
           </>
@@ -124,31 +157,53 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Fixed at bottom */}
-      <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-border bg-background shrink-0">
-        <div className="flex items-center gap-2">
+      {/* Input Area - Redesigned with warmth */}
+      <div className="px-3 sm:px-4 py-3 border-t border-border/50 bg-gradient-to-t from-background via-background to-muted/10 shrink-0">
+        <div className="flex items-center gap-2.5">
           <Input
             placeholder="Type a message..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             disabled={isSending || isLoading}
-            className="flex-1 border-border focus:border-foreground/20 transition-all duration-200 focus:ring-1 focus:ring-ring/20 text-sm"
+            className={cn(
+              "flex-1 h-10 sm:h-11 rounded-xl border-border/60",
+              "bg-background/80 backdrop-blur-sm",
+              "text-[14px] placeholder:text-muted-foreground/60",
+              "transition-all duration-300 ease-out",
+              "focus:border-amber-300/50 focus:ring-2 focus:ring-amber-200/30",
+              "focus:bg-background focus:shadow-md",
+              "hover:border-border/80",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
+            )}
             aria-label="Message input"
           />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || isSending || isLoading}
-            size="icon"
-            className="shrink-0 h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-all duration-200"
-            aria-label="Send message"
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.2 }}
           >
-            {isSending ? (
-              <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
-            ) : (
-              <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            )}
-          </Button>
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || isSending || isLoading}
+              size="icon"
+              className={cn(
+                "shrink-0 h-10 w-10 sm:h-11 sm:w-11 rounded-xl",
+                "bg-gradient-to-br from-amber-500 to-orange-500",
+                "text-white hover:from-amber-600 hover:to-orange-600",
+                "shadow-md hover:shadow-lg",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                "transition-all duration-300"
+              )}
+              aria-label="Send message"
+            >
+              {isSending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowRight className="h-4 w-4" />
+              )}
+            </Button>
+          </motion.div>
         </div>
       </div>
     </div>

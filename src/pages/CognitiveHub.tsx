@@ -18,12 +18,12 @@ const CognitiveHub = () => {
   }, [location.pathname, logActivity]);
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex min-h-screen w-full bg-gradient-to-br from-background via-background to-muted/5">
       <DynamicAppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="flex flex-col h-full">
-            <div className="shrink-0 pt-4 pb-3">
+            <div className="shrink-0 pt-3 pb-2">
               <BotNavigationBar activeBot={activeBot} onBotChange={setActiveBot} />
             </div>
             <div className="flex-1 min-h-0">

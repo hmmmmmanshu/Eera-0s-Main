@@ -48,7 +48,7 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
   }, [canGoLeft, canGoRight]);
 
   return (
-    <div className="flex items-center justify-center w-full max-w-4xl mx-auto gap-2 md:gap-4 px-2 md:px-4 py-4 md:py-6">
+    <div className="flex items-center justify-center w-full max-w-4xl mx-auto gap-3 md:gap-5 px-3 md:px-5 py-3 md:py-4">
       {/* Left Arrow */}
       <motion.button
         onClick={handlePrevious}
@@ -80,10 +80,10 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
               className={cn(
                 "flex flex-col items-center justify-center rounded-xl transition-all duration-300",
                 "border min-w-[100px] md:min-w-[140px]",
-                "px-4 py-3 md:px-8 md:py-5",
+                "px-4 py-2.5 md:px-6 md:py-3.5",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 isActive
-                  ? "bg-background text-foreground border-border shadow-sm"
+                  ? "bg-gradient-to-br from-background to-muted/30 text-foreground border-border shadow-md ring-1 ring-border/50"
                   : "bg-transparent text-muted-foreground border-border/50 opacity-60 hover:opacity-80 hover:border-border/70"
               )}
               aria-label={`Switch to ${bot.name}`}
@@ -91,7 +91,7 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
             >
               <motion.span
                 className={cn(
-                  "text-[14px] md:text-[15px] leading-[1.4] tracking-[-0.01em] transition-colors duration-300",
+                  "text-[15px] md:text-[16px] leading-[1.4] tracking-[-0.01em] transition-colors duration-300",
                   isActive ? "font-semibold" : "font-normal"
                 )}
                 animate={{ opacity: isActive ? 1 : 0.6 }}
@@ -100,7 +100,7 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
               </motion.span>
               <motion.span
                 className={cn(
-                  "text-[12px] md:text-[13px] mt-0.5 md:mt-1 leading-[1.4] font-normal transition-colors duration-300",
+                  "text-[12px] md:text-[13px] mt-0.5 leading-[1.4] font-normal transition-colors duration-300",
                   isActive ? "text-foreground/70" : "text-muted-foreground/70"
                 )}
                 animate={{ opacity: isActive ? 0.7 : 0.5 }}
