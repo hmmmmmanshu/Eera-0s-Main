@@ -25,7 +25,7 @@ const CognitiveHub = () => {
         <AppTopBar title="Cognitive Hub" />
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="flex flex-col h-full">
-            <div className="shrink-0 pt-6 pb-4">
+            <div className="shrink-0 pt-4 pb-3">
               <BotNavigationBar activeBot={activeBot} onBotChange={setActiveBot} />
             </div>
             <div className="flex-1 min-h-0">

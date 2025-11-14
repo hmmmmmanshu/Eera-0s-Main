@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useBotChat } from "@/hooks/useBotChat";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 interface BotChatInterfaceProps {
   botId: 'friend' | 'mentor' | 'ea';
@@ -62,36 +62,33 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
 
   return (
     <div className="flex flex-col h-full w-full bg-background overflow-hidden">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+      {/* Compact Header */}
+      <div
         className={cn(
-          "px-6 py-6 border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10",
+          "px-4 py-3 border-b bg-background sticky top-0 z-10 shrink-0",
           isActive 
-            ? botId === 'friend' ? "border-b-4 border-blue-300" 
-              : botId === 'mentor' ? "border-b-4 border-purple-300"
-              : "border-b-4 border-green-300"
+            ? botId === 'friend' ? "border-b-2 border-blue-300" 
+              : botId === 'mentor' ? "border-b-2 border-purple-300"
+              : "border-b-2 border-green-300"
             : "border-border"
         )}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className={cn(
-            "w-3 h-3 rounded-full",
+            "w-2 h-2 rounded-full shrink-0",
             botId === 'friend' ? "bg-blue-400" 
               : botId === 'mentor' ? "bg-purple-400"
               : "bg-green-400"
           )} />
-          <div className="flex-1">
-            <h2 className="text-2xl font-semibold text-foreground tracking-tight">{botName}</h2>
-            <p className="text-sm text-muted-foreground mt-1">{botSubtitle}</p>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold text-foreground tracking-tight truncate">{botName}</h2>
+            <p className="text-xs text-muted-foreground truncate">{botSubtitle}</p>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 space-y-4 scroll-smooth custom-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-3 scroll-smooth custom-scrollbar min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <motion.div
@@ -105,72 +102,45 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
             </motion.div>
           </div>
         ) : messages.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="flex items-center justify-center h-full text-center px-6"
-          >
-            <div className="text-muted-foreground max-w-md">
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                className="mb-4"
-              >
-                <div className="w-16 h-16 mx-auto rounded-full bg-muted/50 flex items-center justify-center mb-4 border border-border/50">
-                  <div className="w-8 h-8 rounded-full bg-muted-foreground/20" />
-                </div>
-              </motion.div>
-              <p className="text-lg font-medium mb-2 text-foreground">Start a conversation</p>
-              <p className="text-sm leading-relaxed">{BOT_WELCOME_MESSAGES[botId]}</p>
+          <div className="flex items-center justify-center h-full text-center px-4">
+            <div className="text-muted-foreground max-w-sm">
+              <p className="text-sm font-medium mb-1 text-foreground">Start a conversation</p>
+              <p className="text-xs leading-relaxed">{BOT_WELCOME_MESSAGES[botId]}</p>
             </div>
-          </motion.div>
+          </div>
         ) : (
-          <AnimatePresence mode="popLayout">
-            {messages.map((message, index) => (
-              <motion.div
+          <>
+            {messages.map((message) => (
+              <div
                 key={message.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2, delay: index === messages.length - 1 ? 0 : 0 }}
                 className={cn(
                   "flex",
                   message.role === "user" ? "justify-end" : "justify-start"
                 )}
               >
-                <motion.div
+                <div
                   className={cn(
-                    "max-w-[70%] px-4 py-3 rounded-[18px] text-sm leading-relaxed",
-                    "shadow-sm break-words overflow-wrap-anywhere",
+                    "max-w-[75%] px-3 py-2 rounded-lg text-sm leading-relaxed",
+                    "break-words overflow-wrap-anywhere",
                     message.role === "user"
                       ? "bg-accent text-accent-foreground"
                       : "bg-muted border border-border text-foreground"
                   )}
-                  initial={{ scale: 0.95 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.15 }}
                   style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                 >
                   {message.content || (message.streaming && (
                     <TypingIndicator />
                   ))}
-                </motion.div>
-              </motion.div>
+                </div>
+              </div>
             ))}
-          </AnimatePresence>
+          </>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className="px-6 py-4 border-t border-border bg-background/95 backdrop-blur-sm"
-      >
+      {/* Input Area - Fixed at bottom */}
+      <div className="px-4 py-3 border-t border-border bg-background shrink-0">
         <div className="flex items-center gap-2">
           <Input
             placeholder="Type a message..."
@@ -178,26 +148,24 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             disabled={isSending || isLoading}
-            className="flex-1 border-border focus:border-foreground/20 transition-all duration-200 focus:ring-2 focus:ring-ring/20"
+            className="flex-1 border-border focus:border-foreground/20 transition-all duration-200 focus:ring-1 focus:ring-ring/20 text-sm"
             aria-label="Message input"
           />
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || isSending || isLoading}
-              size="icon"
-              className="shrink-0 h-10 w-10 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-all duration-200 shadow-sm"
-              aria-label="Send message"
-            >
-              {isSending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ArrowRight className="h-4 w-4" />
-              )}
-            </Button>
-          </motion.div>
+          <Button
+            onClick={handleSend}
+            disabled={!input.trim() || isSending || isLoading}
+            size="icon"
+            className="shrink-0 h-9 w-9 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-all duration-200"
+            aria-label="Send message"
+          >
+            {isSending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowRight className="h-4 w-4" />
+            )}
+          </Button>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -26,8 +26,8 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
     const currentIndex = BOTS.findIndex(bot => bot.id === activeBot);
     if (currentIndex === -1) return;
 
-    const cardWidth = window.innerWidth - 48; // Account for margins (1.5rem = 24px each side)
-    const scrollPosition = currentIndex * (cardWidth + 48); // Add margin spacing
+    const cardWidth = window.innerWidth - 64; // Account for margins (2rem = 32px each side)
+    const scrollPosition = currentIndex * (cardWidth + 64); // Add margin spacing
 
     containerRef.current.scrollTo({
       left: scrollPosition,
@@ -40,8 +40,8 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
     if (!containerRef.current || isScrollingRef.current) return;
 
     const scrollLeft = containerRef.current.scrollLeft;
-    const cardWidth = window.innerWidth - 48; // Account for margins (1.5rem = 24px each side)
-    const cardWithSpacing = cardWidth + 48; // Card width + margin spacing
+    const cardWidth = window.innerWidth - 64; // Account for margins (2rem = 32px each side)
+    const cardWithSpacing = cardWidth + 64; // Card width + margin spacing
     const currentIndex = Math.round(scrollLeft / cardWithSpacing);
 
     if (currentIndex >= 0 && currentIndex < BOTS.length) {
@@ -68,8 +68,8 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
         if (!containerRef.current || isScrollingRef.current) return;
 
         const scrollLeft = containerRef.current.scrollLeft;
-        const cardWidth = window.innerWidth - 32; // Account for margins
-        const cardWithSpacing = cardWidth + 32; // Card width + margin spacing
+        const cardWidth = window.innerWidth - 64; // Account for margins (2rem = 32px each side)
+        const cardWithSpacing = cardWidth + 64; // Card width + margin spacing
         const currentIndex = Math.round(scrollLeft / cardWithSpacing);
         const targetIndex = Math.max(0, Math.min(currentIndex, BOTS.length - 1));
         const targetScroll = targetIndex * cardWithSpacing;
@@ -129,27 +129,24 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
                 "transition-all duration-300"
               )}
               style={{
-                width: 'calc(100vw - 3rem)',
+                width: 'calc(100vw - 4rem)',
                 scrollSnapAlign: 'start',
-                minWidth: 'calc(100vw - 3rem)',
-                maxWidth: 'calc(100vw - 3rem)',
-                marginLeft: '1.5rem',
-                marginRight: '1.5rem',
+                minWidth: 'calc(100vw - 4rem)',
+                maxWidth: 'calc(100vw - 4rem)',
+                marginLeft: '2rem',
+                marginRight: '2rem',
               }}
             >
               <div
                 className={cn(
                   "h-full w-full overflow-hidden",
-                  "border-2 rounded-xl",
+                  "border rounded-lg",
                   isActive 
                     ? cn(
                         bot.borderColor,
-                        bot.id === 'friend' ? "ring-2 ring-blue-200 ring-offset-2" 
-                          : bot.id === 'mentor' ? "ring-2 ring-purple-200 ring-offset-2"
-                          : "ring-2 ring-green-200 ring-offset-2",
-                        "shadow-lg"
+                        "shadow-md"
                       )
-                    : "border-border/40 shadow-sm",
+                    : "border-border/30",
                   "transition-all duration-300",
                   "bg-background"
                 )}
