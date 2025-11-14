@@ -118,7 +118,7 @@ export async function generateVideoWithVEO3(
     // Use Supabase Edge Function to avoid CORS issues (VEO3 API doesn't support CORS)
     console.log("[VEO3] Calling Edge Function with prompt length:", videoPrompt.length);
     
-    const { data, error } = await supabase.functions.invoke("veo3-generate-video", {
+    const { data, error } = await supabase.functions.invoke("veo3-video-generate", {
       body: {
         prompt: videoPrompt,
         modelName: modelName,
