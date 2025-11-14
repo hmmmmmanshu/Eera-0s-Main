@@ -100,16 +100,32 @@ export async function generateVideoWithVEO3(
     brandProfile: params.brandProfile,
   });
 
+  // Map aspect ratio for prompt
+  const aspectRatioText = params.aspectRatio === "1:1" 
+    ? "square (1:1)" 
+    : params.aspectRatio === "16:9" 
+    ? "landscape (16:9)" 
+    : "vertical (9:16)";
+  
   // Enhance prompt for video generation
-  const videoPrompt = `${simplePrompt} Create a professional social media video (5-10 seconds) that visually represents this concept. The video should be dynamic, engaging, and suitable for ${params.platform} platform.`;
+  const videoPrompt = `${simplePrompt} Create a professional social media video (5-10 seconds, ${aspectRatioText} aspect ratio) that visually represents this concept. The video should be dynamic, engaging, and suitable for ${params.platform} platform.`;
 
   console.log("[VEO3] Using prompt:", videoPrompt);
 
   try {
     // Call Gemini VEO3 API
-    // Note: VEO3 endpoint may vary - using veo-3 model name
+    // Note: VEO3 may not be publicly available yet or may use a different API format
+    // If this fails, VEO3 might require:
+    // 1. Different endpoint (e.g., veo-3-exp, veo-3-pro)
+    // 2. Different API version
+    // 3. Special access/permissions
+    // 4. Different request format
+    
+    // Try with minimal config first
+    const modelName = "veo-3"; // May need to be "veo-3-exp" or "veo-3-pro" if available
+    
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/veo-3:generateContent?key=${API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -125,13 +141,8 @@ export async function generateVideoWithVEO3(
               ],
             },
           ],
-          generationConfig: {
-            responseModalities: ["video"],
-            videoConfig: {
-              aspectRatio: params.aspectRatio === "1:1" ? "1:1" : params.aspectRatio === "16:9" ? "16:9" : "9:16",
-              durationSeconds: 5, // 5 seconds video
-            },
-          },
+          // Minimal generation config - VEO3 format may differ from image generation
+          // If this fails, VEO3 might not be available or requires different format
         }),
       }
     );
@@ -143,7 +154,23 @@ export async function generateVideoWithVEO3(
         statusText: response.statusText,
         body: errorText,
       });
-      throw new Error(`VEO3 API error: ${response.status} - ${errorText}`);
+      
+      // Provide more helpful error message
+      let errorMessage = `VEO3 API error: ${response.status}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error?.message) {
+          errorMessage += ` - ${errorJson.error.message}`;
+        }
+        // Check if model doesn't exist
+        if (errorJson.error?.message?.includes("not found") || response.status === 404) {
+          errorMessage += "\n\nNote: VEO3 may not be publicly available yet or may require special access. Please check Google AI Studio for availability.";
+        }
+      } catch {
+        errorMessage += ` - ${errorText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
