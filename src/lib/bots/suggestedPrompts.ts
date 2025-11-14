@@ -8,7 +8,8 @@ export interface SuggestedPrompt {
 }
 
 // Lazy initialization function to avoid module-level initialization issues
-const getGeneralPrompts = (): Record<BotType, SuggestedPrompt[]> => ({
+// Use plain object type instead of Record<BotType, ...>
+const getGeneralPrompts = (): { friend: SuggestedPrompt[]; mentor: SuggestedPrompt[]; ea: SuggestedPrompt[] } => ({
   friend: [
     {
       label: "How are you feeling today?",

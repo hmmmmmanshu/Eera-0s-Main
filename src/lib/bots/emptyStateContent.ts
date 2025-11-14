@@ -14,7 +14,8 @@ export interface EmptyStateContent {
 }
 
 // Lazy initialization to avoid module-level initialization issues
-const getEmptyStateContent = (): Record<'friend' | 'mentor' | 'ea', EmptyStateContent> => ({
+// Use plain object type instead of Record<...> to avoid type evaluation issues
+const getEmptyStateContent = (): { friend: EmptyStateContent; mentor: EmptyStateContent; ea: EmptyStateContent } => ({
   friend: {
     welcome: "Hi! I'm here to support you.",
     subtitle: "How are you feeling today?",

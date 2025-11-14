@@ -54,21 +54,22 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
   const [inputHistory, setInputHistory] = useState<string[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Initialize refs with Record<BotType, ...> - these are fine as they're inside the hook
-  const hasCreatedInitialConversationRef = useRef<Record<BotType, boolean>>({
+  // Use plain objects instead of Record<BotType, ...> to avoid type evaluation issues
+  const hasCreatedInitialConversationRef = useRef<{ friend: boolean; mentor: boolean; ea: boolean }>({
     friend: false,
     mentor: false,
     ea: false,
   });
-  const isLoadingConversationsRef = useRef<Record<BotType, boolean>>({
+  const isLoadingConversationsRef = useRef<{ friend: boolean; mentor: boolean; ea: boolean }>({
     friend: false,
     mentor: false,
     ea: false,
   });
-  const inputHistoryRef = useRef<Map<BotType, string[]>>(new Map());
+  const inputHistoryRef = useRef<Map<string, string[]>>(new Map());
 
   // Map bot types to personas - lazy getter to avoid type evaluation issues
-  const getBotPersonaMap = (): Record<BotType, 'friend' | 'guide' | 'mentor' | 'ea'> => ({
+  // Use plain object type instead of Record<BotType, ...>
+  const getBotPersonaMap = (): { friend: 'friend' | 'guide' | 'mentor' | 'ea'; mentor: 'friend' | 'guide' | 'mentor' | 'ea'; ea: 'friend' | 'guide' | 'mentor' | 'ea' } => ({
     friend: 'friend',
     mentor: 'mentor',
     ea: 'ea',
