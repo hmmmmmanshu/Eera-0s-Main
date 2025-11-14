@@ -13,6 +13,7 @@ interface BotChatInterfaceProps {
   botSubtitle: string;
   accentColor?: string;
   userId?: string | null;
+  isActive?: boolean;
 }
 
 const BOT_WELCOME_MESSAGES: Record<'friend' | 'mentor' | 'ea', string> = {
@@ -21,7 +22,7 @@ const BOT_WELCOME_MESSAGES: Record<'friend' | 'mentor' | 'ea', string> = {
   ea: "How can I help you be more efficient today?",
 };
 
-export function BotChatInterface({ botId, botName, botSubtitle, accentColor, userId }: BotChatInterfaceProps) {
+export function BotChatInterface({ botId, botName, botSubtitle, accentColor, userId, isActive = false }: BotChatInterfaceProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -60,16 +61,33 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-background overflow-hidden" style={{ width: '100vw', minWidth: '100vw', maxWidth: '100vw' }}>
+    <div className="flex flex-col h-full w-full bg-background overflow-hidden">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="px-6 py-6 border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-10"
+        className={cn(
+          "px-6 py-6 border-b bg-background/95 backdrop-blur-sm sticky top-0 z-10",
+          isActive 
+            ? botId === 'friend' ? "border-b-4 border-blue-300" 
+              : botId === 'mentor' ? "border-b-4 border-purple-300"
+              : "border-b-4 border-green-300"
+            : "border-border"
+        )}
       >
-        <h2 className="text-2xl font-semibold text-foreground tracking-tight">{botName}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{botSubtitle}</p>
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "w-3 h-3 rounded-full",
+            botId === 'friend' ? "bg-blue-400" 
+              : botId === 'mentor' ? "bg-purple-400"
+              : "bg-green-400"
+          )} />
+          <div className="flex-1">
+            <h2 className="text-2xl font-semibold text-foreground tracking-tight">{botName}</h2>
+            <p className="text-sm text-muted-foreground mt-1">{botSubtitle}</p>
+          </div>
+        </div>
       </motion.div>
 
       {/* Messages Area */}

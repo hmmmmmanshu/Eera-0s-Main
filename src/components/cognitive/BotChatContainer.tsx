@@ -9,10 +9,10 @@ interface BotChatContainerProps {
   userId?: string | null;
 }
 
-const BOTS: Array<{ id: 'friend' | 'mentor' | 'ea'; name: string; subtitle: string; accentColor?: string }> = [
-  { id: 'friend', name: 'Friend', subtitle: 'Supportive companion', accentColor: 'blue' },
-  { id: 'mentor', name: 'Mentor', subtitle: 'Strategic advisor', accentColor: 'purple' },
-  { id: 'ea', name: 'Executive Assistant', subtitle: 'Efficient assistant', accentColor: 'green' },
+const BOTS: Array<{ id: 'friend' | 'mentor' | 'ea'; name: string; subtitle: string; accentColor?: string; borderColor?: string }> = [
+  { id: 'friend', name: 'Friend', subtitle: 'Supportive companion', accentColor: 'blue', borderColor: 'border-blue-300' },
+  { id: 'mentor', name: 'Mentor', subtitle: 'Strategic advisor', accentColor: 'purple', borderColor: 'border-purple-300' },
+  { id: 'ea', name: 'Executive Assistant', subtitle: 'Efficient assistant', accentColor: 'green', borderColor: 'border-green-300' },
 ];
 
 export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatContainerProps) {
@@ -26,8 +26,8 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
     const currentIndex = BOTS.findIndex(bot => bot.id === activeBot);
     if (currentIndex === -1) return;
 
-    const cardWidth = window.innerWidth;
-    const scrollPosition = currentIndex * cardWidth;
+    const cardWidth = window.innerWidth - 48; // Account for margins (1.5rem = 24px each side)
+    const scrollPosition = currentIndex * (cardWidth + 48); // Add margin spacing
 
     containerRef.current.scrollTo({
       left: scrollPosition,
@@ -40,8 +40,9 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
     if (!containerRef.current || isScrollingRef.current) return;
 
     const scrollLeft = containerRef.current.scrollLeft;
-    const cardWidth = window.innerWidth;
-    const currentIndex = Math.round(scrollLeft / cardWidth);
+    const cardWidth = window.innerWidth - 48; // Account for margins (1.5rem = 24px each side)
+    const cardWithSpacing = cardWidth + 48; // Card width + margin spacing
+    const currentIndex = Math.round(scrollLeft / cardWithSpacing);
 
     if (currentIndex >= 0 && currentIndex < BOTS.length) {
       const newBot = BOTS[currentIndex].id;
@@ -67,10 +68,11 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
         if (!containerRef.current || isScrollingRef.current) return;
 
         const scrollLeft = containerRef.current.scrollLeft;
-        const cardWidth = window.innerWidth;
-        const currentIndex = Math.round(scrollLeft / cardWidth);
+        const cardWidth = window.innerWidth - 32; // Account for margins
+        const cardWithSpacing = cardWidth + 32; // Card width + margin spacing
+        const currentIndex = Math.round(scrollLeft / cardWithSpacing);
         const targetIndex = Math.max(0, Math.min(currentIndex, BOTS.length - 1));
-        const targetScroll = targetIndex * cardWidth;
+        const targetScroll = targetIndex * cardWithSpacing;
 
         // Only snap if we're not already at the target
         if (Math.abs(scrollLeft - targetScroll) > 10) {
@@ -123,21 +125,38 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
               transition={{ duration: 0.3 }}
               className={cn(
                 "flex-shrink-0 h-full snap-start",
-                "bg-background overflow-hidden"
+                "bg-background overflow-hidden",
+                "transition-all duration-300"
               )}
               style={{
-                width: '100vw',
+                width: 'calc(100vw - 3rem)',
                 scrollSnapAlign: 'start',
-                minWidth: '100vw',
-                maxWidth: '100vw',
+                minWidth: 'calc(100vw - 3rem)',
+                maxWidth: 'calc(100vw - 3rem)',
+                marginLeft: '1.5rem',
+                marginRight: '1.5rem',
               }}
             >
               <div
-                className="h-full w-full overflow-hidden"
+                className={cn(
+                  "h-full w-full overflow-hidden",
+                  "border-2 rounded-xl",
+                  isActive 
+                    ? cn(
+                        bot.borderColor,
+                        bot.id === 'friend' ? "ring-2 ring-blue-200 ring-offset-2" 
+                          : bot.id === 'mentor' ? "ring-2 ring-purple-200 ring-offset-2"
+                          : "ring-2 ring-green-200 ring-offset-2",
+                        "shadow-lg"
+                      )
+                    : "border-border/40 shadow-sm",
+                  "transition-all duration-300",
+                  "bg-background"
+                )}
                 style={{
-                  width: '100vw',
-                  minWidth: '100vw',
-                  maxWidth: '100vw',
+                  width: '100%',
+                  minWidth: '100%',
+                  maxWidth: '100%',
                 }}
               >
                 <BotChatInterface
@@ -146,6 +165,7 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
                   botSubtitle={bot.subtitle}
                   accentColor={bot.accentColor}
                   userId={userId}
+                  isActive={isActive}
                 />
               </div>
             </motion.div>
