@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { EMPTY_STATE_CONTENT } from "@/lib/bots/emptyStateContent";
+import { getEmptyStateContentData } from "@/lib/bots/emptyStateContent";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
@@ -10,7 +10,7 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ botType, isFirstTime = false, onQuickAction }: EmptyStateProps) {
-  const content = EMPTY_STATE_CONTENT[botType];
+  const content = getEmptyStateContentData()[botType];
 
   return (
     <motion.div

@@ -4,8 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Conversation } from "@/components/cognitive/ChatTabsBar";
 import type { BotType } from "@/lib/bots/types";
 
-export type { BotType };
-
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -55,6 +53,8 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [inputHistory, setInputHistory] = useState<string[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Initialize refs with Record<BotType, ...> - these are fine as they're inside the hook
   const hasCreatedInitialConversationRef = useRef<Record<BotType, boolean>>({
     friend: false,
     mentor: false,
@@ -67,12 +67,12 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
   });
   const inputHistoryRef = useRef<Map<BotType, string[]>>(new Map());
 
-  // Map bot types to personas
-  const botPersonaMap: Record<BotType, 'friend' | 'guide' | 'mentor' | 'ea'> = {
+  // Map bot types to personas - lazy getter to avoid type evaluation issues
+  const getBotPersonaMap = (): Record<BotType, 'friend' | 'guide' | 'mentor' | 'ea'> => ({
     friend: 'friend',
     mentor: 'mentor',
     ea: 'ea',
-  };
+  });
 
   // Load conversations list for this bot type
   const loadConversations = useCallback(async () => {
@@ -512,7 +512,7 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     setMessages((prev) => [...prev, typingMessage]);
 
     try {
-      const persona = botPersonaMap[botType];
+      const persona = getBotPersonaMap()[botType];
       let fullReply = "";
 
       const stream = sendChatWithPlanExtractStreaming(trimmedContent, sessionId, persona);

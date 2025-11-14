@@ -13,7 +13,8 @@ export interface EmptyStateContent {
   tips?: string[];
 }
 
-export const EMPTY_STATE_CONTENT: Record<'friend' | 'mentor' | 'ea', EmptyStateContent> = {
+// Lazy initialization to avoid module-level initialization issues
+const getEmptyStateContent = (): Record<'friend' | 'mentor' | 'ea', EmptyStateContent> => ({
   friend: {
     welcome: "Hi! I'm here to support you.",
     subtitle: "How are you feeling today?",
@@ -107,5 +108,8 @@ export const EMPTY_STATE_CONTENT: Record<'friend' | 'mentor' | 'ea', EmptyStateC
       "I keep track of your priorities and help you stay organized",
     ],
   },
-};
+});
+
+// Export lazy getter function instead of constant
+export const getEmptyStateContentData = getEmptyStateContent;
 
