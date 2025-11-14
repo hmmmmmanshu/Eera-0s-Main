@@ -114,35 +114,28 @@ export async function generateVideoWithVEO3(
 
   try {
     // Call Gemini VEO3 API
-    // Note: VEO3 may not be publicly available yet or may use a different API format
-    // If this fails, VEO3 might require:
-    // 1. Different endpoint (e.g., veo-3-exp, veo-3-pro)
-    // 2. Different API version
-    // 3. Special access/permissions
-    // 4. Different request format
+    // VEO 3 uses a different endpoint: generate_videos (not generateContent)
+    // Model names: "veo-3.0-generate" or "veo-3.0-generate-preview"
+    // Reference: https://developers.googleblog.com/en/veo-3-now-available-gemini-api/
+    // VEO 3 returns async operations that need to be polled
     
-    // Try with minimal config first
-    const modelName = "veo-3"; // May need to be "veo-3-exp" or "veo-3-pro" if available
+    const modelName = "veo-3.0-generate"; // Try "veo-3.0-generate-preview" if this doesn't work
     
+    // Step 1: Initiate video generation (returns an operation)
+    // Note: The exact REST endpoint format may vary - this is based on typical Google API patterns
+    // If this fails, check the official REST API docs or use the Python SDK as reference
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateVideos?key=${API_KEY}`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: videoPrompt,
-                },
-              ],
-            },
-          ],
-          // Minimal generation config - VEO3 format may differ from image generation
-          // If this fails, VEO3 might not be available or requires different format
+          prompt: videoPrompt,
+          // Optional config based on Python SDK example:
+          // negative_prompt: "...",
+          // aspect_ratio: params.aspectRatio,
         }),
       }
     );
@@ -162,9 +155,11 @@ export async function generateVideoWithVEO3(
         if (errorJson.error?.message) {
           errorMessage += ` - ${errorJson.error.message}`;
         }
-        // Check if model doesn't exist
+        // Check if model doesn't exist or wrong endpoint
         if (errorJson.error?.message?.includes("not found") || response.status === 404) {
-          errorMessage += "\n\nNote: VEO3 may not be publicly available yet or may require special access. Please check Google AI Studio for availability.";
+          errorMessage += `\n\nNote: VEO3 uses a different API endpoint. Model: ${modelName}.`;
+          errorMessage += `\nTry "veo-3.0-generate-preview" or check Google AI Studio for the correct endpoint.`;
+          errorMessage += `\nReference: https://developers.googleblog.com/en/veo-3-now-available-gemini-api/`;
         }
       } catch {
         errorMessage += ` - ${errorText}`;
@@ -173,100 +168,97 @@ export async function generateVideoWithVEO3(
       throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-    console.log("[VEO3] API Response:", data);
+    const operationData = await response.json();
+    console.log("[VEO3] Operation created:", operationData);
+    
+    // Step 2: Poll for operation completion
+    // VEO 3 returns an async operation that needs to be polled
+    // Operation format: { name: "operations/...", done: false, ... }
+    let operation = operationData;
+    const operationName = operation.name;
+    
+    if (!operationName) {
+      throw new Error("No operation name returned from VEO3 API");
+    }
+    
+    // Poll the operation until it's done
+    let attempts = 0;
+    const maxAttempts = 60; // 5 minutes max (poll every 5 seconds)
+    
+    while (!operation.done && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+      
+      // Poll operation status
+      const statusResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${API_KEY}`
+      );
+      
+      if (!statusResponse.ok) {
+        throw new Error(`Failed to check operation status: ${statusResponse.status}`);
+      }
+      
+      operation = await statusResponse.json();
+      attempts++;
+      
+      console.log(`[VEO3] Polling operation (attempt ${attempts}/${maxAttempts}):`, {
+        done: operation.done,
+        name: operationName,
+      });
+    }
+    
+    if (!operation.done) {
+      throw new Error("Video generation timed out after 5 minutes");
+    }
+    
+    // Step 3: Extract video from completed operation
+    // VEO 3 response format: operation.result.generated_videos[0].video
+    const data = operation;
+    console.log("[VEO3] Operation completed:", data);
 
-    // Extract video data from response
-    // VEO3 may return video as URL or base64 data
+    // Extract video data from completed operation
+    // VEO 3 format: operation.result.generated_videos[0].video (file reference)
+    // Need to download the file using the file API
     let videoUrl: string;
     
-    if (data.candidates?.[0]?.content?.parts?.[0]?.videoUrl) {
-      // Video URL provided directly
-      videoUrl = data.candidates[0].content.parts[0].videoUrl;
-      console.log("[VEO3] Received video URL:", videoUrl);
+    if (data.result?.generated_videos?.[0]?.video) {
+      // VEO 3 returns a file reference, need to download it
+      const videoFile = data.result.generated_videos[0].video;
+      const fileUri = videoFile.uri || videoFile.name || videoFile;
       
-      // Download and upload to Supabase
-      const videoResponse = await fetch(videoUrl);
-      const videoBlob = await videoResponse.blob();
-      const filename = `veo3-${Date.now()}.mp4`;
-      videoUrl = await uploadVideoToSupabase(videoBlob, filename);
-    } else if (data.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
-      // Video as base64 data
-      const videoData = data.candidates[0].content.parts[0].inlineData;
-      const base64Video = videoData.data;
-      const mimeType = videoData.mimeType || "video/mp4";
-
-      // Convert base64 to blob
-      const binaryString = atob(base64Video);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: mimeType });
-
-      const filename = `veo3-${Date.now()}.mp4`;
-      videoUrl = await uploadVideoToSupabase(blob, filename);
-    } else {
-      // Check for async generation (VEO3 may return a task ID)
-      if (data.task?.name) {
-        // Poll for completion
-        const taskName = data.task.name;
-        console.log("[VEO3] Async task created:", taskName);
-        
-        // Poll for video completion
-        let attempts = 0;
-        const maxAttempts = 60; // 5 minutes max (5s intervals)
-        
-        while (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-          
-          const statusResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/${taskName}?key=${API_KEY}`
-          );
-          
-          if (!statusResponse.ok) {
-            throw new Error(`Failed to check task status: ${statusResponse.status}`);
-          }
-          
-          const statusData = await statusResponse.json();
-          
-          if (statusData.done) {
-            // Task completed
-            if (statusData.response?.candidates?.[0]?.content?.parts?.[0]?.videoUrl) {
-              videoUrl = statusData.response.candidates[0].content.parts[0].videoUrl;
-              const videoResponse = await fetch(videoUrl);
-              const videoBlob = await videoResponse.blob();
-              const filename = `veo3-${Date.now()}.mp4`;
-              videoUrl = await uploadVideoToSupabase(videoBlob, filename);
-              break;
-            } else if (statusData.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
-              const videoData = statusData.response.candidates[0].content.parts[0].inlineData;
-              const base64Video = videoData.data;
-              const mimeType = videoData.mimeType || "video/mp4";
-              
-              const binaryString = atob(base64Video);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-              }
-              const blob = new Blob([bytes], { type: mimeType });
-              
-              const filename = `veo3-${Date.now()}.mp4`;
-              videoUrl = await uploadVideoToSupabase(blob, filename);
-              break;
-            }
-          }
-          
-          attempts++;
-        }
-        
-        if (attempts >= maxAttempts) {
-          throw new Error("Video generation timed out");
-        }
+      console.log("[VEO3] Video file reference:", fileUri);
+      
+      // Download the video file
+      // VEO 3 files API endpoint: /v1beta/files/{file_id}:download
+      // Or use the file URI directly if it's a public URL
+      if (typeof fileUri === "string" && fileUri.startsWith("http")) {
+        // Direct URL
+        const videoResponse = await fetch(fileUri);
+        const videoBlob = await videoResponse.blob();
+        const filename = `veo3-${Date.now()}.mp4`;
+        videoUrl = await uploadVideoToSupabase(videoBlob, filename);
       } else {
-        console.error("[VEO3] No video data in response:", data);
-        throw new Error("No video data in VEO3 response");
+        // File ID - need to download via files API
+        const fileId = typeof fileUri === "string" ? fileUri.split("/").pop() : fileUri;
+        const downloadResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/files/${fileId}:download?key=${API_KEY}`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        
+        if (!downloadResponse.ok) {
+          throw new Error(`Failed to download video file: ${downloadResponse.status}`);
+        }
+        
+        const videoBlob = await downloadResponse.blob();
+        const filename = `veo3-${Date.now()}.mp4`;
+        videoUrl = await uploadVideoToSupabase(videoBlob, filename);
       }
+    } else {
+      console.error("[VEO3] No video data in operation result:", data);
+      throw new Error("No video data in VEO3 operation result. Check operation.result.generated_videos");
     }
 
     const generationTime = Date.now() - startTime;
