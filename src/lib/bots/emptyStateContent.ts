@@ -1,9 +1,10 @@
-import { MessageSquare, Target, Zap, LucideIcon } from "lucide-react";
+// DO NOT import icons at module level - causes temporal dead zone in bundled code
+// Icons are imported dynamically in the component that uses them
 
 export interface QuickAction {
   label: string;
   prompt: string;
-  icon?: LucideIcon;
+  iconName?: 'MessageSquare' | 'Target' | 'Zap';
 }
 
 export interface EmptyStateContent {
@@ -25,22 +26,22 @@ export function getEmptyStateContentData() {
         {
           label: "I'm feeling stressed about...",
           prompt: "I'm feeling stressed about ",
-          icon: MessageSquare,
+          iconName: 'MessageSquare',
         },
         {
           label: "Help me reflect on...",
           prompt: "Help me reflect on ",
-          icon: MessageSquare,
+          iconName: 'MessageSquare',
         },
         {
           label: "I need encouragement about...",
           prompt: "I need encouragement about ",
-          icon: MessageSquare,
+          iconName: 'MessageSquare',
         },
         {
           label: "Tell me about your day",
           prompt: "Tell me about your day",
-          icon: MessageSquare,
+          iconName: 'MessageSquare',
         },
       ],
       tips: [
@@ -56,22 +57,22 @@ export function getEmptyStateContentData() {
         {
           label: "Help me think through fundraising strategy",
           prompt: "Help me think through fundraising strategy",
-          icon: Target,
+          iconName: 'Target',
         },
         {
           label: "Analyze my go-to-market approach",
           prompt: "Analyze my go-to-market approach",
-          icon: Target,
+          iconName: 'Target',
         },
         {
           label: "Review my competitive positioning",
           prompt: "Review my competitive positioning",
-          icon: Target,
+          iconName: 'Target',
         },
         {
           label: "Strategic planning for next quarter",
           prompt: "Help me with strategic planning for next quarter",
-          icon: Target,
+          iconName: 'Target',
         },
       ],
       tips: [
@@ -87,22 +88,22 @@ export function getEmptyStateContentData() {
         {
           label: "Schedule a team meeting",
           prompt: "Schedule a team meeting",
-          icon: Zap,
+          iconName: 'Zap',
         },
         {
           label: "Create a task list for...",
           prompt: "Create a task list for ",
-          icon: Zap,
+          iconName: 'Zap',
         },
         {
           label: "Summarize my priorities",
           prompt: "Summarize my priorities",
-          icon: Zap,
+          iconName: 'Zap',
         },
         {
           label: "Help me organize my day",
           prompt: "Help me organize my day",
-          icon: Zap,
+          iconName: 'Zap',
         },
       ],
       tips: [

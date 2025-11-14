@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { getEmptyStateContentData } from "@/lib/bots/emptyStateContent";
 import { cn } from "@/lib/utils";
+import { MessageSquare, Target, Zap } from "lucide-react";
 
 interface EmptyStateProps {
   botType: 'friend' | 'mentor' | 'ea';
@@ -11,6 +12,13 @@ interface EmptyStateProps {
 
 export function EmptyState({ botType, isFirstTime = false, onQuickAction }: EmptyStateProps) {
   const content = getEmptyStateContentData()[botType];
+  
+  // Map icon names to actual icon components
+  const iconMap = {
+    MessageSquare,
+    Target,
+    Zap,
+  };
 
   return (
     <motion.div
@@ -73,9 +81,12 @@ export function EmptyState({ botType, isFirstTime = false, onQuickAction }: Empt
                   )}
                 >
                   <div className="flex items-center gap-2 w-full">
-                    {action.icon && (
+                    {action.iconName && iconMap[action.iconName] && (
                       <span className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
-                        <action.icon className="w-3 h-3" />
+                        {(() => {
+                          const Icon = iconMap[action.iconName];
+                          return <Icon className="w-3 h-3" />;
+                        })()}
                       </span>
                     )}
                     <span className="flex-1 text-left leading-tight truncate">{action.label}</span>
