@@ -78,8 +78,8 @@ const getGeneralPrompts = (): { friend: SuggestedPrompt[]; mentor: SuggestedProm
   ],
 });
 
-// Follow-up prompts (when conversation has messages)
-const FOLLOW_UP_PROMPTS: SuggestedPrompt[] = [
+// Lazy initialization function for follow-up prompts to avoid module-level initialization issues
+const getFollowUpPrompts = (): SuggestedPrompt[] => [
   {
     label: "Tell me more",
     prompt: "Can you tell me more about that?",
@@ -122,7 +122,7 @@ export function getSuggestedPrompts(
     // If has messages, mix general and follow-up prompts
     // Rotate suggestions to avoid showing same ones always
     const general = GENERAL_PROMPTS[botType] || [];
-    const followUp = FOLLOW_UP_PROMPTS;
+    const followUp = getFollowUpPrompts();
     
     // Take 2 general and 2 follow-up prompts
     const selectedGeneral = general.slice(0, 2);

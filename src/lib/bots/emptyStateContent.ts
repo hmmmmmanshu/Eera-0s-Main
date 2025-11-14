@@ -111,6 +111,8 @@ const getEmptyStateContent = (): { friend: EmptyStateContent; mentor: EmptyState
   },
 });
 
-// Export lazy getter function instead of constant
-export const getEmptyStateContentData = getEmptyStateContent;
+// Export as function to avoid const assignment evaluation issues
+export function getEmptyStateContentData() {
+  return getEmptyStateContent();
+}
 
