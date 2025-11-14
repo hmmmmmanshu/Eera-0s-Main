@@ -32,8 +32,6 @@ import {
   CheckCircle, 
   Settings,
   Palette,
-  Video,
-  Play,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -56,7 +54,6 @@ import { assembleBrandContext } from "@/lib/brandContext";
 // AI Functions
 import { generatePostContent, type GeneratedPostContent } from "@/lib/gemini";
 import { generateImageVariations, generateWithGeminiSimple } from "@/lib/imageGeneration";
-import { generateVideoWithVEO3, type GeneratedVideo } from "@/lib/videoGeneration";
 
 // Professional Enhancement
 import { ProfessionalEnhancementDialog } from "./ProfessionalEnhancementDialog";
@@ -187,10 +184,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   
-  // Video generation state
-  const [generatedVideo, setGeneratedVideo] = useState<GeneratedVideo | null>(null);
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
-  const [videoGenerationError, setVideoGenerationError] = useState<string | null>(null);
   
   // Step 3 state - Refinement
   const [refinementCount, setRefinementCount] = useState(0);
@@ -280,9 +273,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
       setShowTextEnhancementDialog(false);
       setTextEnhancementInstructions("");
       setIsRegeneratingWithText(false);
-      setGeneratedVideo(null);
-      setIsGeneratingVideo(false);
-      setVideoGenerationError(null);
       setIsGenerating(false);
       setShowProfessionalDialog(false);
       // Reset professional settings
@@ -675,90 +665,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
     }
   };
   
-  // Handle video generation (Step 2)
-  const handleGenerateVideo = async () => {
-    if (!profile || !accountType || !platform || !headline || !selectedImageUrl) {
-      toast.error("Please select an image first and ensure all required fields are filled");
-      return;
-    }
-    
-    setIsGeneratingVideo(true);
-    setVideoGenerationError(null);
-    setGeneratedVideo(null);
-    
-    try {
-      const brandContext = assembleBrandContext(profile);
-      const brandColors = profile.color_palette ? {
-        primary: (profile.color_palette as any)?.primary,
-        accent: (profile.color_palette as any)?.secondary,
-      } : undefined;
-      
-      // Get effective professional settings
-      let effectiveProfessionalSettings: ProfessionalSettings | undefined = professionalSettings || undefined;
-      
-      if (!effectiveProfessionalSettings && enablePromptEnhancers) {
-        effectiveProfessionalSettings = {
-          qualityLevel: promptEnhancerQuality,
-          photographyStyle: promptEnhancerPhotography ? [promptEnhancerPhotography] : ["natural"],
-          designSophistication: promptEnhancerDesign,
-          platformStandard: promptEnhancerPlatform,
-          industryAesthetic: promptEnhancerIndustry,
-          colorGrading: promptEnhancerColor,
-        };
-      }
-      
-      // Map aspect ratio for video (VEO3 supports 16:9, 9:16, 1:1)
-      let videoAspectRatio: "16:9" | "9:16" | "1:1" = "16:9";
-      if (aspectRatio === "1:1") {
-        videoAspectRatio = "1:1";
-      } else if (aspectRatio === "9:16") {
-        videoAspectRatio = "9:16";
-      } else {
-        videoAspectRatio = "16:9";
-      }
-      
-      // Generate video with VEO3
-      const videoResult = await generateVideoWithVEO3({
-        accountType,
-        platform,
-        headline,
-        keyPoints: keyPoints || undefined,
-        colorMode,
-        customColors: colorMode === "custom" ? customColors || undefined : undefined,
-        brandColors: colorMode === "brand" ? brandColors : undefined,
-        tone,
-        aspectRatio: videoAspectRatio,
-        professionalSettings: effectiveProfessionalSettings,
-        imageType: imageType || null,
-        brandProfile: profile ? {
-          industry: profile.industry || undefined,
-          style: profile.design_philosophy || undefined,
-          mood: profile.tone_personality || undefined,
-        } : undefined,
-      });
-      
-      setGeneratedVideo(videoResult);
-      
-      // Update post with video URL if post exists
-      if (currentPostId) {
-        await updatePostMutation.mutateAsync({
-          id: currentPostId,
-          updates: {
-            video_url: videoResult.url,
-          } as any,
-        });
-      }
-      
-      toast.success("Video generated successfully!");
-    } catch (error) {
-      console.error("[Step 2] Video generation failed:", error);
-      setVideoGenerationError(error instanceof Error ? error.message : "Failed to generate video");
-      toast.error(`Video generation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-    } finally {
-      setIsGeneratingVideo(false);
-    }
-  };
-
   // Handle text enhancement regeneration (Step 2)
   const handleTextEnhancementRegenerate = async () => {
     if (!profile || !accountType || !platform || !headline) {
@@ -1806,63 +1712,6 @@ export const CreatePostModal = ({ open, onOpenChange }: CreatePostModalProps) =>
                 </div>
                 )}
 
-                {/* Video Generation Section */}
-                <div className="space-y-3 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base font-semibold">Video Generation</Label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Generate a video version of your post using Gemini VEO3
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={handleGenerateVideo}
-                      disabled={isGeneratingVideo || isGenerating || !selectedImageUrl}
-                      className="gap-2"
-                    >
-                      {isGeneratingVideo ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Video className="w-4 h-4" />
-                          Generate Video
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  
-                  {videoGenerationError && (
-                    <div className="p-3 border border-red-500 rounded-lg bg-red-50 dark:bg-red-950">
-                      <p className="text-sm text-red-700 dark:text-red-400">{videoGenerationError}</p>
-                    </div>
-                  )}
-                  
-                  {generatedVideo && (
-                    <Card className="overflow-hidden">
-                      <CardContent className="p-0">
-                        <div className="relative aspect-video bg-muted">
-                          <video
-                            src={generatedVideo.url}
-                            controls
-                            className="w-full h-full object-contain"
-                          >
-                            Your browser does not support the video tag.
-                          </video>
-                        </div>
-                        <div className="p-4 space-y-2">
-                          <p className="text-sm text-muted-foreground">
-                            Generated in {(generatedVideo.generationTime / 1000).toFixed(1)}s
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-                
                 {/* Action Buttons */}
                 <div className="flex flex-col gap-3 pt-4">
                   {/* Regenerate/Remake Options */}

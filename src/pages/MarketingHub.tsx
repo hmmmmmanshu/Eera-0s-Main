@@ -8,6 +8,7 @@ import { MetricsCards } from "@/components/marketing/MetricsCards";
 import { TopPostsCarousel } from "@/components/marketing/TopPostsCarousel";
 import { TargetsProgress } from "@/components/marketing/TargetsProgress";
 import { CreatePostModal } from "@/components/marketing/CreatePostModal";
+import { CreateVideoModal } from "@/components/marketing/CreateVideoModal";
 import { PlatformToggle } from "@/components/marketing/PlatformToggle";
 import { AIInsightCard } from "@/components/marketing/AIInsightCard";
 import { DraftsSection } from "@/components/marketing/DraftsSection";
@@ -19,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Zap, Plus, Palette } from "lucide-react";
+import { Zap, Plus, Palette, Video } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 
@@ -29,6 +30,7 @@ const MarketingHub = () => {
   const location = useLocation();
   const { logActivity } = useActivityLogger();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateVideoModalOpen, setIsCreateVideoModalOpen] = useState(false);
   const [isBrandSettingsOpen, setIsBrandSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [platform, setPlatform] = useState<Platform>(() => {
@@ -74,6 +76,15 @@ const MarketingHub = () => {
                 <Button 
                   size="lg" 
                   variant="outline"
+                  className="gap-2"
+                  onClick={() => setIsCreateVideoModalOpen(true)}
+                >
+                  <Video className="h-5 w-5" />
+                  Generate Video
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="default"
                   className="gap-2"
                   onClick={() => setIsCreateModalOpen(true)}
                 >
@@ -121,6 +132,11 @@ const MarketingHub = () => {
       <CreatePostModal 
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
+      />
+
+      <CreateVideoModal 
+        open={isCreateVideoModalOpen}
+        onOpenChange={setIsCreateVideoModalOpen}
       />
 
       {/* Brand Identity Settings Dialog */}
