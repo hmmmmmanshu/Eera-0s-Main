@@ -3,7 +3,7 @@
  * These will be replaced with real API calls later
  */
 
-export type BotType = 'friend' | 'mentor' | 'ea';
+import type { BotType } from "./types";
 
 export async function* sendMessageToBotMock(
   botType: BotType,

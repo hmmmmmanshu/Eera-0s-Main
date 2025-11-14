@@ -25,10 +25,14 @@ interface ChatInputProps {
   onHistoryDown?: () => void;
 }
 
-const BOT_PLACEHOLDERS: Record<BotType, string> = {
-  friend: "Share what's on your mind...",
-  mentor: "What strategic challenge are you facing?",
-  ea: "What can I help you accomplish?",
+// Lazy initialization to avoid module-level initialization issues
+const getBotPlaceholder = (botType: BotType): string => {
+  const placeholders: Record<BotType, string> = {
+    friend: "Share what's on your mind...",
+    mentor: "What strategic challenge are you facing?",
+    ea: "What can I help you accomplish?",
+  };
+  return placeholders[botType];
 };
 
 export function ChatInput({
@@ -122,7 +126,7 @@ export function ChatInput({
     return "text-muted-foreground";
   };
 
-  const displayPlaceholder = placeholder || BOT_PLACEHOLDERS[botType];
+  const displayPlaceholder = placeholder || getBotPlaceholder(botType);
 
   return (
     <div className="relative">
