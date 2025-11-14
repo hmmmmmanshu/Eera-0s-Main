@@ -115,20 +115,29 @@ export async function generateVideoWithVEO3(
     
     if (USE_PROXY && SUPABASE_URL) {
       // Call Supabase Edge Function proxy
-      const { data, error } = await supabase.functions.invoke("veo3-generate-video", {
-        body: {
-          prompt: videoPrompt,
-          modelName: modelName,
-        },
-      });
+      try {
+        const { data, error } = await supabase.functions.invoke("veo3-generate-video", {
+          body: {
+            prompt: videoPrompt,
+            modelName: modelName,
+          },
+        });
 
-      if (error) {
-        throw new Error(error.message || "Supabase function error");
-      }
+        if (error) {
+          console.error("[VEO3] Supabase function error:", error);
+          // Check if function doesn't exist
+          if (error.message?.includes("not found") || error.message?.includes("404")) {
+            throw new Error(
+              "VEO3 Edge Function not deployed. Please deploy the 'veo3-generate-video' function. " +
+              "See DEPLOY_VEO3_FUNCTION.md for instructions."
+            );
+          }
+          throw new Error(error.message || "Supabase function error");
+        }
 
-      if (!data?.success || !data?.video) {
-        throw new Error(data?.message || "Video generation failed");
-      }
+        if (!data?.success || !data?.video) {
+          throw new Error(data?.message || "Video generation failed");
+        }
 
       // Convert base64 to blob
       const base64Video = data.video.data;
@@ -149,11 +158,22 @@ export async function generateVideoWithVEO3(
         time: generationTime,
       });
 
-      return {
-        url: videoUrl,
-        prompt: videoPrompt,
-        generationTime,
-      };
+        return {
+          url: videoUrl,
+          prompt: videoPrompt,
+          generationTime,
+        };
+      } catch (invokeError: any) {
+        // Handle network/CORS errors
+        if (invokeError.message?.includes("Failed to send") || invokeError.message?.includes("CORS")) {
+          throw new Error(
+            "VEO3 Edge Function not deployed or CORS error. " +
+            "Please deploy the 'veo3-generate-video' function in Supabase Dashboard. " +
+            "See DEPLOY_VEO3_FUNCTION.md for instructions."
+          );
+        }
+        throw invokeError;
+      }
     } else {
       // Fallback: direct API call (will fail due to CORS, but kept for reference)
       throw new Error("VEO3 proxy not available. Please deploy the veo3-generate-video Edge Function.");
