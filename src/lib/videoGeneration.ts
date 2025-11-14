@@ -115,19 +115,53 @@ export async function generateVideoWithVEO3(
     
     if (USE_PROXY && SUPABASE_URL) {
       // Call Supabase Edge Function proxy
+      console.log("[VEO3] Calling Edge Function with prompt length:", videoPrompt.length);
       const { data, error } = await supabase.functions.invoke("veo3-generate-video", {
         body: {
           prompt: videoPrompt,
           modelName: modelName,
         },
+      }).catch((invokeError: any) => {
+        console.error("[VEO3] Function invoke error:", invokeError);
+        // Handle network/CORS errors
+        if (invokeError.message?.includes("Failed to send") || invokeError.message?.includes("CORS")) {
+          throw new Error(
+            "VEO3 Edge Function not deployed or CORS error. " +
+            "Please deploy the 'veo3-generate-video' function in Supabase Dashboard. " +
+            "See DEPLOY_VEO3_FUNCTION.md for instructions."
+          );
+        }
+        throw invokeError;
       });
 
+      // Handle errors - check both error object and data for error responses
       if (error) {
+        console.error("[VEO3] Supabase function error:", error);
+        // Check if function doesn't exist
+        if (error.message?.includes("not found") || error.message?.includes("404")) {
+          throw new Error(
+            "VEO3 Edge Function not deployed. Please deploy the 'veo3-generate-video' function. " +
+            "See DEPLOY_VEO3_FUNCTION.md for instructions."
+          );
+        }
+        // If we have data with error info, use that instead
+        if (data && typeof data === 'object' && !data.success) {
+          const errorMsg = data.error || data.message || error.message || "Supabase function error";
+          throw new Error(`VEO3 Error: ${errorMsg}${data.details ? ` - ${data.details}` : ""}`);
+        }
         throw new Error(error.message || "Supabase function error");
       }
 
-      if (!data?.success || !data?.video) {
-        throw new Error(data?.message || "Video generation failed");
+      // Check if response indicates failure (even if no error object)
+      if (!data || (typeof data === 'object' && !data.success)) {
+        const errorMsg = data?.error || data?.message || "Video generation failed";
+        console.error("[VEO3] Edge Function returned error:", data);
+        throw new Error(`VEO3 Error: ${errorMsg}${data?.details ? ` - ${data.details}` : ""}`);
+      }
+
+      if (!data?.video) {
+        console.error("[VEO3] No video in response:", data);
+        throw new Error(data?.message || "Video generation failed - no video data returned");
       }
 
       // Convert base64 to blob
