@@ -65,7 +65,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
       {/* Compact Header */}
       <div
         className={cn(
-          "px-4 py-3 border-b bg-background sticky top-0 z-10 shrink-0",
+          "px-3 sm:px-4 py-2 sm:py-3 border-b bg-background sticky top-0 z-10 shrink-0",
           isActive 
             ? botId === 'friend' ? "border-b-2 border-blue-300" 
               : botId === 'mentor' ? "border-b-2 border-purple-300"
@@ -81,14 +81,14 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
               : "bg-green-400"
           )} />
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold text-foreground tracking-tight truncate">{botName}</h2>
+            <h2 className="text-base sm:text-lg font-semibold text-foreground tracking-tight truncate">{botName}</h2>
             <p className="text-xs text-muted-foreground truncate">{botSubtitle}</p>
           </div>
         </div>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-3 scroll-smooth custom-scrollbar min-h-0">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 py-3 sm:py-4 space-y-2 sm:space-y-3 scroll-smooth custom-scrollbar min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <motion.div
@@ -120,7 +120,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
               >
                 <div
                   className={cn(
-                    "max-w-[75%] px-3 py-2 rounded-lg text-sm leading-relaxed",
+                    "max-w-[85%] sm:max-w-[75%] px-3 py-2 rounded-lg text-sm leading-relaxed",
                     "break-words overflow-wrap-anywhere",
                     message.role === "user"
                       ? "bg-accent text-accent-foreground"
@@ -140,7 +140,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
       </div>
 
       {/* Input Area - Fixed at bottom */}
-      <div className="px-4 py-3 border-t border-border bg-background shrink-0">
+      <div className="px-3 sm:px-4 py-2 sm:py-3 border-t border-border bg-background shrink-0">
         <div className="flex items-center gap-2">
           <Input
             placeholder="Type a message..."
@@ -155,13 +155,13 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
             onClick={handleSend}
             disabled={!input.trim() || isSending || isLoading}
             size="icon"
-            className="shrink-0 h-9 w-9 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-all duration-200"
+            className="shrink-0 h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-all duration-200"
             aria-label="Send message"
           >
             {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
             ) : (
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             )}
           </Button>
         </div>

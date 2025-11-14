@@ -26,11 +26,12 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
     const currentIndex = BOTS.findIndex(bot => bot.id === activeBot);
     if (currentIndex === -1) return;
 
-    const cardWidth = window.innerWidth - 64; // Account for margins (2rem = 32px each side)
-    const scrollPosition = currentIndex * (cardWidth + 64); // Add margin spacing
-
+    // Calculate card width based on responsive breakpoints
+    const containerWidth = containerRef.current.offsetWidth;
+    const cardWidth = containerWidth; // Each card takes full width of container
+    
     containerRef.current.scrollTo({
-      left: scrollPosition,
+      left: currentIndex * cardWidth,
       behavior: 'smooth',
     });
   }, [activeBot]);
@@ -40,9 +41,8 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
     if (!containerRef.current || isScrollingRef.current) return;
 
     const scrollLeft = containerRef.current.scrollLeft;
-    const cardWidth = window.innerWidth - 64; // Account for margins (2rem = 32px each side)
-    const cardWithSpacing = cardWidth + 64; // Card width + margin spacing
-    const currentIndex = Math.round(scrollLeft / cardWithSpacing);
+    const containerWidth = containerRef.current.offsetWidth;
+    const currentIndex = Math.round(scrollLeft / containerWidth);
 
     if (currentIndex >= 0 && currentIndex < BOTS.length) {
       const newBot = BOTS[currentIndex].id;
@@ -68,11 +68,10 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
         if (!containerRef.current || isScrollingRef.current) return;
 
         const scrollLeft = containerRef.current.scrollLeft;
-        const cardWidth = window.innerWidth - 64; // Account for margins (2rem = 32px each side)
-        const cardWithSpacing = cardWidth + 64; // Card width + margin spacing
-        const currentIndex = Math.round(scrollLeft / cardWithSpacing);
+        const containerWidth = containerRef.current.offsetWidth;
+        const currentIndex = Math.round(scrollLeft / containerWidth);
         const targetIndex = Math.max(0, Math.min(currentIndex, BOTS.length - 1));
-        const targetScroll = targetIndex * cardWithSpacing;
+        const targetScroll = targetIndex * containerWidth;
 
         // Only snap if we're not already at the target
         if (Math.abs(scrollLeft - targetScroll) > 10) {
@@ -99,14 +98,15 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
   }, [activeBot, onBotChange]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
+    <div className="relative w-full h-full overflow-hidden flex items-center justify-center px-4 md:px-6 lg:px-8">
       <div
         ref={containerRef}
         onScroll={handleScroll}
         className={cn(
           "flex h-full overflow-x-scroll snap-x snap-mandatory",
           "scrollbar-hide", // Hide scrollbar visually
-          "scroll-smooth" // Smooth scrolling
+          "scroll-smooth", // Smooth scrolling
+          "w-full max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto" // Responsive centered container
         )}
         style={{
           scrollSnapType: 'x mandatory',
@@ -126,15 +126,12 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
               className={cn(
                 "flex-shrink-0 h-full snap-start",
                 "bg-background overflow-hidden",
-                "transition-all duration-300"
+                "transition-all duration-300",
+                "w-full sm:w-[90%] md:w-[85%] lg:w-[80%] xl:w-[75%]",
+                "px-2 sm:px-3 md:px-4"
               )}
               style={{
-                width: 'calc(100vw - 4rem)',
                 scrollSnapAlign: 'start',
-                minWidth: 'calc(100vw - 4rem)',
-                maxWidth: 'calc(100vw - 4rem)',
-                marginLeft: '2rem',
-                marginRight: '2rem',
               }}
             >
               <div
@@ -150,11 +147,6 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
                   "transition-all duration-300",
                   "bg-background"
                 )}
-                style={{
-                  width: '100%',
-                  minWidth: '100%',
-                  maxWidth: '100%',
-                }}
               >
                 <BotChatInterface
                   botId={bot.id}
