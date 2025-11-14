@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { List } from "lucide-react";
+import { List } from "./icons";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useBotChat } from "@/hooks/useBotChat";

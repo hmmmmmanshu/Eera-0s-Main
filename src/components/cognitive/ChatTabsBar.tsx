@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "./icons";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
