@@ -7,8 +7,8 @@ export interface SuggestedPrompt {
   context?: 'general' | 'follow-up' | 'related';
 }
 
-// General prompts for each bot type (when conversation is empty)
-const GENERAL_PROMPTS: Record<BotType, SuggestedPrompt[]> = {
+// Lazy initialization function to avoid module-level initialization issues
+const getGeneralPrompts = (): Record<BotType, SuggestedPrompt[]> => ({
   friend: [
     {
       label: "How are you feeling today?",
@@ -75,7 +75,7 @@ const GENERAL_PROMPTS: Record<BotType, SuggestedPrompt[]> = {
       context: 'general',
     },
   ],
-};
+});
 
 // Follow-up prompts (when conversation has messages)
 const FOLLOW_UP_PROMPTS: SuggestedPrompt[] = [
@@ -110,6 +110,9 @@ export function getSuggestedPrompts(
   lastMessage?: string
 ): SuggestedPrompt[] {
   try {
+    // Lazy initialization to avoid module-level issues
+    const GENERAL_PROMPTS = getGeneralPrompts();
+    
     // If no messages, return general prompts for this bot
     if (!hasMessages) {
       return GENERAL_PROMPTS[botType] || [];
