@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { SkeletonLoader } from "./SkeletonLoader";
 import type { Conversation } from "./ChatTabsBar";
 
 type FilterType = 'all' | 'recent' | 'pinned' | 'archived';
@@ -22,6 +23,7 @@ interface ConversationSidebarProps {
   onUnarchiveConversation: (conversationId: string) => void;
   onDeleteConversation: (conversationId: string) => void;
   onRenameConversation: (conversationId: string, newTitle: string) => void;
+  isLoading?: boolean;
 }
 
 export function ConversationSidebar({
@@ -38,6 +40,7 @@ export function ConversationSidebar({
   onUnarchiveConversation,
   onDeleteConversation,
   onRenameConversation,
+  isLoading = false,
 }: ConversationSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
@@ -253,7 +256,11 @@ export function ConversationSidebar({
 
             {/* Conversation List */}
             <div className="flex-1 overflow-y-auto scrollbar-thin">
-              {sortedConversations.length === 0 ? (
+              {isLoading ? (
+                <div className="py-2 px-2 space-y-2" aria-label="Loading conversations...">
+                  <SkeletonLoader variant="conversation" count={5} />
+                </div>
+              ) : sortedConversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full px-4 text-center">
                   <div className="text-muted-foreground">
                     {searchQuery ? (

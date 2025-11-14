@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowRight, Loader2, List } from "lucide-react";
+import { List } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useBotChat } from "@/hooks/useBotChat";
 import { motion } from "framer-motion";
@@ -10,6 +8,8 @@ import { ChatTabsBar } from "./ChatTabsBar";
 import { ConversationSidebar } from "./ConversationSidebar";
 import { EmptyState } from "./EmptyState";
 import { MessageActions } from "./MessageActions";
+import { ChatInput } from "./ChatInput";
+import { SkeletonLoader } from "./SkeletonLoader";
 
 interface BotChatInterfaceProps {
   botId: 'friend' | 'mentor' | 'ea';
@@ -25,7 +25,9 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isFirstTime, setIsFirstTime] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const {
     messages,
@@ -45,6 +47,8 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
     editMessage,
     deleteMessage,
     regenerateMessage,
+    inputHistory,
+    getInputHistoryItem,
   } = useBotChat({ userId, botType: botId });
 
   // Auto-scroll to bottom when new messages arrive
@@ -59,6 +63,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
 
     const msg = input.trim();
     setInput("");
+    setHistoryIndex(-1); // Reset history index after sending
 
     try {
       await sendMessage(msg);
@@ -67,12 +72,44 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+  const handleHistoryUp = () => {
+    if (inputHistory.length === 0) return;
+    
+    const newIndex = historyIndex === -1 
+      ? inputHistory.length - 1 
+      : Math.max(historyIndex - 1, 0);
+    
+    const historyItem = getInputHistoryItem(newIndex);
+    if (historyItem) {
+      setHistoryIndex(newIndex);
+      setInput(historyItem);
     }
   };
+
+  const handleHistoryDown = () => {
+    if (historyIndex === -1) return;
+    
+    const newIndex = historyIndex + 1;
+    if (newIndex >= inputHistory.length) {
+      setHistoryIndex(-1);
+      setInput("");
+    } else {
+      const historyItem = getInputHistoryItem(newIndex);
+      if (historyItem) {
+        setHistoryIndex(newIndex);
+        setInput(historyItem);
+      }
+    }
+  };
+
+  // Auto-focus input when switching bots or when active
+  useEffect(() => {
+    if (isActive && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [isActive, botId]);
 
   const hasMessages = messages.length > 0;
 
@@ -164,16 +201,10 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
         hasMessages ? "py-3 space-y-2" : ""
       )}>
         {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              className="flex flex-col items-center gap-4"
-            >
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Loading conversation...</p>
-            </motion.div>
+          <div className="py-3 space-y-2" aria-label="Loading conversation...">
+            <SkeletonLoader variant="message" align="left" count={2} />
+            <SkeletonLoader variant="message" align="right" count={1} />
+            <SkeletonLoader variant="message" align="left" count={1} />
           </div>
         ) : messages.length === 0 ? (
           <EmptyState
@@ -258,54 +289,23 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Compact */}
+      {/* Input Area - Enhanced */}
       <div className="px-3 sm:px-4 py-2 border-t border-border/50 bg-gradient-to-t from-background via-background to-muted/10 shrink-0">
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Type a message..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            disabled={isSending || isLoading}
-            className={cn(
-              "flex-1 h-9 rounded-lg border-border/60",
-              "bg-background/80 backdrop-blur-sm",
-              "text-[13px] placeholder:text-muted-foreground/60",
-              "transition-all duration-300 ease-out",
-              "focus:border-amber-300/50 focus:ring-2 focus:ring-amber-200/30",
-              "focus:bg-background focus:shadow-md",
-              "hover:border-border/80",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
-            )}
-            aria-label="Message input"
-          />
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-          >
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || isSending || isLoading}
-              size="icon"
-              className={cn(
-                "shrink-0 h-9 w-9 rounded-lg",
-                "bg-gradient-to-br from-amber-500 to-orange-500",
-                "text-white hover:from-amber-600 hover:to-orange-600",
-                "shadow-md hover:shadow-lg",
-                "disabled:opacity-50 disabled:cursor-not-allowed",
-                "transition-all duration-300"
-              )}
-              aria-label="Send message"
-            >
-              {isSending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <ArrowRight className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          </motion.div>
-        </div>
+        <ChatInput
+          botType={botId}
+          value={input}
+          onChange={setInput}
+          onSubmit={handleSend}
+          disabled={isSending || isLoading}
+          loading={isSending}
+          showCharacterCount={true}
+          showSuggestedPrompts={true}
+          hasMessages={messages.length > 0}
+          lastMessage={messages.length > 0 ? messages[messages.length - 1]?.content : undefined}
+          inputRef={inputRef}
+          onHistoryUp={handleHistoryUp}
+          onHistoryDown={handleHistoryDown}
+        />
       </div>
     </div>
   );

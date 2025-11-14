@@ -49,6 +49,7 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [inputHistory, setInputHistory] = useState<string[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasCreatedInitialConversationRef = useRef<Record<BotType, boolean>>({
     friend: false,
@@ -60,6 +61,7 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     mentor: false,
     ea: false,
   });
+  const inputHistoryRef = useRef<Map<BotType, string[]>>(new Map());
 
   // Map bot types to personas
   const botPersonaMap: Record<BotType, 'friend' | 'guide' | 'mentor' | 'ea'> = {
@@ -372,6 +374,32 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     setMessages([]);
   }, []);
 
+  // Add to input history
+  const addToInputHistory = useCallback((message: string) => {
+    if (!message.trim()) return;
+    
+    const history = inputHistoryRef.current.get(botType) || [];
+    // Remove if already exists (to avoid duplicates)
+    const filtered = history.filter(m => m !== message);
+    // Add to beginning and limit to 10
+    const updated = [message, ...filtered].slice(0, 10);
+    inputHistoryRef.current.set(botType, updated);
+    setInputHistory(updated);
+  }, [botType]);
+
+  // Get input history item by index (negative index for reverse)
+  const getInputHistoryItem = useCallback((index: number): string | null => {
+    const history = inputHistoryRef.current.get(botType) || [];
+    if (index < 0 || index >= history.length) return null;
+    return history[index];
+  }, [botType]);
+
+  // Load input history when bot type changes
+  useEffect(() => {
+    const history = inputHistoryRef.current.get(botType) || [];
+    setInputHistory(history);
+  }, [botType]);
+
   // Edit a message
   const editMessage = useCallback(async (messageId: string, newContent: string) => {
     if (!sessionId || !newContent.trim()) return;
@@ -559,7 +587,7 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
       setIsSending(false);
       abortControllerRef.current = null;
     }
-  }, [userId, sessionId, botType, isSending, sendChatWithPlanExtractStreaming, botPersonaMap, conversations, renameConversation]);
+  }, [userId, sessionId, botType, isSending, sendChatWithPlanExtractStreaming, botPersonaMap, conversations, renameConversation, addToInputHistory]);
 
   // Load conversations when bot type changes or on mount
   useEffect(() => {
@@ -630,6 +658,9 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     editMessage,
     deleteMessage,
     regenerateMessage,
+    inputHistory,
+    addToInputHistory,
+    getInputHistoryItem,
   };
 }
 
