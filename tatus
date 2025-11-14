@@ -1,0 +1,38 @@
+[1mdiff --git a/src/components/cognitive/BotChatContainer.tsx b/src/components/cognitive/BotChatContainer.tsx[m
+[1mindex f356836..369c0e2 100644[m
+[1m--- a/src/components/cognitive/BotChatContainer.tsx[m
+[1m+++ b/src/components/cognitive/BotChatContainer.tsx[m
+[36m@@ -144,14 +144,25 @@[m [mexport function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont[m
+                   borderColor: isActive ? undefined : "rgba(0,0,0,0.1)",[m
+                 }}[m
+               >[m
+[31m-                <BotChatInterface[m
+[31m-                  botId={bot.id}[m
+[31m-                  botName={bot.name}[m
+[31m-                  botSubtitle={bot.subtitle}[m
+[31m-                  accentColor={bot.accentColor}[m
+[31m-                  userId={userId}[m
+[31m-                  isActive={isActive}[m
+[31m-                />[m
+[32m+[m[32m                {/* CRITICAL FIX: Only render BotChatInterface when active to prevent simultaneous initialization */}[m
+[32m+[m[32m                {isActive ? ([m
+[32m+[m[32m                  <BotChatInterface[m
+[32m+[m[32m                    botId={bot.id}[m
+[32m+[m[32m                    botName={bot.name}[m
+[32m+[m[32m                    botSubtitle={bot.subtitle}[m
+[32m+[m[32m                    accentColor={bot.accentColor}[m
+[32m+[m[32m                    userId={userId}[m
+[32m+[m[32m                    isActive={isActive}[m
+[32m+[m[32m                  />[m
+[32m+[m[32m                ) : ([m
+[32m+[m[32m                  // Placeholder for inactive bots to maintain scroll structure[m
+[32m+[m[32m                  <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">[m
+[32m+[m[32m                    <div className="text-center space-y-2">[m
+[32m+[m[32m                      <p className="text-sm font-medium">{bot.name}</p>[m
+[32m+[m[32m                      <p className="text-xs">{bot.subtitle}</p>[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                  </div>[m
+[32m+[m[32m                )}[m
+               </motion.div>[m
+             </motion.div>[m
+           );[m

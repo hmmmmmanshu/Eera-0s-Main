@@ -1,7 +1,10 @@
-import { useEffect, useRef } from "react";
-import { BotChatInterface } from "./BotChatInterface";
+import { useEffect, useRef, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+
+// CRITICAL: Lazy load BotChatInterface to prevent all icon imports from loading simultaneously
+// This prevents temporal dead zone errors in the bundled code
+const BotChatInterface = lazy(() => import("./BotChatInterface").then(m => ({ default: m.BotChatInterface })));
 
 interface BotChatContainerProps {
   activeBot: 'friend' | 'mentor' | 'ea';
@@ -146,14 +149,23 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
               >
                 {/* CRITICAL FIX: Only render BotChatInterface when active to prevent simultaneous initialization */}
                 {isActive ? (
-                  <BotChatInterface
-                    botId={bot.id}
-                    botName={bot.name}
-                    botSubtitle={bot.subtitle}
-                    accentColor={bot.accentColor}
-                    userId={userId}
-                    isActive={isActive}
-                  />
+                  <Suspense fallback={
+                    <div className="h-full w-full flex items-center justify-center">
+                      <div className="text-center space-y-2 text-muted-foreground">
+                        <div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
+                        <p className="text-sm">Loading {bot.name}...</p>
+                      </div>
+                    </div>
+                  }>
+                    <BotChatInterface
+                      botId={bot.id}
+                      botName={bot.name}
+                      botSubtitle={bot.subtitle}
+                      accentColor={bot.accentColor}
+                      userId={userId}
+                      isActive={isActive}
+                    />
+                  </Suspense>
                 ) : (
                   // Placeholder for inactive bots to maintain scroll structure
                   <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
