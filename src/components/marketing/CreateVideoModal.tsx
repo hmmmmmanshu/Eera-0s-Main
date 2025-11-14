@@ -173,9 +173,13 @@ export const CreateVideoModal = ({ open, onOpenChange }: CreateVideoModalProps) 
       const createdPost = await createPostMutation.mutateAsync({
         platform: normalizedPlatform,
         content: headline, // Temporary content
+        media_urls: [], // Empty array initially, will be updated with video URL
         status: "generating",
         account_type: accountType,
-        video_url: null,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
       });
       
       setCurrentPostId(createdPost.id);
@@ -221,10 +225,9 @@ export const CreateVideoModal = ({ open, onOpenChange }: CreateVideoModalProps) 
       await updatePostMutation.mutateAsync({
         id: createdPost.id,
         updates: {
-          video_url: videoResult.url,
+          media_urls: [videoResult.url], // Store video URL in media_urls array
           content: caption.caption || headline,
           status: "draft",
-          final_image_url: null, // No image for video-only posts
         } as any,
       });
       
@@ -252,7 +255,7 @@ export const CreateVideoModal = ({ open, onOpenChange }: CreateVideoModalProps) 
         id: currentPostId,
         updates: {
           platform: normalizedPlatform,
-          video_url: generatedVideo.url,
+          media_urls: [generatedVideo.url], // Store video URL in media_urls array
           content: generatedCaption?.caption || headline,
           status: "draft",
         } as any,

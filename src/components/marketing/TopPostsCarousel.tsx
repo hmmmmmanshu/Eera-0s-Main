@@ -27,9 +27,10 @@ export const TopPostsCarousel = ({ platform }: TopPostsCarouselProps) => {
     .sort((a, b) => (b.likes + b.comments) - (a.likes + a.comments))
     .slice(0, 6);
   
-  console.log("[TopPostsCarousel] Platform filter:", normalizedPlatform);
-  console.log("[TopPostsCarousel] Posts found:", posts.length);
-  console.log("[TopPostsCarousel] Top posts:", topPosts.length);
+  // Debug logging (commented out for production)
+  // console.log("[TopPostsCarousel] Platform filter:", normalizedPlatform);
+  // console.log("[TopPostsCarousel] Posts found:", posts.length);
+  // console.log("[TopPostsCarousel] Top posts:", topPosts.length);
 
   if (isLoading) {
     return (
