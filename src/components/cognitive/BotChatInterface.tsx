@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { ChatTabsBar } from "./ChatTabsBar";
 import { ConversationSidebar } from "./ConversationSidebar";
 import { EmptyState } from "./EmptyState";
+import { MessageActions } from "./MessageActions";
 
 interface BotChatInterfaceProps {
   botId: 'friend' | 'mentor' | 'ea';
@@ -23,6 +24,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
   const [input, setInput] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isFirstTime, setIsFirstTime] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -40,6 +42,9 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
     unpinConversation,
     archiveConversation,
     unarchiveConversation,
+    editMessage,
+    deleteMessage,
+    regenerateMessage,
   } = useBotChat({ userId, botType: botId });
 
   // Auto-scroll to bottom when new messages arrive
@@ -178,33 +183,76 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
           />
         ) : (
           <>
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex",
-                  message.role === "user" ? "justify-end" : "justify-start"
-                )}
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
+            {messages.map((message, index) => {
+              const isEditing = editingMessageId === message.id;
+              
+              return (
+                <div
+                  key={message.id}
                   className={cn(
-                    "max-w-[85%] sm:max-w-[75%] px-3 py-2 rounded-lg text-[14px] leading-relaxed",
-                    "break-words overflow-wrap-anywhere",
-                    message.role === "user"
-                      ? "bg-accent text-accent-foreground"
-                      : "bg-muted/80 border border-border/50 text-foreground"
+                    "group flex items-start gap-2",
+                    message.role === "user" ? "justify-end" : "justify-start"
                   )}
-                  style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                 >
-                  {message.content || (message.streaming && (
-                    <TypingIndicator />
-                  ))}
-                </motion.div>
-              </div>
-            ))}
+                  {!isEditing ? (
+                    <>
+                      <motion.div
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={cn(
+                          "max-w-[85%] sm:max-w-[75%] px-3 py-2 rounded-lg text-[14px] leading-relaxed",
+                          "break-words overflow-wrap-anywhere relative",
+                          message.role === "user"
+                            ? "bg-accent text-accent-foreground"
+                            : "bg-muted/80 border border-border/50 text-foreground"
+                        )}
+                        style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                      >
+                        {message.content || (message.streaming && (
+                          <TypingIndicator />
+                        ))}
+                        {message.isEdited && (
+                          <span className="text-[10px] text-muted-foreground/60 ml-1 italic">(edited)</span>
+                        )}
+                      </motion.div>
+                      {!message.streaming && (
+                        <MessageActions
+                          message={message}
+                          messageIndex={index}
+                          onCopy={() => {}}
+                          onRegenerate={message.role === 'assistant' ? () => regenerateMessage(message.id) : undefined}
+                          onEdit={message.role === 'user' ? (newContent) => {
+                            editMessage(message.id, newContent);
+                            setEditingMessageId(null);
+                          } : undefined}
+                          onDelete={() => deleteMessage(message.id)}
+                          position={message.role === "user" ? "right" : "left"}
+                          isStreaming={message.streaming}
+                          onEditStart={() => setEditingMessageId(message.id)}
+                          onEditCancel={() => setEditingMessageId(null)}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <MessageActions
+                      message={message}
+                      messageIndex={index}
+                      onCopy={() => {}}
+                      onEdit={(newContent) => {
+                        editMessage(message.id, newContent);
+                        setEditingMessageId(null);
+                      }}
+                      onDelete={() => deleteMessage(message.id)}
+                      position={message.role === "user" ? "right" : "left"}
+                      isStreaming={false}
+                      onEditStart={() => setEditingMessageId(message.id)}
+                      onEditCancel={() => setEditingMessageId(null)}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </>
         )}
         <div ref={messagesEndRef} />

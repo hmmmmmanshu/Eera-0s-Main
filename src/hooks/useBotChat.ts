@@ -12,6 +12,8 @@ export interface ChatMessage {
   botType: BotType;
   timestamp: Date;
   streaming?: boolean;
+  isEdited?: boolean;
+  editedAt?: Date;
 }
 
 interface UseBotChatOptions {
@@ -34,6 +36,9 @@ interface UseBotChatReturn {
   closeConversation: (conversationId: string) => Promise<void>;
   renameConversation: (conversationId: string, newTitle: string) => Promise<void>;
   loadConversations: () => Promise<void>;
+  editMessage: (messageId: string, newContent: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
+  regenerateMessage: (messageId: string) => Promise<void>;
 }
 
 export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatReturn {
@@ -367,6 +372,73 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     setMessages([]);
   }, []);
 
+  // Edit a message
+  const editMessage = useCallback(async (messageId: string, newContent: string) => {
+    if (!sessionId || !newContent.trim()) return;
+
+    try {
+      // Update in database if message exists there
+      // For now, we'll just update local state
+      // In a full implementation, you'd update the database record
+      
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId && msg.role === 'user'
+            ? {
+                ...msg,
+                content: newContent.trim(),
+                isEdited: true,
+                editedAt: new Date(),
+              }
+            : msg
+        )
+      );
+    } catch (error) {
+      console.error("Error editing message:", error);
+      throw error;
+    }
+  }, [sessionId]);
+
+  // Delete a message
+  const deleteMessage = useCallback(async (messageId: string) => {
+    if (!sessionId) return;
+
+    try {
+      // Remove from local state
+      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+      
+      // In a full implementation, you'd also delete from database
+      // await supabase.from("chat_messages").delete().eq("id", messageId);
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      throw error;
+    }
+  }, [sessionId]);
+
+  // Regenerate assistant response
+  const regenerateMessage = useCallback(async (assistantMessageId: string) => {
+    if (!sessionId || !userId || isSending) return;
+
+    try {
+      // Find the assistant message to regenerate
+      const assistantIndex = messages.findIndex((m) => m.id === assistantMessageId && m.role === 'assistant');
+      if (assistantIndex === -1) return;
+
+      // Find the user message that preceded this assistant message
+      const userMessage = messages[assistantIndex - 1];
+      if (!userMessage || userMessage.role !== 'user') return;
+
+      // Remove the assistant message
+      setMessages((prev) => prev.filter((m) => m.id !== assistantMessageId));
+
+      // Resend the user message (this will create a new assistant response)
+      await sendMessage(userMessage.content);
+    } catch (error) {
+      console.error("Error regenerating message:", error);
+      throw error;
+    }
+  }, [sessionId, userId, isSending, messages, sendMessage]);
+
   // Send message
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || !userId || !sessionId || isSending) return;
@@ -555,6 +627,9 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     archiveConversation,
     unarchiveConversation,
     loadConversations,
+    editMessage,
+    deleteMessage,
+    regenerateMessage,
   };
 }
 
