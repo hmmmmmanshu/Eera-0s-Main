@@ -25,16 +25,16 @@ interface ChatInputProps {
   onHistoryDown?: () => void;
 }
 
-// Lazy initialization to avoid module-level initialization issues
-// Use plain object type instead of Record<BotType, ...>
-const getBotPlaceholder = (botType: BotType): string => {
+// Function to get placeholder - defined inside component file but outside component
+// to avoid module-level initialization issues
+function getBotPlaceholder(botType: BotType): string {
   const placeholders: { friend: string; mentor: string; ea: string } = {
     friend: "Share what's on your mind...",
     mentor: "What strategic challenge are you facing?",
     ea: "What can I help you accomplish?",
   };
   return placeholders[botType];
-};
+}
 
 export function ChatInput({
   botType,
