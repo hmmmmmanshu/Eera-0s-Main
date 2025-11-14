@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { AppTopBar } from "@/components/AppTopBar";
 import { DynamicAppSidebar } from "@/components/DynamicAppSidebar";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { BotNavigationBar } from "@/components/cognitive/BotNavigationBar";
@@ -22,7 +21,6 @@ const CognitiveHub = () => {
     <div className="flex min-h-screen w-full bg-background">
       <DynamicAppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <AppTopBar title="Cognitive Hub" />
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="flex flex-col h-full">
             <div className="shrink-0 pt-4 pb-3">

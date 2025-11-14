@@ -9,10 +9,10 @@ interface BotChatContainerProps {
   userId?: string | null;
 }
 
-const BOTS: Array<{ id: 'friend' | 'mentor' | 'ea'; name: string; subtitle: string; accentColor?: string; borderColor?: string }> = [
-  { id: 'friend', name: 'Friend', subtitle: 'Supportive companion', accentColor: 'blue', borderColor: 'border-blue-300' },
-  { id: 'mentor', name: 'Mentor', subtitle: 'Strategic advisor', accentColor: 'purple', borderColor: 'border-purple-300' },
-  { id: 'ea', name: 'Executive Assistant', subtitle: 'Efficient assistant', accentColor: 'green', borderColor: 'border-green-300' },
+const BOTS: Array<{ id: 'friend' | 'mentor' | 'ea'; name: string; subtitle: string; accentColor?: string }> = [
+  { id: 'friend', name: 'Friend', subtitle: 'Supportive companion', accentColor: 'blue' },
+  { id: 'mentor', name: 'Mentor', subtitle: 'Strategic advisor', accentColor: 'purple' },
+  { id: 'ea', name: 'Executive Assistant', subtitle: 'Efficient assistant', accentColor: 'green' },
 ];
 
 export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatContainerProps) {
@@ -98,7 +98,7 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
   }, [activeBot, onBotChange]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden flex items-center justify-center px-4 md:px-6 lg:px-8">
+    <div className="relative w-full h-full overflow-hidden flex items-center justify-center px-4 md:px-6">
       <div
         ref={containerRef}
         onScroll={handleScroll}
@@ -106,7 +106,7 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
           "flex h-full overflow-x-scroll snap-x snap-mandatory",
           "scrollbar-hide", // Hide scrollbar visually
           "scroll-smooth", // Smooth scrolling
-          "w-full max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto" // Responsive centered container
+          "w-full max-w-xl md:max-w-2xl lg:max-w-3xl mx-auto" // Smaller max-width for better zoom
         )}
         style={{
           scrollSnapType: 'x mandatory',
@@ -124,11 +124,8 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
               }}
               transition={{ duration: 0.3 }}
               className={cn(
-                "flex-shrink-0 h-full snap-start",
-                "bg-background overflow-hidden",
-                "transition-all duration-300",
-                "w-full sm:w-[90%] md:w-[85%] lg:w-[80%] xl:w-[75%]",
-                "px-2 sm:px-3 md:px-4"
+                "flex-shrink-0 h-full snap-start w-full", // Full width - only one visible at a time
+                "bg-background overflow-hidden"
               )}
               style={{
                 scrollSnapAlign: 'start',
@@ -137,14 +134,7 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
               <div
                 className={cn(
                   "h-full w-full overflow-hidden",
-                  "border rounded-lg",
-                  isActive 
-                    ? cn(
-                        bot.borderColor,
-                        "shadow-md"
-                      )
-                    : "border-border/30",
-                  "transition-all duration-300",
+                  "border border-border rounded-lg",
                   "bg-background"
                 )}
               >

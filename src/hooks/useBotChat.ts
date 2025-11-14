@@ -53,7 +53,38 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
 
     try {
       setIsLoading(true);
-      const sid = await createOrGetSession("cognitive");
+      // Create or get separate session for each bot type
+      const sessionTitle = `Cognitive ${botType.charAt(0).toUpperCase() + botType.slice(1)}`;
+      
+      // Query for existing session with this title
+      const { data: existingSession } = await supabase
+        .from("chat_sessions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("title", sessionTitle)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let sid: string;
+      if (existingSession?.id) {
+        sid = existingSession.id;
+      } else {
+        // Create new session for this bot type
+        const { data: newSession, error } = await supabase
+          .from("chat_sessions")
+          .insert({ 
+            user_id: userId, 
+            active_hub: "cognitive", 
+            title: sessionTitle 
+          })
+          .select("id")
+          .single();
+        
+        if (error) throw error;
+        sid = newSession.id;
+      }
+      
       setSessionId(sid);
 
       const recent = await listRecentMessages(sid, 20);
@@ -73,17 +104,23 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     } finally {
       setIsLoading(false);
     }
-  }, [userId, botType, createOrGetSession, listRecentMessages]);
+  }, [userId, botType, listRecentMessages]);
 
   // Create new chat session
   const createNewChat = useCallback(async () => {
     if (!userId) return;
 
     try {
-      // Create a new session
+      const sessionTitle = `Cognitive ${botType.charAt(0).toUpperCase() + botType.slice(1)}`;
+      
+      // Create a new session for this bot type
       const { data: newSession, error } = await supabase
         .from("chat_sessions")
-        .insert({ user_id: userId, active_hub: "cognitive", title: `${botType} Chat` })
+        .insert({ 
+          user_id: userId, 
+          active_hub: "cognitive", 
+          title: sessionTitle 
+        })
         .select("id")
         .single();
 
@@ -212,8 +249,11 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
 
   // Load history when bot type changes or on mount
   useEffect(() => {
+    // Clear messages when switching bots to prevent showing wrong messages
+    setMessages([]);
+    setSessionId(null);
     loadConversationHistory();
-  }, [loadConversationHistory]);
+  }, [botType, loadConversationHistory]);
 
   // Cleanup on unmount
   useEffect(() => {

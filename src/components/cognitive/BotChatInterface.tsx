@@ -63,23 +63,8 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
   return (
     <div className="flex flex-col h-full w-full bg-background overflow-hidden">
       {/* Compact Header */}
-      <div
-        className={cn(
-          "px-3 sm:px-4 py-2 sm:py-3 border-b bg-background sticky top-0 z-10 shrink-0",
-          isActive 
-            ? botId === 'friend' ? "border-b-2 border-blue-300" 
-              : botId === 'mentor' ? "border-b-2 border-purple-300"
-              : "border-b-2 border-green-300"
-            : "border-border"
-        )}
-      >
+      <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border bg-background sticky top-0 z-10 shrink-0">
         <div className="flex items-center gap-2">
-          <div className={cn(
-            "w-2 h-2 rounded-full shrink-0",
-            botId === 'friend' ? "bg-blue-400" 
-              : botId === 'mentor' ? "bg-purple-400"
-              : "bg-green-400"
-          )} />
           <div className="flex-1 min-w-0">
             <h2 className="text-base sm:text-lg font-semibold text-foreground tracking-tight truncate">{botName}</h2>
             <p className="text-xs text-muted-foreground truncate">{botSubtitle}</p>
