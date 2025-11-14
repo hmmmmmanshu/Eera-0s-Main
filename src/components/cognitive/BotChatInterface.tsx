@@ -8,6 +8,7 @@ import { useBotChat } from "@/hooks/useBotChat";
 import { motion } from "framer-motion";
 import { ChatTabsBar } from "./ChatTabsBar";
 import { ConversationSidebar } from "./ConversationSidebar";
+import { EmptyState } from "./EmptyState";
 
 interface BotChatInterfaceProps {
   botId: 'friend' | 'mentor' | 'ea';
@@ -18,15 +19,10 @@ interface BotChatInterfaceProps {
   isActive?: boolean;
 }
 
-const BOT_WELCOME_MESSAGES: Record<'friend' | 'mentor' | 'ea', string> = {
-  friend: "Hey! I'm here to listen and support you. What's on your mind?",
-  mentor: "Let's work through this strategically. What challenge are you facing?",
-  ea: "How can I help you be more efficient today?",
-};
-
 export function BotChatInterface({ botId, botName, botSubtitle, accentColor, userId, isActive = false }: BotChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isFirstTime, setIsFirstTime] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -78,9 +74,32 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
   const handleNewConversation = async () => {
     try {
       await createNewConversation();
+      setIsFirstTime(false); // Not first time if user manually creates conversation
     } catch (error) {
       toast.error("Failed to create new conversation");
     }
+  };
+
+  // Check if this is first time user (no conversations exist)
+  useEffect(() => {
+    if (conversations.length === 0 && !isLoading) {
+      setIsFirstTime(true);
+    } else if (conversations.length > 0) {
+      setIsFirstTime(false);
+    }
+  }, [conversations.length, isLoading]);
+
+  const handleQuickAction = (prompt: string) => {
+    setInput(prompt);
+    // Focus the input field
+    setTimeout(() => {
+      const inputElement = document.querySelector('input[aria-label="Message input"]') as HTMLInputElement;
+      inputElement?.focus();
+      // Move cursor to end
+      if (inputElement) {
+        inputElement.setSelectionRange(prompt.length, prompt.length);
+      }
+    }, 0);
   };
 
   return (
@@ -151,11 +170,11 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
             </motion.div>
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-center px-4">
-            <div className="text-muted-foreground max-w-xs">
-              <p className="text-[13px] font-normal mb-2 text-muted-foreground/80">{BOT_WELCOME_MESSAGES[botId]}</p>
-            </div>
-          </div>
+          <EmptyState
+            botType={botId}
+            isFirstTime={isFirstTime}
+            onQuickAction={handleQuickAction}
+          />
         ) : (
           <>
             {messages.map((message) => (

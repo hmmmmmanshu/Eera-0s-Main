@@ -222,6 +222,7 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
       setActiveConversationId(newSession.id);
       setSessionId(newSession.id);
       setMessages([]);
+      setIsLoading(false); // Ensure loading is false for new empty conversation
 
       return newSession.id;
     } catch (error) {
@@ -519,6 +520,10 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
   useEffect(() => {
     if (activeConversationId) {
       loadConversationHistory(activeConversationId);
+    } else {
+      // If no active conversation, set loading to false and clear messages
+      setIsLoading(false);
+      setMessages([]);
     }
   }, [activeConversationId, loadConversationHistory]);
 
