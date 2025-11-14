@@ -8,7 +8,7 @@ import { buildSimpleGeminiPrompt } from "./promptAmplification";
 import type { ImageType } from "@/types/imageTypes";
 import type { ProfessionalKeywordSettings } from "./professionalKeywords";
 
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export interface VideoGenerationParams {
   accountType: "personal" | "company";
@@ -108,126 +108,64 @@ export async function generateVideoWithVEO3(
 
   console.log("[VEO3] Using prompt:", videoPrompt);
 
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!API_KEY) {
-    throw new Error("VITE_GEMINI_API_KEY is required for video generation");
+  if (!SUPABASE_URL) {
+    throw new Error("VITE_SUPABASE_URL is required for video generation");
   }
 
   const modelName = "veo-3.0-generate";
 
   try {
-    // Step 1: Initiate video generation (returns an operation)
-    console.log(`[VEO3] Calling VEO3 API directly with model: ${modelName}`);
-    console.log(`[VEO3] Prompt length: ${videoPrompt.length} characters`);
+    // Use Supabase Edge Function to avoid CORS issues (VEO3 API doesn't support CORS)
+    console.log("[VEO3] Calling Edge Function with prompt length:", videoPrompt.length);
     
-    const generateResponse = await fetch(
-      `${GEMINI_API_BASE}/models/${modelName}:generateVideos?key=${API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: videoPrompt,
-        }),
-      }
-    );
-
-    if (!generateResponse.ok) {
-      const errorText = await generateResponse.text();
-      console.error('[VEO3] API Error:', {
-        status: generateResponse.status,
-        statusText: generateResponse.statusText,
-        error: errorText,
-      });
-      
-      let errorMessage = 'VEO3 API error';
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
-      } catch {
-        errorMessage = errorText.substring(0, 200);
-      }
-      
-      throw new Error(`VEO3 API error: ${generateResponse.status} - ${errorMessage}`);
-    }
-
-    const operationData = await generateResponse.json();
-    console.log('[VEO3] Operation created:', operationData);
-
-    // Step 2: Poll for operation completion
-    const operationName = operationData.name;
-    if (!operationName) {
-      throw new Error('No operation name returned from VEO3 API');
-    }
-
-    // Poll the operation until it's done
-    let operation = operationData;
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutes max (poll every 5 seconds)
-
-    while (!operation.done && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-
-      const statusResponse = await fetch(
-        `${GEMINI_API_BASE}/${operationName}?key=${API_KEY}`
+    const { data, error } = await supabase.functions.invoke("veo3-generate-video", {
+      body: {
+        prompt: videoPrompt,
+        modelName: modelName,
+      },
+    }).catch((invokeError: any) => {
+      console.error("[VEO3] Function invoke error:", invokeError);
+      throw new Error(
+        `VEO3 Edge Function error: ${invokeError.message || "Failed to invoke function"}. ` +
+        "Please ensure the 'veo3-generate-video' function is deployed and GEMINI_API_KEY secret is set."
       );
+    });
 
-      if (!statusResponse.ok) {
-        throw new Error(`Failed to check operation status: ${statusResponse.status}`);
+    // Handle errors
+    if (error) {
+      console.error("[VEO3] Supabase function error:", error);
+      if (error.message?.includes("not found") || error.message?.includes("404")) {
+        throw new Error(
+          "VEO3 Edge Function not found. Please deploy the 'veo3-generate-video' function in Supabase Dashboard."
+        );
       }
-
-      operation = await statusResponse.json();
-      attempts++;
-
-      console.log(`[VEO3] Polling operation (attempt ${attempts}/${maxAttempts}):`, {
-        done: operation.done,
-      });
+      throw new Error(error.message || "Supabase function error");
     }
 
-    if (!operation.done) {
-      throw new Error('Video generation timed out after 5 minutes');
+    // Check if response indicates failure
+    if (!data || (typeof data === 'object' && !data.success)) {
+      const errorMsg = data?.error || data?.message || "Video generation failed";
+      console.error("[VEO3] Edge Function returned error:", data);
+      throw new Error(`VEO3 Error: ${errorMsg}${data?.details ? ` - ${data.details}` : ""}`);
     }
 
-    // Step 3: Extract video file reference and download
-    const videoFile = operation.result?.generated_videos?.[0]?.video;
-    if (!videoFile) {
-      console.error('[VEO3] No video data in operation result:', operation);
-      throw new Error('No video data in operation result');
+    if (!data?.video) {
+      console.error("[VEO3] No video in response:", data);
+      throw new Error(data?.message || "Video generation failed - no video data returned");
     }
 
-    const fileUri = videoFile.uri || videoFile.name || videoFile;
-    let videoBlob: Blob;
-
-    if (typeof fileUri === 'string' && fileUri.startsWith('http')) {
-      // Direct URL
-      const videoResponse = await fetch(fileUri);
-      if (!videoResponse.ok) {
-        throw new Error(`Failed to download video from URL: ${videoResponse.status}`);
-      }
-      videoBlob = await videoResponse.blob();
-    } else {
-      // File ID - download via files API
-      const fileId = typeof fileUri === 'string' ? fileUri.split('/').pop() : fileUri;
-      const downloadResponse = await fetch(
-        `${GEMINI_API_BASE}/files/${fileId}:download?key=${API_KEY}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!downloadResponse.ok) {
-        throw new Error(`Failed to download video file: ${downloadResponse.status}`);
-      }
-
-      videoBlob = await downloadResponse.blob();
+    // Convert base64 to blob
+    const base64Video = data.video.data;
+    const binaryString = atob(base64Video);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
+    const blob = new Blob([bytes], { type: data.video.mimeType || "video/mp4" });
 
     // Upload to Supabase Storage
     const filename = `veo3-${Date.now()}.mp4`;
-    const videoUrl = await uploadVideoToSupabase(videoBlob, filename);
+    const videoUrl = await uploadVideoToSupabase(blob, filename);
 
     const generationTime = Date.now() - startTime;
     console.log("[VEO3] Video generation successful:", {
