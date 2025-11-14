@@ -155,7 +155,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
       {/* Messages Area - Reduced height when empty */}
       <div className={cn(
         "overflow-y-auto overflow-x-hidden px-3 sm:px-4 scroll-smooth custom-scrollbar",
-        hasMessages ? "flex-1 py-3 sm:py-4 space-y-2 sm:space-y-3" : "flex-1 py-8 sm:py-12 min-h-0"
+        hasMessages ? "flex-1 py-3 sm:py-4 space-y-2 sm:space-y-3" : "flex-1 min-h-0"
       )}>
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
