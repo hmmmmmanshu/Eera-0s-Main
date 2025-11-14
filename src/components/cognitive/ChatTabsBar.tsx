@@ -62,12 +62,12 @@ export function ChatTabsBar({
 
   if (conversations.length === 0) {
     return (
-      <div className="px-3 sm:px-4 py-2 border-b border-border/50 bg-background/50">
+      <div className="px-3 sm:px-4 py-1.5 border-b border-border/50 bg-background/50 shrink-0">
         <button
           onClick={onNewConversation}
-          className="text-[13px] text-muted-foreground hover:text-foreground transition-colors duration-200 flex items-center gap-1.5"
+          className="text-[12px] text-muted-foreground hover:text-foreground transition-colors duration-200 flex items-center gap-1.5"
         >
-          <span className="text-lg leading-none">+</span>
+          <span className="text-base leading-none">+</span>
           <span>New Chat</span>
         </button>
       </div>
@@ -75,7 +75,7 @@ export function ChatTabsBar({
   }
 
   return (
-    <div className="px-3 sm:px-4 py-2 border-b border-border/50 bg-background/50 overflow-x-auto scrollbar-hide">
+    <div className="px-3 sm:px-4 py-1.5 border-b border-border/50 bg-background/50 overflow-x-auto scrollbar-hide shrink-0">
       <div className="flex items-center gap-1.5 min-w-max">
         {conversations.map((conversation) => {
           const isActive = conversation.id === activeConversationId;
@@ -98,8 +98,8 @@ export function ChatTabsBar({
                 onClick={() => !isEditing && onConversationSwitch(conversation.id)}
                 onDoubleClick={() => handleDoubleClick(conversation)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all duration-200",
-                  "max-w-[200px] min-w-[120px]",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg transition-all duration-200",
+                  "max-w-[180px] min-w-[100px]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                   isActive
                     ? "bg-background text-foreground font-semibold border-t border-l border-r border-border shadow-sm"
@@ -125,7 +125,7 @@ export function ChatTabsBar({
                   />
                 ) : (
                   <>
-                    <span className="flex-1 text-[13px] truncate text-left">
+                    <span                     className="flex-1 text-[12px] truncate text-left">
                       {conversation.title}
                     </span>
                     {showClose && (
@@ -156,14 +156,14 @@ export function ChatTabsBar({
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           className={cn(
-            "flex items-center gap-1.5 px-3 py-2 rounded-lg",
-            "text-[13px] text-muted-foreground hover:text-foreground",
+            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg",
+            "text-[12px] text-muted-foreground hover:text-foreground",
             "hover:bg-muted/30 transition-colors duration-200",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
           )}
           aria-label="New Chat"
         >
-          <span className="text-base leading-none">+</span>
+          <span className="text-sm leading-none">+</span>
           <span className="hidden sm:inline">New Chat</span>
         </motion.button>
       </div>

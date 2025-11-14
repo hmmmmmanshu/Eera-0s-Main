@@ -98,7 +98,7 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
   }, [activeBot, onBotChange]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden flex items-center justify-center px-2 sm:px-3 md:px-4">
+    <div className="relative w-full h-full overflow-hidden">
       <div
         ref={containerRef}
         onScroll={handleScroll}
@@ -106,7 +106,7 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
           "flex h-full overflow-x-scroll snap-x snap-mandatory",
           "scrollbar-hide", // Hide scrollbar visually
           "scroll-smooth", // Smooth scrolling
-          "w-full max-w-lg sm:max-w-xl md:max-w-2xl mx-auto" // Reduced zoom: 15-20% smaller
+          "w-full" // Full width - use all available space
         )}
         style={{
           scrollSnapType: 'x mandatory',
@@ -134,7 +134,7 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
             >
               <motion.div
                 className={cn(
-                  "h-full w-full overflow-hidden rounded-xl",
+                  "h-full w-full overflow-hidden",
                   "border transition-all duration-300",
                   isActive 
                     ? "border-border shadow-lg bg-gradient-to-b from-background to-muted/20" 

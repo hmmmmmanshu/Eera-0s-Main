@@ -122,21 +122,21 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
       />
 
       {/* Slimmer Header */}
-      <div className="px-3 sm:px-4 py-2 border-b border-border/50 bg-background/95 backdrop-blur-sm sticky top-0 z-10 shrink-0">
+      <div className="px-3 sm:px-4 py-1.5 border-b border-border/50 bg-background/95 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSidebarOpen(true)}
             className={cn(
-              "p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0",
+              "p-1 rounded-lg hover:bg-muted transition-colors shrink-0",
               sidebarOpen && "bg-muted"
             )}
             aria-label="Toggle conversations sidebar"
           >
-            <List className="w-4 h-4" />
+            <List className="w-3.5 h-3.5" />
           </button>
           <div className="flex-1 min-w-0">
-            <h2 className="text-[18px] font-semibold text-foreground tracking-tight truncate">{botName}</h2>
-            <p className="text-[13px] text-muted-foreground truncate">{botSubtitle}</p>
+            <h2 className="text-[16px] font-semibold text-foreground tracking-tight truncate">{botName}</h2>
+            <p className="text-[12px] text-muted-foreground truncate">{botSubtitle}</p>
           </div>
         </div>
       </div>
@@ -152,10 +152,11 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
         onRenameConversation={renameConversation}
       />
 
-      {/* Messages Area - Reduced height when empty */}
+      {/* Messages Area - No scrolling, fits on screen */}
       <div className={cn(
         "overflow-y-auto overflow-x-hidden px-3 sm:px-4 scroll-smooth custom-scrollbar",
-        hasMessages ? "flex-1 py-3 sm:py-4 space-y-2 sm:space-y-3" : "flex-1 min-h-0"
+        "flex-1 min-h-0",
+        hasMessages ? "py-3 space-y-2" : ""
       )}>
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -209,9 +210,9 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Redesigned with warmth */}
-      <div className="px-3 sm:px-4 py-3 border-t border-border/50 bg-gradient-to-t from-background via-background to-muted/10 shrink-0">
-        <div className="flex items-center gap-2.5">
+      {/* Input Area - Compact */}
+      <div className="px-3 sm:px-4 py-2 border-t border-border/50 bg-gradient-to-t from-background via-background to-muted/10 shrink-0">
+        <div className="flex items-center gap-2">
           <Input
             placeholder="Type a message..."
             value={input}
@@ -219,9 +220,9 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
             onKeyPress={handleKeyPress}
             disabled={isSending || isLoading}
             className={cn(
-              "flex-1 h-10 sm:h-11 rounded-xl border-border/60",
+              "flex-1 h-9 rounded-lg border-border/60",
               "bg-background/80 backdrop-blur-sm",
-              "text-[14px] placeholder:text-muted-foreground/60",
+              "text-[13px] placeholder:text-muted-foreground/60",
               "transition-all duration-300 ease-out",
               "focus:border-amber-300/50 focus:ring-2 focus:ring-amber-200/30",
               "focus:bg-background focus:shadow-md",
@@ -240,7 +241,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
               disabled={!input.trim() || isSending || isLoading}
               size="icon"
               className={cn(
-                "shrink-0 h-10 w-10 sm:h-11 sm:w-11 rounded-xl",
+                "shrink-0 h-9 w-9 rounded-lg",
                 "bg-gradient-to-br from-amber-500 to-orange-500",
                 "text-white hover:from-amber-600 hover:to-orange-600",
                 "shadow-md hover:shadow-lg",
@@ -250,9 +251,9 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
               aria-label="Send message"
             >
               {isSending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-3.5 w-3.5" />
               )}
             </Button>
           </motion.div>

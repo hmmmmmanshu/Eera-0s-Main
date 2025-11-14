@@ -17,16 +17,16 @@ export function EmptyState({ botType, isFirstTime = false, onQuickAction }: Empt
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col items-center justify-center w-full h-full px-4 py-6 sm:py-8 text-center"
+      className="flex flex-col items-center justify-center w-full px-4 py-3 text-center"
     >
-      <div className="max-w-lg w-full space-y-4">
+      <div className="w-full max-w-2xl space-y-3">
         {/* Welcome Message */}
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <motion.h2
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
-            className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight"
+            className="text-lg sm:text-xl font-semibold text-foreground tracking-tight"
           >
             {content.welcome}
           </motion.h2>
@@ -35,7 +35,7 @@ export function EmptyState({ botType, isFirstTime = false, onQuickAction }: Empt
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.15 }}
-              className="text-sm sm:text-base text-muted-foreground"
+              className="text-xs sm:text-sm text-muted-foreground"
             >
               {content.subtitle}
             </motion.p>
@@ -43,42 +43,42 @@ export function EmptyState({ botType, isFirstTime = false, onQuickAction }: Empt
         </div>
 
         {/* Quick Actions */}
-        <div className="space-y-2 pt-2">
+        <div className="space-y-1.5 pt-1">
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.2 }}
-            className="text-xs sm:text-sm text-muted-foreground mb-2.5"
+            className="text-[11px] sm:text-xs text-muted-foreground mb-2"
           >
             Try asking:
           </motion.p>
-          <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {content.quickActions.map((action, index) => (
               <motion.div
                 key={action.label}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2, delay: 0.25 + index * 0.05 }}
+                transition={{ duration: 0.2, delay: 0.25 + index * 0.03 }}
               >
                 <Button
                   variant="outline"
                   onClick={() => onQuickAction(action.prompt)}
                   className={cn(
-                    "w-full justify-start h-auto py-2.5 px-3.5",
-                    "text-left text-[14px] font-normal",
+                    "w-full justify-start h-auto py-2 px-3",
+                    "text-left text-[13px] font-normal",
                     "hover:bg-muted/50 hover:border-border",
                     "transition-all duration-200",
                     "group",
                     "border-border/60"
                   )}
                 >
-                  <div className="flex items-center gap-2.5 w-full">
+                  <div className="flex items-center gap-2 w-full">
                     {action.icon && (
                       <span className="text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
-                        <action.icon className="w-3.5 h-3.5" />
+                        <action.icon className="w-3 h-3" />
                       </span>
                     )}
-                    <span className="flex-1 text-left leading-snug">{action.label}</span>
+                    <span className="flex-1 text-left leading-tight truncate">{action.label}</span>
                   </div>
                 </Button>
               </motion.div>
@@ -92,16 +92,16 @@ export function EmptyState({ botType, isFirstTime = false, onQuickAction }: Empt
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.5 }}
-            className="pt-4 border-t border-border/40 mt-4"
+            className="pt-3 border-t border-border/30 mt-3"
           >
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {content.tips.map((tip, index) => (
                 <motion.p
                   key={index}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.2, delay: 0.55 + index * 0.05 }}
-                  className="text-[11px] sm:text-xs text-muted-foreground/70 leading-relaxed"
+                  className="text-[10px] sm:text-[11px] text-muted-foreground/60 leading-snug"
                 >
                   {tip}
                 </motion.p>
