@@ -60,7 +60,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-background">
+    <div className="flex flex-col h-full w-full bg-background overflow-hidden" style={{ width: '100vw', minWidth: '100vw', maxWidth: '100vw' }}>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -73,7 +73,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
       </motion.div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 scroll-smooth custom-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 space-y-4 scroll-smooth custom-scrollbar">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <motion.div
@@ -125,7 +125,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
                 <motion.div
                   className={cn(
                     "max-w-[70%] px-4 py-3 rounded-[18px] text-sm leading-relaxed",
-                    "shadow-sm",
+                    "shadow-sm break-words overflow-wrap-anywhere",
                     message.role === "user"
                       ? "bg-accent text-accent-foreground"
                       : "bg-muted border border-border text-foreground"
@@ -133,6 +133,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
                   initial={{ scale: 0.95 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.15 }}
+                  style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
                 >
                   {message.content || (message.streaming && (
                     <TypingIndicator />

@@ -122,18 +122,23 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
               }}
               transition={{ duration: 0.3 }}
               className={cn(
-                "flex-shrink-0 w-screen h-full snap-start",
-                "bg-background"
+                "flex-shrink-0 h-full snap-start",
+                "bg-background overflow-hidden"
               )}
               style={{
+                width: '100vw',
                 scrollSnapAlign: 'start',
+                minWidth: '100vw',
+                maxWidth: '100vw',
               }}
             >
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: isActive ? 1 : 0.7 }}
-                transition={{ duration: 0.3 }}
-                className="h-full w-full"
+              <div
+                className="h-full w-full overflow-hidden"
+                style={{
+                  width: '100vw',
+                  minWidth: '100vw',
+                  maxWidth: '100vw',
+                }}
               >
                 <BotChatInterface
                   botId={bot.id}
@@ -142,7 +147,7 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
                   accentColor={bot.accentColor}
                   userId={userId}
                 />
-              </motion.div>
+              </div>
             </motion.div>
           );
         })}
