@@ -144,14 +144,25 @@ export function BotChatContainer({ activeBot, onBotChange, userId }: BotChatCont
                   borderColor: isActive ? undefined : "rgba(0,0,0,0.1)",
                 }}
               >
-                <BotChatInterface
-                  botId={bot.id}
-                  botName={bot.name}
-                  botSubtitle={bot.subtitle}
-                  accentColor={bot.accentColor}
-                  userId={userId}
-                  isActive={isActive}
-                />
+                {/* CRITICAL FIX: Only render BotChatInterface when active to prevent simultaneous initialization */}
+                {isActive ? (
+                  <BotChatInterface
+                    botId={bot.id}
+                    botName={bot.name}
+                    botSubtitle={bot.subtitle}
+                    accentColor={bot.accentColor}
+                    userId={userId}
+                    isActive={isActive}
+                  />
+                ) : (
+                  // Placeholder for inactive bots to maintain scroll structure
+                  <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
+                    <div className="text-center space-y-2">
+                      <p className="text-sm font-medium">{bot.name}</p>
+                      <p className="text-xs">{bot.subtitle}</p>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             </motion.div>
           );
