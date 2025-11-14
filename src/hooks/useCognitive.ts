@@ -762,9 +762,9 @@ TEXT: ${text}`;
     if (!userId) throw new Error("No user");
     const { data, error } = await supabase
       .from("chat_sessions")
-      .select("id, title, updated_at, created_at")
+      .select("id, title, created_at, active_hub, is_pinned, is_archived")
       .eq("user_id", userId)
-      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error; return data || [];
   }, [userId]);

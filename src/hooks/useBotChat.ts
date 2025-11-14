@@ -50,6 +50,11 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     mentor: false,
     ea: false,
   });
+  const isLoadingConversationsRef = useRef<Record<BotType, boolean>>({
+    friend: false,
+    mentor: false,
+    ea: false,
+  });
 
   // Map bot types to personas
   const botPersonaMap: Record<BotType, 'friend' | 'guide' | 'mentor' | 'ea'> = {
@@ -60,7 +65,14 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
 
   // Load conversations list for this bot type
   const loadConversations = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) return [];
+    
+    // Prevent concurrent calls
+    if (isLoadingConversationsRef.current[botType]) {
+      return [];
+    }
+
+    isLoadingConversationsRef.current[botType] = true;
 
     try {
       const allSessions = await listSessions(50);
@@ -72,13 +84,44 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
         return title.startsWith(botName.toLowerCase()) || title.includes(botType.toLowerCase());
       });
 
-      const mapped: Conversation[] = botSessions.map((s: any) => ({
+      // Fetch last message previews for each session
+      const sessionsWithPreviews = await Promise.all(
+        botSessions.map(async (s: any) => {
+          try {
+            const { data: messages } = await supabase
+              .from("chat_messages")
+              .select("content, created_at")
+              .eq("session_id", s.id)
+              .order("created_at", { ascending: false })
+              .limit(1);
+
+            const lastMessage = messages && messages.length > 0 ? messages[0] : null;
+
+            return {
+              ...s,
+              lastMessagePreview: lastMessage?.content?.slice(0, 50) || undefined,
+              lastMessageAt: lastMessage?.created_at || s.created_at,
+            };
+          } catch {
+            return {
+              ...s,
+              lastMessagePreview: undefined,
+              lastMessageAt: s.created_at,
+            };
+          }
+        })
+      );
+
+      const mapped: Conversation[] = sessionsWithPreviews.map((s: any) => ({
         id: s.id,
         botType,
         title: s.title || `Chat ${s.id.slice(0, 8)}`,
         createdAt: new Date(s.created_at),
-        lastMessageAt: new Date(s.updated_at || s.created_at),
+        lastMessageAt: new Date(s.lastMessageAt || s.created_at),
         messageCount: 0, // Could be enhanced to count actual messages
+        isPinned: s.is_pinned || false,
+        isArchived: s.is_archived || false,
+        lastMessagePreview: s.lastMessagePreview,
       }));
 
       // Sort by last message time (most recent first)
@@ -99,6 +142,8 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
       console.error("Error loading conversations:", error);
       setConversations([]);
       return [];
+    } finally {
+      isLoadingConversationsRef.current[botType] = false;
     }
   }, [userId, botType, listSessions]);
 
@@ -153,7 +198,9 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
         .insert({ 
           user_id: userId, 
           active_hub: "cognitive", 
-          title: sessionTitle 
+          title: sessionTitle,
+          is_pinned: false,
+          is_archived: false
         })
         .select("id")
         .single();
@@ -167,6 +214,8 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
         createdAt: new Date(),
         lastMessageAt: new Date(),
         messageCount: 0,
+        isPinned: false,
+        isArchived: false,
       };
 
       setConversations(prev => [newConversation, ...prev]);
@@ -245,6 +294,70 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
       );
     } catch (error) {
       console.error("Error renaming conversation:", error);
+    }
+  }, []);
+
+  // Pin a conversation
+  const pinConversation = useCallback(async (conversationId: string) => {
+    try {
+      await supabase
+        .from("chat_sessions")
+        .update({ is_pinned: true })
+        .eq("id", conversationId);
+
+      setConversations(prev =>
+        prev.map(c => c.id === conversationId ? { ...c, isPinned: true } : c)
+      );
+    } catch (error) {
+      console.error("Error pinning conversation:", error);
+    }
+  }, []);
+
+  // Unpin a conversation
+  const unpinConversation = useCallback(async (conversationId: string) => {
+    try {
+      await supabase
+        .from("chat_sessions")
+        .update({ is_pinned: false })
+        .eq("id", conversationId);
+
+      setConversations(prev =>
+        prev.map(c => c.id === conversationId ? { ...c, isPinned: false } : c)
+      );
+    } catch (error) {
+      console.error("Error unpinning conversation:", error);
+    }
+  }, []);
+
+  // Archive a conversation
+  const archiveConversation = useCallback(async (conversationId: string) => {
+    try {
+      await supabase
+        .from("chat_sessions")
+        .update({ is_archived: true })
+        .eq("id", conversationId);
+
+      setConversations(prev =>
+        prev.map(c => c.id === conversationId ? { ...c, isArchived: true } : c)
+      );
+    } catch (error) {
+      console.error("Error archiving conversation:", error);
+    }
+  }, []);
+
+  // Unarchive a conversation
+  const unarchiveConversation = useCallback(async (conversationId: string) => {
+    try {
+      await supabase
+        .from("chat_sessions")
+        .update({ is_archived: false })
+        .eq("id", conversationId);
+
+      setConversations(prev =>
+        prev.map(c => c.id === conversationId ? { ...c, isArchived: false } : c)
+      );
+    } catch (error) {
+      console.error("Error unarchiving conversation:", error);
     }
   }, []);
 
@@ -383,18 +496,24 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     setActiveConversationId(null);
     setConversations([]);
     hasCreatedInitialConversationRef.current[botType] = false;
+    isLoadingConversationsRef.current[botType] = false;
     
     // Load conversations for this bot type
     loadConversations().then((mapped) => {
       // If no conversations exist and we haven't created one yet, create one
-      if (mapped.length === 0 && userId && !hasCreatedInitialConversationRef.current[botType]) {
+      if (mapped && mapped.length === 0 && userId && !hasCreatedInitialConversationRef.current[botType]) {
         hasCreatedInitialConversationRef.current[botType] = true;
         createNewConversation().catch(() => {
           hasCreatedInitialConversationRef.current[botType] = false;
         });
       }
+    }).catch((error) => {
+      // Silently handle errors to prevent infinite loops
+      console.error("Error in loadConversations effect:", error);
+      setConversations([]);
+      isLoadingConversationsRef.current[botType] = false;
     });
-  }, [botType, loadConversations, userId, createNewConversation]);
+  }, [botType, userId, loadConversations, createNewConversation]);
 
   // Load history when active conversation changes
   useEffect(() => {
@@ -426,6 +545,10 @@ export function useBotChat({ userId, botType }: UseBotChatOptions): UseBotChatRe
     switchConversation,
     closeConversation,
     renameConversation,
+    pinConversation,
+    unpinConversation,
+    archiveConversation,
+    unarchiveConversation,
     loadConversations,
   };
 }

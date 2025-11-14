@@ -10,6 +10,9 @@ export interface Conversation {
   createdAt: Date;
   lastMessageAt: Date;
   messageCount: number;
+  isPinned: boolean;
+  isArchived: boolean;
+  lastMessagePreview?: string; // First 50 chars of last message
 }
 
 interface ChatTabsBarProps {

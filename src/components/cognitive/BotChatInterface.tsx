@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useBotChat } from "@/hooks/useBotChat";
 import { motion } from "framer-motion";
 import { ChatTabsBar } from "./ChatTabsBar";
+import { ConversationSidebar } from "./ConversationSidebar";
 
 interface BotChatInterfaceProps {
   botId: 'friend' | 'mentor' | 'ea';
@@ -25,6 +26,7 @@ const BOT_WELCOME_MESSAGES: Record<'friend' | 'mentor' | 'ea', string> = {
 
 export function BotChatInterface({ botId, botName, botSubtitle, accentColor, userId, isActive = false }: BotChatInterfaceProps) {
   const [input, setInput] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -38,6 +40,10 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
     switchConversation,
     closeConversation,
     renameConversation,
+    pinConversation,
+    unpinConversation,
+    archiveConversation,
+    unarchiveConversation,
   } = useBotChat({ userId, botType: botId });
 
   // Auto-scroll to bottom when new messages arrive
@@ -78,10 +84,37 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-transparent overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-transparent overflow-hidden relative">
+      {/* Conversation Sidebar */}
+      <ConversationSidebar
+        botType={botId}
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onConversationSelect={switchConversation}
+        onNewConversation={handleNewConversation}
+        onPinConversation={pinConversation}
+        onUnpinConversation={unpinConversation}
+        onArchiveConversation={archiveConversation}
+        onUnarchiveConversation={unarchiveConversation}
+        onDeleteConversation={closeConversation}
+        onRenameConversation={renameConversation}
+      />
+
       {/* Slimmer Header */}
       <div className="px-3 sm:px-4 py-2 border-b border-border/50 bg-background/95 backdrop-blur-sm sticky top-0 z-10 shrink-0">
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className={cn(
+              "p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0",
+              sidebarOpen && "bg-muted"
+            )}
+            aria-label="Toggle conversations sidebar"
+          >
+            <List className="w-4 h-4" />
+          </button>
           <div className="flex-1 min-w-0">
             <h2 className="text-[18px] font-semibold text-foreground tracking-tight truncate">{botName}</h2>
             <p className="text-[13px] text-muted-foreground truncate">{botSubtitle}</p>
