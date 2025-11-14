@@ -27,8 +27,12 @@ Deno.serve(async (req) => {
   const origin = req.headers.get('origin');
   const headers = corsHeaders(origin);
 
+  // Log all requests for debugging
+  console.log(`[VEO3] ${req.method} request received from origin: ${origin}`);
+
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
+    console.log('[VEO3] OPTIONS request - returning CORS headers');
     return new Response('', {
       status: 200,
       headers: corsHeaders(origin),
@@ -36,6 +40,7 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('[VEO3] Processing request, method:', req.method);
     const apiKey = Deno.env.get('GEMINI_API_KEY');
     if (!apiKey) {
       console.error('[VEO3] GEMINI_API_KEY not configured');
