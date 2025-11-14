@@ -38,7 +38,11 @@ Deno.serve(async (req) => {
   try {
     const apiKey = Deno.env.get('GEMINI_API_KEY');
     if (!apiKey) {
-      return new Response(JSON.stringify({ message: 'GEMINI_API_KEY not configured' }), {
+      console.error('[VEO3] GEMINI_API_KEY not configured');
+      return new Response(JSON.stringify({ 
+        success: false,
+        message: 'GEMINI_API_KEY not configured. Please set it in Supabase Dashboard → Edge Functions → Settings → Secrets' 
+      }), {
         status: 500,
         headers: { ...headers, 'Content-Type': 'application/json' },
       });
@@ -62,6 +66,10 @@ Deno.serve(async (req) => {
     }
 
     // Step 1: Initiate video generation (returns an operation)
+    // Note: VEO3 API endpoint format may vary - trying standard format first
+    console.log(`[VEO3] Calling VEO3 API with model: ${modelName}`);
+    console.log(`[VEO3] Prompt length: ${prompt.length} characters`);
+    
     const generateResponse = await fetch(
       `${GEMINI_API_BASE}/models/${modelName}:generateVideos?key=${apiKey}`,
       {
@@ -77,12 +85,29 @@ Deno.serve(async (req) => {
 
     if (!generateResponse.ok) {
       const errorText = await generateResponse.text();
-      return new Response(JSON.stringify({ 
-        message: 'VEO3 API error', 
-        error: errorText,
-        status: generateResponse.status 
-      }), {
+      console.error('[VEO3] API Error:', {
         status: generateResponse.status,
+        statusText: generateResponse.statusText,
+        error: errorText,
+      });
+      
+      // Try to parse error for better message
+      let errorMessage = 'VEO3 API error';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
+      } catch {
+        errorMessage = errorText.substring(0, 200); // Limit error text length
+      }
+      
+      return new Response(JSON.stringify({ 
+        success: false,
+        message: 'VEO3 API error', 
+        error: errorMessage,
+        status: generateResponse.status,
+        details: 'Check if VEO3 model is available and API key has correct permissions'
+      }), {
+        status: generateResponse.status >= 400 && generateResponse.status < 500 ? generateResponse.status : 500,
         headers: { ...headers, 'Content-Type': 'application/json' },
       });
     }
@@ -201,10 +226,16 @@ Deno.serve(async (req) => {
     });
 
   } catch (err) {
-    console.error('[VEO3] Error:', err);
+    console.error('[VEO3] Unexpected error:', err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorStack = err instanceof Error ? err.stack : undefined;
+    
     return new Response(JSON.stringify({ 
+      success: false,
       message: 'Proxy error', 
-      error: String(err) 
+      error: errorMessage,
+      stack: errorStack,
+      details: 'Check Edge Function logs for more details'
     }), {
       status: 500,
       headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },

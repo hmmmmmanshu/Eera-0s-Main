@@ -2,14 +2,10 @@
 
 ## ⚠️ **The function must be deployed for video generation to work!**
 
-**If you see this error:** `"Failed to send a request to the Edge Function"` or `"CORS policy"`  
-**It means:** The function is not deployed yet or not accessible.
-
 The CORS error you're seeing means the function either:
-1. ❌ Not deployed yet (most common)
+1. ❌ Not deployed yet
 2. ❌ Deployed but missing the `GEMINI_API_KEY` secret
 3. ❌ Has an error in the code
-4. ❌ Function name mismatch (must be exactly `veo3-generate-video`)
 
 ---
 
