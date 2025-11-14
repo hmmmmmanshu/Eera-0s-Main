@@ -1,5 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 
 interface BotNavigationBarProps {
   activeBot: 'friend' | 'mentor' | 'ea';
@@ -29,12 +31,30 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
     }
   };
 
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && canGoLeft) {
+        e.preventDefault();
+        handlePrevious();
+      } else if (e.key === "ArrowRight" && canGoRight) {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [canGoLeft, canGoRight]);
+
   return (
     <div className="flex items-center justify-center w-full max-w-4xl mx-auto gap-2 md:gap-4 px-2 md:px-4 py-4 md:py-6">
       {/* Left Arrow */}
-      <button
+      <motion.button
         onClick={handlePrevious}
         disabled={!canGoLeft}
+        whileHover={canGoLeft ? { scale: 1.1 } : {}}
+        whileTap={canGoLeft ? { scale: 0.95 } : {}}
         className={cn(
           "flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full transition-all duration-200",
           "text-muted-foreground hover:text-foreground hover:bg-muted/50",
@@ -44,18 +64,21 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
         aria-label="Previous bot"
       >
         <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
-      </button>
+      </motion.button>
 
       {/* Pill Buttons */}
       <div className="flex items-center gap-2 md:gap-3 flex-1 justify-center">
         {BOTS.map((bot) => {
           const isActive = activeBot === bot.id;
           return (
-            <button
+            <motion.button
               key={bot.id}
               onClick={() => onBotChange(bot.id)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ duration: 0.15 }}
               className={cn(
-                "flex flex-col items-center justify-center rounded-xl transition-all duration-200",
+                "flex flex-col items-center justify-center rounded-xl transition-all duration-300",
                 "border min-w-[100px] md:min-w-[140px]",
                 "px-4 py-3 md:px-8 md:py-5",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
@@ -66,31 +89,35 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
               aria-label={`Switch to ${bot.name}`}
               aria-pressed={isActive}
             >
-              <span
+              <motion.span
                 className={cn(
-                  "text-[14px] md:text-[15px] leading-[1.4] tracking-[-0.01em] transition-colors",
+                  "text-[14px] md:text-[15px] leading-[1.4] tracking-[-0.01em] transition-colors duration-300",
                   isActive ? "font-semibold" : "font-normal"
                 )}
+                animate={{ opacity: isActive ? 1 : 0.6 }}
               >
                 {bot.name}
-              </span>
-              <span
+              </motion.span>
+              <motion.span
                 className={cn(
-                  "text-[12px] md:text-[13px] mt-0.5 md:mt-1 leading-[1.4] font-normal transition-colors",
+                  "text-[12px] md:text-[13px] mt-0.5 md:mt-1 leading-[1.4] font-normal transition-colors duration-300",
                   isActive ? "text-foreground/70" : "text-muted-foreground/70"
                 )}
+                animate={{ opacity: isActive ? 0.7 : 0.5 }}
               >
                 {bot.subtitle}
-              </span>
-            </button>
+              </motion.span>
+            </motion.button>
           );
         })}
       </div>
 
       {/* Right Arrow */}
-      <button
+      <motion.button
         onClick={handleNext}
         disabled={!canGoRight}
+        whileHover={canGoRight ? { scale: 1.1 } : {}}
+        whileTap={canGoRight ? { scale: 0.95 } : {}}
         className={cn(
           "flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full transition-all duration-200",
           "text-muted-foreground hover:text-foreground hover:bg-muted/50",
@@ -100,7 +127,7 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
         aria-label="Next bot"
       >
         <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
-      </button>
+      </motion.button>
     </div>
   );
 }
