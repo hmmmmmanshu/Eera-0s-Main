@@ -73,7 +73,8 @@ const MarketingHub = () => {
                   <Palette className="h-5 w-5" />
                   Brand
                 </Button>
-                <Button 
+                {/* Video generation button hidden temporarily */}
+                {/* <Button 
                   size="lg" 
                   variant="outline"
                   className="gap-2"
@@ -81,7 +82,7 @@ const MarketingHub = () => {
                 >
                   <Video className="h-5 w-5" />
                   Generate Video
-                </Button>
+                </Button> */}
                 <Button 
                   size="lg" 
                   variant="default"
@@ -134,10 +135,11 @@ const MarketingHub = () => {
         onOpenChange={setIsCreateModalOpen}
       />
 
-      <CreateVideoModal 
+      {/* Video generation modal hidden temporarily */}
+      {/* <CreateVideoModal 
         open={isCreateVideoModalOpen}
         onOpenChange={setIsCreateVideoModalOpen}
-      />
+      /> */}
 
       {/* Brand Identity Settings Dialog */}
       <Dialog open={isBrandSettingsOpen} onOpenChange={setIsBrandSettingsOpen}>
