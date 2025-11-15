@@ -91,9 +91,9 @@ export function ChatInput({
         : "What can I help you accomplish today?";
 
   return (
-    <div className="relative w-full bg-background border-t border-border">
+    <div className="relative w-full bg-background">
       {/* Input Container */}
-      <div className="relative flex items-end gap-2 p-4 max-w-full">
+      <div className="relative flex items-end gap-2 px-4 py-3 max-w-4xl mx-auto">
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
@@ -109,8 +109,8 @@ export function ChatInput({
             disabled={disabled}
             rows={1}
             className={cn(
-              "min-h-[44px] max-h-[200px] resize-none w-full",
-              "pr-12 pb-6",
+              "min-h-[52px] max-h-[200px] resize-none w-full",
+              "pr-12 pb-2",
               "text-[15px] leading-relaxed",
               "focus-visible:ring-2 focus-visible:ring-ring",
               "bg-background"
@@ -121,7 +121,7 @@ export function ChatInput({
           {charCount > 0 && (
             <div
               className={cn(
-                "absolute bottom-2 right-2 text-[11px] font-normal",
+                "absolute bottom-1 right-2 text-[11px] font-normal",
                 isNearLimit ? "text-destructive" : "text-muted-foreground/60"
               )}
             >
@@ -136,7 +136,7 @@ export function ChatInput({
           disabled={!value.trim() || disabled || charCount > maxLength}
           size="icon"
           className={cn(
-            "h-11 w-11 shrink-0",
+            "h-[52px] w-[52px] shrink-0",
             "transition-all duration-200",
             value.trim() && !disabled && charCount <= maxLength
               ? "bg-foreground text-background hover:bg-foreground/90"
@@ -144,7 +144,7 @@ export function ChatInput({
           )}
           aria-label="Send message"
         >
-          <Send className="h-4 w-4" />
+          <Send className="h-5 w-5" />
         </Button>
       </div>
     </div>

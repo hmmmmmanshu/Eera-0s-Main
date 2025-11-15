@@ -198,7 +198,7 @@ export function Message({
           <>
             <div
               className={cn(
-                "relative px-4 py-3 rounded-[18px] break-words",
+                "relative px-4 py-3 rounded-2xl break-words",
                 "text-[15px] leading-relaxed",
                 isUser
                   ? "bg-muted text-foreground"

@@ -82,7 +82,7 @@ export function BotChatInterface({
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -150,7 +150,7 @@ export function BotChatInterface({
           </div>
 
           {/* Fixed Input at Bottom */}
-          <div className="flex-shrink-0 relative z-10 bg-background">
+          <div className="flex-shrink-0 relative z-10 bg-background border-t border-border">
             <ChatInput
               botType={botType}
               value={inputValue}
