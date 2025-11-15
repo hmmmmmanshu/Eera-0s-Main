@@ -11,16 +11,8 @@ import FinanceHubMockup from "@/components/hub-mockups/FinanceHubMockup";
 import OpsHubMockup from "@/components/hub-mockups/OpsHubMockup";
 import LegalHubMockup from "@/components/hub-mockups/LegalHubMockup";
 import HRHubMockup from "@/components/hub-mockups/HRHubMockup";
-import CognitiveHubMockup from "@/components/hub-mockups/CognitiveHubMockup";
 
 const hubs = [
-  {
-    id: "cognitive",
-    name: "Cognitive Hub",
-    color: "purple-500",
-    component: CognitiveHubMockup,
-    route: "/cognitive"
-  },
   {
     id: "marketing",
     name: "Marketing Hub",
