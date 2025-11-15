@@ -6,11 +6,12 @@ interface BotChatContainerProps {
   activeBot: BotType;
   children: ReactNode;
   onScrollChange?: (bot: BotType) => void;
+  fullHeight?: boolean;
 }
 
 const BOT_ORDER: BotType[] = ["friend", "mentor", "ea"];
 
-export function BotChatContainer({ activeBot, children, onScrollChange }: BotChatContainerProps) {
+export function BotChatContainer({ activeBot, children, onScrollChange, fullHeight = false }: BotChatContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
 
@@ -59,7 +60,8 @@ export function BotChatContainer({ activeBot, children, onScrollChange }: BotCha
         "flex overflow-x-auto overflow-y-hidden",
         "scroll-smooth scrollbar-hide",
         "snap-x snap-mandatory",
-        "w-full h-[calc(100vh-200px)]"
+        "w-full transition-all duration-500",
+        fullHeight ? "h-[calc(100vh-80px)]" : "h-[calc(100vh-200px)]"
       )}
       style={{
         scrollSnapType: "x mandatory",

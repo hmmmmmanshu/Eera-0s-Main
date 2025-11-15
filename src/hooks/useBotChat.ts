@@ -86,16 +86,19 @@ export function useBotChat({ botType, onError }: UseBotChatOptions): UseBotChatR
       setConversations(convs);
 
       // Set first conversation as active if none selected
-      if (convs.length > 0 && !activeConversationId) {
-        setActiveConversationId(convs[0].id);
-      }
+      setActiveConversationId((currentId) => {
+        if (!currentId && convs.length > 0) {
+          return convs[0].id;
+        }
+        return currentId;
+      });
     } catch (error) {
       console.error("Error loading conversations:", error);
       onError?.(error as Error);
     } finally {
       setLoading(false);
     }
-  }, [botType, activeConversationId, sessionToConversation, onError]);
+  }, [botType, sessionToConversation, onError]);
 
   // Load messages for active conversation
   const loadMessages = useCallback(async (sessionId: string) => {
@@ -116,10 +119,11 @@ export function useBotChat({ botType, onError }: UseBotChatOptions): UseBotChatR
     });
   }, []);
 
-  // Initialize
+  // Initialize - only run once on mount
   useEffect(() => {
     loadConversations();
-  }, [loadConversations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load messages when active conversation changes
   useEffect(() => {
@@ -128,7 +132,8 @@ export function useBotChat({ botType, onError }: UseBotChatOptions): UseBotChatR
     } else {
       setMessages([]);
     }
-  }, [activeConversationId, loadMessages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversationId]);
 
   // Create new conversation
   const createNewConversation = useCallback(async () => {

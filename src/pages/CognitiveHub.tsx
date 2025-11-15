@@ -5,10 +5,12 @@ import { BotChatContainer, BotCard } from "@/components/cognitive/BotChatContain
 import { BotChatInterface } from "@/components/cognitive/BotChatInterface";
 import { useBotChat } from "@/hooks/useBotChat";
 import type { BotType } from "@/lib/bots/types";
+import { cn } from "@/lib/utils";
 
 const CognitiveHub = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeBot, setActiveBot] = useState<BotType>("mentor");
+  const [showNavigationBar, setShowNavigationBar] = useState(true);
 
   // Initialize hooks for each bot
   const friendChat = useBotChat({
@@ -39,6 +41,25 @@ const CognitiveHub = () => {
   };
 
   const activeChat = getActiveChat();
+
+  // Hide navigation bar after 5 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowNavigationBar(false);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Show navigation bar when bot changes
+  useEffect(() => {
+    setShowNavigationBar(true);
+    const timer = setTimeout(() => {
+      setShowNavigationBar(false);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [activeBot]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -71,12 +92,38 @@ const CognitiveHub = () => {
   return (
     <div className="flex min-h-screen w-full bg-background">
       <DynamicAppSidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Navigation Bar */}
-        <BotNavigationBar activeBot={activeBot} onBotChange={setActiveBot} />
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Navigation Bar - Hidden after 5 seconds */}
+        <div
+          className={cn(
+            "transition-all duration-500 ease-in-out overflow-hidden",
+            showNavigationBar ? "max-h-32 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+          )}
+        >
+          <BotNavigationBar activeBot={activeBot} onBotChange={setActiveBot} />
+        </div>
 
-        {/* Chat Container */}
-        <BotChatContainer activeBot={activeBot} onScrollChange={setActiveBot}>
+        {/* Show Navigation Button - Appears when navigation is hidden */}
+        {!showNavigationBar && (
+          <button
+            onClick={() => {
+              setShowNavigationBar(true);
+              // Hide again after 5 seconds
+              setTimeout(() => setShowNavigationBar(false), 5000);
+            }}
+            className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-background border border-border rounded-lg shadow-sm hover:bg-muted transition-colors text-sm font-medium"
+            aria-label="Show bot navigation"
+          >
+            Switch Bot
+          </button>
+        )}
+
+        {/* Chat Container - Full height when navigation is hidden */}
+        <BotChatContainer
+          activeBot={activeBot}
+          onScrollChange={setActiveBot}
+          fullHeight={!showNavigationBar}
+        >
           {/* Friend Bot */}
           <BotCard botType="friend" isActive={activeBot === "friend"}>
             <BotChatInterface

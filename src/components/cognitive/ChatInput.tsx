@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
-import { Send, X } from "lucide-react";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { getSuggestedPrompts } from "@/lib/bots/suggestedPrompts";
 import type { BotType } from "@/lib/bots/types";
 import { cn } from "@/lib/utils";
 
@@ -11,10 +10,8 @@ interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (message: string) => void;
-  onPromptSelect?: (prompt: string) => void;
   disabled?: boolean;
   placeholder?: string;
-  hasMessages?: boolean;
   maxLength?: number;
 }
 
@@ -25,19 +22,14 @@ export function ChatInput({
   value,
   onChange,
   onSubmit,
-  onPromptSelect,
   disabled = false,
   placeholder,
-  hasMessages = false,
   maxLength = MAX_LENGTH,
 }: ChatInputProps) {
-  const [isFocused, setIsFocused] = useState(false);
   const [inputHistory, setInputHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const suggestedPrompts = getSuggestedPrompts(botType, hasMessages);
-  const showSuggestions = isFocused && !value && suggestedPrompts.length > 0;
   const charCount = value.length;
   const charCountPercentage = (charCount / maxLength) * 100;
   const isNearLimit = charCountPercentage >= 80;
@@ -91,15 +83,6 @@ export function ChatInput({
     }
   };
 
-  const handlePromptClick = (prompt: string) => {
-    if (onPromptSelect) {
-      onPromptSelect(prompt);
-    } else {
-      onChange(prompt);
-      textareaRef.current?.focus();
-    }
-  };
-
   const defaultPlaceholder =
     botType === "friend"
       ? "Share what's on your mind..."
@@ -109,27 +92,6 @@ export function ChatInput({
 
   return (
     <div className="relative w-full">
-      {/* Suggested Prompts Dropdown */}
-      {showSuggestions && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 bg-background border border-border rounded-lg shadow-lg p-2 z-10 max-h-64 overflow-y-auto">
-          <div className="space-y-1">
-            {suggestedPrompts.slice(0, 4).map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => handlePromptClick(suggestion.prompt)}
-                className={cn(
-                  "w-full text-left px-3 py-2 rounded-md text-sm",
-                  "hover:bg-muted/50 transition-colors duration-150",
-                  "text-foreground"
-                )}
-              >
-                {suggestion.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Input Container */}
       <div className="relative flex items-end gap-2 p-4 bg-background border-t border-border">
         <div className="flex-1 relative">
@@ -143,8 +105,6 @@ export function ChatInput({
               }
             }}
             onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setTimeout(() => setIsFocused(false), 200)}
             placeholder={placeholder || defaultPlaceholder}
             disabled={disabled}
             rows={1}

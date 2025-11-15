@@ -151,8 +151,6 @@ export function BotChatInterface({
             value={inputValue}
             onChange={setInputValue}
             onSubmit={handleSubmit}
-            onPromptSelect={handlePromptSelect}
-            hasMessages={hasMessages}
             disabled={loading}
           />
         </div>
