@@ -150,7 +150,7 @@ export function BotChatInterface({
           </div>
 
           {/* Fixed Input at Bottom */}
-          <div className="flex-shrink-0 relative z-10 bg-background border-t border-border pb-0">
+          <div className="flex-shrink-0 relative z-10 bg-background border-t border-border">
             <ChatInput
               botType={botType}
               value={inputValue}

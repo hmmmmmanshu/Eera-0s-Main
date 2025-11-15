@@ -91,7 +91,7 @@ export function BotCard({ botType, isActive, children }: BotCardProps) {
       className={cn(
         "flex-shrink-0 w-full h-full",
         "snap-start snap-always",
-        "px-6 py-4",
+        "px-6 py-0",
         "transition-all duration-300",
         isActive ? "border-l-2 border-r-2 border-border" : "border-l border-r border-border/50"
       )}
