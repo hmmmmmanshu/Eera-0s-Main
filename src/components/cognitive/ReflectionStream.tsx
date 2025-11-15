@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Link2, Mic, Plus } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCognitiveActions } from "@/hooks/useCognitive";
@@ -51,7 +51,7 @@ export function ReflectionStream() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5 text-accent" />
+          <DynamicIcon name="BookOpen" className="h-5 w-5 text-accent"  />
           Reflection Stream
         </CardTitle>
       </CardHeader>
@@ -79,11 +79,11 @@ export function ReflectionStream() {
                 setLastRun({ ok: false, details: "Local skills unavailable; used LLM-only summarization." });
               }
             }}>
-              <Plus className="h-4 w-4 mr-2" />
+              <DynamicIcon name="Plus" className="h-4 w-4 mr-2"  />
               Add Reflection
             </Button>
             <Button variant="outline" size="icon">
-              <Mic className="h-4 w-4" />
+              <DynamicIcon name="Mic" className="h-4 w-4"  />
             </Button>
           </div>
         </div>
@@ -108,7 +108,7 @@ export function ReflectionStream() {
                 <p className="text-xs text-muted-foreground">{entry.date}</p>
                 {entry.linkedHub && (
                   <Badge variant="outline" className="text-xs">
-                    <Link2 className="h-3 w-3 mr-1" />
+                    <DynamicIcon name="Link2" className="h-3 w-3 mr-1"  />
                     {entry.linkedHub}
                   </Badge>
                 )}

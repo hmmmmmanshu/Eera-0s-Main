@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ActivitySquare, Beaker } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCognitiveActions } from "@/hooks/useCognitive";
 import { useState } from "react";
@@ -17,7 +17,7 @@ export function CognitiveDiagnostics() {
     <Card className="border-lime-500/20 bg-gradient-to-br from-lime-500/5 to-emerald-500/5">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-sm">
-          <Beaker className="h-4 w-4 text-lime-500" />
+          <DynamicIcon name="Beaker" className="h-4 w-4 text-lime-500"  />
           Cognitive Diagnostics
         </CardTitle>
       </CardHeader>

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Smile, Meh, Frown, Heart, Zap, CloudRain } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { useState } from "react";
 import { Progress } from "@/components/ui/progress";
 
@@ -22,7 +22,7 @@ export function MoodTracker() {
     <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-cyan-500/5">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Heart className="h-5 w-5 text-purple-500" />
+          <DynamicIcon name="Heart" className="h-5 w-5 text-purple-500"  />
           How are you feeling today?
         </CardTitle>
       </CardHeader>

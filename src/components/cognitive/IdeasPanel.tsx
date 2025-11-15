@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, Sparkles, TrendingUp } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCognitiveActions } from "@/hooks/useCognitive";
 import { useState, useEffect } from "react";
@@ -45,7 +45,7 @@ export function IdeasPanel() {
     <Card className="border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-cyan-500" />
+          <DynamicIcon name="Lightbulb" className="h-5 w-5 text-cyan-500"  />
           AI-Generated Ideas
         </CardTitle>
       </CardHeader>
@@ -83,7 +83,7 @@ export function IdeasPanel() {
             {idea.rationale && <p className="text-xs text-muted-foreground mb-2">{idea.rationale}</p>}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-3 w-3 text-cyan-500" />
+                <DynamicIcon name="Sparkles" className="h-3 w-3 text-cyan-500"  />
                 <span className="text-xs text-muted-foreground">{idea.nextStep || "Suggestion"}</span>
               </div>
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={async () => {
@@ -119,7 +119,7 @@ export function IdeasPanel() {
             setLoading(false);
           }
         }}>
-          <TrendingUp className="h-4 w-4 mr-2" />
+          <DynamicIcon name="TrendingUp" className="h-4 w-4 mr-2"  />
           {llmOk === false ? "Model unavailable" : (loading ? "Generating…" : "Generate 5 Ideas")}
         </Button>
       </CardContent>

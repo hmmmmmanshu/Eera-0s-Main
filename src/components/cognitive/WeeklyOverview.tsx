@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Target, Award, Activity, RefreshCw } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { useCognitiveActions } from "@/hooks/useCognitive";
@@ -39,7 +39,7 @@ export function WeeklyOverview() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-accent" />
+            <DynamicIcon name="Activity" className="h-5 w-5 text-accent"  />
             Weekly Overview
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -64,28 +64,28 @@ export function WeeklyOverview() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Target className="h-4 w-4 text-green-500" />
+                <DynamicIcon name="Target" className="h-4 w-4 text-green-500"  />
                 <span className="text-2xl font-bold">{snapshot.moodAverage ?? "–"}</span>
               </div>
               <p className="text-xs text-muted-foreground">Mood Average</p>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Activity className="h-4 w-4 text-purple-500" />
+                <DynamicIcon name="Activity" className="h-4 w-4 text-purple-500"  />
                 <span className="text-2xl font-bold">{(snapshot.topMoods?.length || 0)}</span>
               </div>
               <p className="text-xs text-muted-foreground">Top Moods</p>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <TrendingUp className="h-4 w-4 text-blue-500" />
+                <DynamicIcon name="TrendingUp" className="h-4 w-4 text-blue-500"  />
                 <span className="text-2xl font-bold">{(snapshot.themes?.length || 0)}</span>
               </div>
               <p className="text-xs text-muted-foreground">Themes</p>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Award className="h-4 w-4 text-amber-500" />
+                <DynamicIcon name="Award" className="h-4 w-4 text-amber-500"  />
                 <span className="text-2xl font-bold">3</span>
               </div>
               <p className="text-xs text-muted-foreground">Actions</p>

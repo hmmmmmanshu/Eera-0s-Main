@@ -7,7 +7,7 @@ import { useCognitiveActions } from "@/hooks/useCognitive";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
-import { Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { FeatureRequestButton } from "@/components/FeatureRequestButton";
 
 export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?: string | null) => void }) {
@@ -182,7 +182,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
             <Badge variant={modelOk ? "default" : "outline"}>{modelOk === false ? "Model unavailable" : "Ready"}</Badge>
             <FeatureRequestButton />
             <Button size="icon" variant="ghost" onClick={() => setFullScreen((v) => !v)}>
-              {fullScreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {fullScreen ? <DynamicIcon name="Minimize2" className="h-4 w-4"  /> : <DynamicIcon name="Maximize2" className="h-4 w-4"  />}
             </Button>
           </div>
         </div>
@@ -249,7 +249,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
         <div className="space-y-2 min-h-[40vh] max-h-[65vh] overflow-y-auto transition-opacity duration-200" key={activeSessionId || 'no-session'}>
           {historyLoading && (
             <div className="flex justify-center py-6 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading conversation…
+              <DynamicIcon name="Loader2" className="h-4 w-4 animate-spin mr-2"  /> Loading conversation…
             </div>
           )}
           {!historyLoading && messages.map((m, idx) => (
@@ -261,7 +261,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
               }`}>
                 {m.text || (m.streaming && <span className="text-muted-foreground">Thinking...</span>)}
                 {m.streaming && (
-                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-2 inline" />
+                  <DynamicIcon name="Loader2" className="h-3 w-3 animate-spin text-muted-foreground ml-2 inline"  />
                 )}
               </div>
             </div>
@@ -280,7 +280,7 @@ export function CognitiveChatPanel({ onPlanCreated }: { onPlanCreated?: (planId?
             disabled={busy || !modelOk || !input.trim()} 
             onClick={handleSend}
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
+            {busy ? <DynamicIcon name="Loader2" className="h-4 w-4 animate-spin"  /> : "Send"}
           </Button>
         </div>
       </CardContent>

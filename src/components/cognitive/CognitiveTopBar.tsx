@@ -6,7 +6,7 @@ import { useCognitiveActions } from "@/hooks/useCognitive";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Heart, Frown, CloudRain, Meh, Smile, Zap } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -271,7 +271,7 @@ export function CognitiveTopBar() {
     <Card className="border-purple-200/50 bg-gradient-to-br from-purple-50/30 to-pink-50/20">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
-          <Heart className="h-5 w-5 text-purple-500" />
+          <DynamicIcon name="Heart" className="h-5 w-5 text-purple-500"  />
           How are you feeling today?
         </CardTitle>
       </CardHeader>
