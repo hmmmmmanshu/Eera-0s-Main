@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Search, Pin, PinOff, Archive, ArchiveRestore, Trash2, MoreVertical, Clock } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
@@ -198,13 +198,13 @@ export function ConversationSidebar({
                   className="p-1.5 rounded-lg hover:bg-muted transition-colors"
                   aria-label="Close sidebar"
                 >
-                  <X className="w-4 h-4" />
+                  <DynamicIcon name="X" className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <DynamicIcon name="Search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   ref={inputRef}
                   placeholder="Search conversations..."
@@ -217,7 +217,7 @@ export function ConversationSidebar({
                     onClick={() => setSearchQuery("")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted"
                   >
-                    <X className="w-3 h-3" />
+                    <DynamicIcon name="X" className="w-3 h-3" />
                   </button>
                 )}
               </div>
@@ -327,7 +327,7 @@ export function ConversationSidebar({
                         >
                           <div className="flex items-start gap-2">
                             {conversation.isPinned && (
-                              <Pin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                              <DynamicIcon name="Pin" className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
                             )}
                             <div className="flex-1 min-w-0">
                               {isEditing ? (
@@ -370,7 +370,7 @@ export function ConversationSidebar({
                                           isMenuOpen || isHovered ? "opacity-100" : "opacity-0"
                                         )}
                                       >
-                                        <MoreVertical className="w-3.5 h-3.5" />
+                                        <DynamicIcon name="MoreVertical" className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
                                   </div>
@@ -402,7 +402,7 @@ export function ConversationSidebar({
                                   }}
                                   className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
                                 >
-                                  <PinOff className="w-4 h-4" />
+                                  <DynamicIcon name="PinOff" className="w-4 h-4" />
                                   Unpin
                                 </button>
                               ) : (
@@ -413,7 +413,7 @@ export function ConversationSidebar({
                                   }}
                                   className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
                                 >
-                                  <Pin className="w-4 h-4" />
+                                  <DynamicIcon name="Pin" className="w-4 h-4" />
                                   Pin
                                 </button>
                               )}
@@ -424,7 +424,7 @@ export function ConversationSidebar({
                                 }}
                                 className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
                               >
-                                <Clock className="w-4 h-4" />
+                                <DynamicIcon name="Clock" className="w-4 h-4" />
                                 Rename
                               </button>
                               {conversation.isArchived ? (
@@ -435,7 +435,7 @@ export function ConversationSidebar({
                                   }}
                                   className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
                                 >
-                                  <ArchiveRestore className="w-4 h-4" />
+                                  <DynamicIcon name="ArchiveRestore" className="w-4 h-4" />
                                   Unarchive
                                 </button>
                               ) : (
@@ -446,7 +446,7 @@ export function ConversationSidebar({
                                   }}
                                   className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
                                 >
-                                  <Archive className="w-4 h-4" />
+                                  <DynamicIcon name="Archive" className="w-4 h-4" />
                                   Archive
                                 </button>
                               )}
@@ -460,7 +460,7 @@ export function ConversationSidebar({
                                 }}
                                 className="w-full px-3 py-2 text-left text-sm hover:bg-destructive/10 text-destructive flex items-center gap-2"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <DynamicIcon name="Trash2" className="w-4 h-4" />
                                 Delete
                               </button>
                             </motion.div>

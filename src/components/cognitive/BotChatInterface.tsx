@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { List } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useBotChat } from "@/hooks/useBotChat";
@@ -174,7 +174,7 @@ export function BotChatInterface({ botId, botName, botSubtitle, accentColor, use
             )}
             aria-label="Toggle conversations sidebar"
           >
-            <List className="w-3.5 h-3.5" />
+            <DynamicIcon name="List" className="w-3.5 h-3.5" />
           </button>
           <div className="flex-1 min-w-0">
             <h2 className="text-[16px] font-semibold text-foreground tracking-tight truncate">{botName}</h2>

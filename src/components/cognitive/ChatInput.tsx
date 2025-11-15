@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -235,9 +235,9 @@ export function ChatInput({
             aria-label="Send message"
           >
             {loading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <DynamicIcon name="Loader2" className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <ArrowRight className="h-3.5 w-3.5" />
+              <DynamicIcon name="ArrowRight" className="h-3.5 w-3.5" />
             )}
           </Button>
         </motion.div>

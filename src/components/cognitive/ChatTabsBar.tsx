@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
@@ -140,7 +140,7 @@ export function ChatTabsBar({
                         className="flex-shrink-0 w-4 h-4 rounded-full hover:bg-muted-foreground/20 flex items-center justify-center transition-colors"
                         aria-label="Close conversation"
                       >
-                        <X className="w-3 h-3" />
+                        <DynamicIcon name="X" className="w-3 h-3" />
                       </motion.button>
                     )}
                   </>

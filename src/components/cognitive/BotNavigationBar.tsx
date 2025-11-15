@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
@@ -63,7 +63,7 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
         )}
         aria-label="Previous bot"
       >
-        <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
+        <DynamicIcon name="ChevronLeft" className="w-4 h-4 md:w-5 md:h-5" />
       </motion.button>
 
       {/* Pill Buttons */}
@@ -126,7 +126,7 @@ export function BotNavigationBar({ activeBot, onBotChange }: BotNavigationBarPro
         )}
         aria-label="Next bot"
       >
-        <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
+        <DynamicIcon name="ChevronRight" className="w-4 h-4 md:w-5 md:h-5" />
       </motion.button>
     </div>
   );

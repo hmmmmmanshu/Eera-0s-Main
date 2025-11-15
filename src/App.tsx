@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { preloadCommonIcons } from "@/lib/iconPreloader";
 import ChatBubble from "@/components/ChatBubble";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -21,7 +23,13 @@ import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 
-const App = () => (
+const App = () => {
+  // Preload common icons on app initialization
+  useEffect(() => {
+    preloadCommonIcons();
+  }, []);
+
+  return (
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -120,6 +128,7 @@ const App = () => (
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
-);
+  );
+};
 
 export default App;

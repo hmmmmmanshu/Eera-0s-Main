@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, RotateCw, Edit, Trash2, MoreVertical, Check, X } from "lucide-react";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -136,7 +136,7 @@ export function MessageActions({
             className="h-8 w-8 p-0"
             disabled={!editValue.trim() || editValue === message.content}
           >
-            <Check className="h-3.5 w-3.5" />
+            <DynamicIcon name="Check" className="h-3.5 w-3.5" />
           </Button>
           <Button
             size="sm"
@@ -144,7 +144,7 @@ export function MessageActions({
             onClick={handleCancelEdit}
             className="h-8 w-8 p-0"
           >
-            <X className="h-3.5 w-3.5" />
+            <DynamicIcon name="X" className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
@@ -164,7 +164,7 @@ export function MessageActions({
           )}
           aria-label="Message actions"
         >
-          <MoreVertical className="h-3.5 w-3.5" />
+          <DynamicIcon name="MoreVertical" className="h-3.5 w-3.5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -173,7 +173,7 @@ export function MessageActions({
         className="min-w-[160px]"
       >
         <DropdownMenuItem onClick={handleCopy} className="cursor-pointer">
-          <Copy className="mr-2 h-3.5 w-3.5" />
+          <DynamicIcon name="Copy" className="mr-2 h-3.5 w-3.5" />
           Copy
         </DropdownMenuItem>
 
@@ -181,7 +181,7 @@ export function MessageActions({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleRegenerate} className="cursor-pointer">
-              <RotateCw className="mr-2 h-3.5 w-3.5" />
+              <DynamicIcon name="RotateCcw" className="mr-2 h-3.5 w-3.5" />
               Regenerate
             </DropdownMenuItem>
           </>
@@ -191,7 +191,7 @@ export function MessageActions({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleEdit} className="cursor-pointer">
-              <Edit className="mr-2 h-3.5 w-3.5" />
+              <DynamicIcon name="Edit" className="mr-2 h-3.5 w-3.5" />
               Edit
             </DropdownMenuItem>
           </>
@@ -203,7 +203,7 @@ export function MessageActions({
           className="cursor-pointer text-destructive focus:text-destructive"
           disabled={isDeleting}
         >
-          <Trash2 className="mr-2 h-3.5 w-3.5" />
+          <DynamicIcon name="Trash2" className="mr-2 h-3.5 w-3.5" />
           Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
