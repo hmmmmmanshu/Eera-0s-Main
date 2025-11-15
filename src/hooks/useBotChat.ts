@@ -177,8 +177,38 @@ export function useBotChat({ botType, onError }: UseBotChatOptions): UseBotChatR
           setMessages((prev) => [...prev, msg]);
         }
 
-        // Get system prompt with founder context
-        const systemPrompt = getSystemPrompt(botType, founderProfile);
+        // RAG Retrieval for Mentor bot
+        let ragContext = '';
+        if (botType === 'mentor') {
+          try {
+            console.log('[Mentor RAG] Retrieving relevant frameworks...');
+            const { retrieveRelevantFrameworks, formatFrameworksForPrompt } = await import('@/lib/rag/mentorRetrieval');
+            
+            const retrievedFrameworks = await retrieveRelevantFrameworks(
+              content,
+              founderProfile?.company_stage,
+              founderProfile?.industry,
+              5 // Top 5 frameworks
+            );
+            
+            if (retrievedFrameworks.length > 0) {
+              ragContext = formatFrameworksForPrompt(
+                retrievedFrameworks,
+                founderProfile?.company_stage
+              );
+              console.log('[Mentor RAG] Retrieved', retrievedFrameworks.length, 'frameworks');
+              console.log('[Mentor RAG] Frameworks:', retrievedFrameworks.map(f => f.chunk_name));
+            } else {
+              console.log('[Mentor RAG] No relevant frameworks found');
+            }
+          } catch (error) {
+            console.error('[Mentor RAG] Error during retrieval:', error);
+            // Continue without RAG if it fails
+          }
+        }
+
+        // Get system prompt with founder context AND RAG context
+        const systemPrompt = getSystemPrompt(botType, founderProfile, ragContext);
 
         // Build conversation history for context
         const conversationHistory = messages.map((m) => ({
