@@ -5,7 +5,6 @@ import DashboardHero from "@/components/dashboard/DashboardHero";
 import ActivityHeatmap from "@/components/dashboard/ActivityHeatmap";
 import UpcomingCalendar from "@/components/dashboard/UpcomingCalendar";
 import HubsGrid from "@/components/dashboard/HubsGrid";
-import ActivityFeed from "@/components/dashboard/ActivityFeed";
 import { FinanceWidget } from "@/components/dashboard/FinanceWidget";
 import { IncompleteProfileBanner } from "@/components/IncompleteProfileBanner";
 import { DataPromptBanner } from "@/components/dashboard/DataPromptBanner";
@@ -31,7 +30,6 @@ const Dashboard = () => {
               </div>
             </div>
             <HubsGrid />
-            <ActivityFeed />
           </div>
         </main>
       </div>

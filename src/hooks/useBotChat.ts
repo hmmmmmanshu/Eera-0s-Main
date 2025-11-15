@@ -12,6 +12,9 @@ import {
   type ChatSession,
   type ChatMessage as DBChatMessage,
 } from "@/lib/supabase/chat";
+import { generateChatResponseStreaming } from "@/lib/gemini";
+import { getSystemPrompt, type FounderProfile } from "@/lib/bots/prompts";
+import { getFounderProfile } from "@/lib/supabase/founderProfile";
 import type { BotType } from "@/lib/bots/types";
 import type { ChatMessage } from "@/components/cognitive/MessageList";
 import type { Conversation } from "@/components/cognitive/ChatTabsBar";
@@ -47,6 +50,7 @@ export function useBotChat({ botType, onError }: UseBotChatOptions): UseBotChatR
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [founderProfile, setFounderProfile] = useState<FounderProfile | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Convert DB ChatSession to Conversation
@@ -105,6 +109,13 @@ export function useBotChat({ botType, onError }: UseBotChatOptions): UseBotChatR
     }
   }, [dbMessageToMessage, onError]);
 
+  // Load founder profile
+  useEffect(() => {
+    getFounderProfile().then((profile) => {
+      setFounderProfile(profile);
+    });
+  }, []);
+
   // Initialize
   useEffect(() => {
     loadConversations();
@@ -161,19 +172,79 @@ export function useBotChat({ botType, onError }: UseBotChatOptions): UseBotChatR
           setMessages((prev) => [...prev, msg]);
         }
 
-        // TODO: Call AI API and stream response
-        // For now, simulate a response
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        const assistantResponse = `This is a placeholder response from the ${botType} bot. The actual AI integration will be implemented next.`;
+        // Get system prompt with founder context
+        const systemPrompt = getSystemPrompt(botType, founderProfile);
 
-        const assistantMessage = await saveAssistantMessage(
-          sessionId,
-          botType,
-          assistantResponse
-        );
-        if (assistantMessage) {
-          const msg = dbMessageToMessage(assistantMessage);
-          setMessages((prev) => [...prev, msg]);
+        // Build conversation history for context
+        const conversationHistory = messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+
+        // Add current user message
+        conversationHistory.push({
+          role: "user" as const,
+          content,
+        });
+
+        // Create streaming message placeholder
+        const streamingMessageId = `streaming-${Date.now()}`;
+        const streamingMessage: ChatMessage = {
+          id: streamingMessageId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+          streaming: true,
+        };
+        setMessages((prev) => [...prev, streamingMessage]);
+
+        // Stream AI response
+        let fullResponse = "";
+        try {
+          for await (const chunk of generateChatResponseStreaming({
+            systemPrompt,
+            messages: conversationHistory.slice(-10), // Last 10 messages for context
+            temperature: botType === "mentor" ? 0.7 : botType === "friend" ? 0.8 : 0.6,
+            maxTokens: botType === "mentor" ? 2000 : 1500,
+          })) {
+            fullResponse += chunk;
+            // Update streaming message
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamingMessageId
+                  ? { ...m, content: fullResponse, streaming: true }
+                  : m
+              )
+            );
+          }
+
+          // Mark as complete
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamingMessageId ? { ...m, streaming: false } : m
+            )
+          );
+
+          // Save final message to database
+          const assistantMessage = await saveAssistantMessage(
+            sessionId,
+            botType,
+            fullResponse
+          );
+          if (assistantMessage) {
+            // Replace streaming message with saved message
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamingMessageId
+                  ? { ...dbMessageToMessage(assistantMessage), streaming: false }
+                  : m
+              )
+            );
+          }
+        } catch (streamError) {
+          // Remove streaming message on error
+          setMessages((prev) => prev.filter((m) => m.id !== streamingMessageId));
+          throw streamError;
         }
       } catch (error) {
         console.error("Error sending message:", error);
@@ -186,6 +257,8 @@ export function useBotChat({ botType, onError }: UseBotChatOptions): UseBotChatR
       activeConversationId,
       botType,
       sending,
+      messages,
+      founderProfile,
       sessionToConversation,
       dbMessageToMessage,
       onError,
