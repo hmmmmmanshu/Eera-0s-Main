@@ -112,59 +112,61 @@ export async function generateVideoWithVEO3(
     throw new Error("VITE_SUPABASE_URL is required for video generation");
   }
 
-  const modelName = "veo-3.0-generate-preview";
+  const modelName = "veo-2.0-generate-001"; // Using VEO 2 (stable, documented, REST API available)
 
   try {
-    // Use Supabase Edge Function to avoid CORS issues (VEO3 API doesn't support CORS)
-    console.log("[VEO3] Calling Edge Function with prompt length:", videoPrompt.length);
+    // Use Supabase Edge Function to avoid CORS issues
+    console.log("[VEO2] Calling Edge Function with prompt length:", videoPrompt.length);
+    console.log("[VEO2] Model:", modelName);
+    console.log("[VEO2] Aspect Ratio:", params.aspectRatio);
     
-    const { data, error } = await supabase.functions.invoke("veo3-generate-video", {
+    const { data, error } = await supabase.functions.invoke("veo2-generate-video", {
       body: {
         prompt: videoPrompt,
         modelName: modelName,
         aspectRatio: params.aspectRatio,
-        durationSeconds: 5, // VEO3 supports 4, 6, or 8 seconds
+        durationSeconds: 6, // VEO 2 supports 5-8 seconds
       },
     }).catch((invokeError: any) => {
-      console.error("[VEO3] Function invoke error:", invokeError);
+      console.error("[VEO2] Function invoke error:", invokeError);
       throw new Error(
-        `VEO3 Edge Function error: ${invokeError.message || "Failed to invoke function"}. ` +
-        "Please ensure the 'veo3-generate-video' function is deployed and GEMINI_API_KEY secret is set."
+        `VEO2 Edge Function error: ${invokeError.message || "Failed to invoke function"}. ` +
+        "Please ensure the 'veo2-generate-video' function is deployed and GEMINI_API_KEY secret is set."
       );
     });
 
     // Handle errors
     if (error) {
-      console.error("[VEO3] Supabase function error:", error);
-      console.error("[VEO3] Error details:", JSON.stringify(error, null, 2));
+      console.error("[VEO2] Supabase function error:", error);
+      console.error("[VEO2] Error details:", JSON.stringify(error, null, 2));
       if (error.message?.includes("not found") || error.message?.includes("404")) {
         throw new Error(
-          "VEO3 Edge Function not found. Please deploy the 'veo3-generate-video' function in Supabase Dashboard."
+          "VEO2 Edge Function not found. Please deploy the 'veo2-generate-video' function in Supabase Dashboard."
         );
       }
       throw new Error(error.message || "Supabase function error");
     }
 
     // Log the full response for debugging
-    console.log("[VEO3] Edge Function response:", data);
+    console.log("[VEO2] Edge Function response:", data);
 
     // Check if response indicates failure
     if (!data || (typeof data === 'object' && !data.success)) {
       const errorMsg = data?.error || data?.message || "Video generation failed";
       const errorDetails = data?.details || "";
       const suggestion = data?.suggestion || "";
-      console.error("[VEO3] Edge Function returned error:", data);
-      console.error("[VEO3] Full error details:", {
+      console.error("[VEO2] Edge Function returned error:", data);
+      console.error("[VEO2] Full error details:", {
         error: errorMsg,
         details: errorDetails,
         suggestion: suggestion,
         fullResponse: JSON.stringify(data, null, 2)
       });
-      throw new Error(`VEO3 Error: ${errorMsg}${errorDetails ? `\n\nDetails: ${errorDetails}` : ""}${suggestion ? `\n\nSuggestion: ${suggestion}` : ""}`);
+      throw new Error(`VEO2 Error: ${errorMsg}${errorDetails ? `\n\nDetails: ${errorDetails}` : ""}${suggestion ? `\n\nSuggestion: ${suggestion}` : ""}`);
     }
 
     if (!data?.video) {
-      console.error("[VEO3] No video in response:", data);
+      console.error("[VEO2] No video in response:", data);
       throw new Error(data?.message || "Video generation failed - no video data returned");
     }
 
@@ -178,11 +180,11 @@ export async function generateVideoWithVEO3(
     const blob = new Blob([bytes], { type: data.video.mimeType || "video/mp4" });
 
     // Upload to Supabase Storage
-    const filename = `veo3-${Date.now()}.mp4`;
+    const filename = `veo2-${Date.now()}.mp4`;
     const videoUrl = await uploadVideoToSupabase(blob, filename);
 
     const generationTime = Date.now() - startTime;
-    console.log("[VEO3] Video generation successful:", {
+    console.log("[VEO2] Video generation successful:", {
       url: videoUrl,
       time: generationTime,
     });
@@ -193,7 +195,7 @@ export async function generateVideoWithVEO3(
       generationTime,
     };
   } catch (error) {
-    console.error("[VEO3] Generation failed:", error);
+    console.error("[VEO2] Generation failed:", error);
     throw error;
   }
 }
