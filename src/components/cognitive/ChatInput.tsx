@@ -1,0 +1,192 @@
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { Send, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { getSuggestedPrompts } from "@/lib/bots/suggestedPrompts";
+import type { BotType } from "@/lib/bots/types";
+import { cn } from "@/lib/utils";
+
+interface ChatInputProps {
+  botType: BotType;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: (message: string) => void;
+  onPromptSelect?: (prompt: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  hasMessages?: boolean;
+  maxLength?: number;
+}
+
+const MAX_LENGTH = 5000;
+
+export function ChatInput({
+  botType,
+  value,
+  onChange,
+  onSubmit,
+  onPromptSelect,
+  disabled = false,
+  placeholder,
+  hasMessages = false,
+  maxLength = MAX_LENGTH,
+}: ChatInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [inputHistory, setInputHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const suggestedPrompts = getSuggestedPrompts(botType, hasMessages);
+  const showSuggestions = isFocused && !value && suggestedPrompts.length > 0;
+  const charCount = value.length;
+  const charCountPercentage = (charCount / maxLength) * 100;
+  const isNearLimit = charCountPercentage >= 80;
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [value]);
+
+  const handleSubmit = () => {
+    if (!value.trim() || disabled || charCount > maxLength) return;
+
+    onSubmit(value.trim());
+    if (value.trim()) {
+      setInputHistory((prev) => [value.trim(), ...prev.slice(0, 9)]);
+      setHistoryIndex(-1);
+    }
+    onChange("");
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    } else if (e.key === "ArrowUp" && inputHistory.length > 0) {
+      e.preventDefault();
+      if (historyIndex === -1) {
+        setHistoryIndex(0);
+        onChange(inputHistory[0]);
+      } else if (historyIndex < inputHistory.length - 1) {
+        const newIndex = historyIndex + 1;
+        setHistoryIndex(newIndex);
+        onChange(inputHistory[newIndex]);
+      }
+    } else if (e.key === "ArrowDown" && historyIndex >= 0) {
+      e.preventDefault();
+      if (historyIndex === 0) {
+        setHistoryIndex(-1);
+        onChange("");
+      } else {
+        const newIndex = historyIndex - 1;
+        setHistoryIndex(newIndex);
+        onChange(inputHistory[newIndex]);
+      }
+    } else if (e.key === "Escape") {
+      onChange("");
+      setHistoryIndex(-1);
+      textareaRef.current?.blur();
+    }
+  };
+
+  const handlePromptClick = (prompt: string) => {
+    if (onPromptSelect) {
+      onPromptSelect(prompt);
+    } else {
+      onChange(prompt);
+      textareaRef.current?.focus();
+    }
+  };
+
+  const defaultPlaceholder =
+    botType === "friend"
+      ? "Share what's on your mind..."
+      : botType === "mentor"
+        ? "Ask me about strategy, fundraising, or growth..."
+        : "What can I help you accomplish today?";
+
+  return (
+    <div className="relative w-full">
+      {/* Suggested Prompts Dropdown */}
+      {showSuggestions && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 bg-background border border-border rounded-lg shadow-lg p-2 z-10 max-h-64 overflow-y-auto">
+          <div className="space-y-1">
+            {suggestedPrompts.slice(0, 4).map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => handlePromptClick(suggestion.prompt)}
+                className={cn(
+                  "w-full text-left px-3 py-2 rounded-md text-sm",
+                  "hover:bg-muted/50 transition-colors duration-150",
+                  "text-foreground"
+                )}
+              >
+                {suggestion.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input Container */}
+      <div className="relative flex items-end gap-2 p-4 bg-background border-t border-border">
+        <div className="flex-1 relative">
+          <Textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => {
+              if (e.target.value.length <= maxLength) {
+                onChange(e.target.value);
+                setHistoryIndex(-1);
+              }
+            }}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+            placeholder={placeholder || defaultPlaceholder}
+            disabled={disabled}
+            rows={1}
+            className={cn(
+              "min-h-[44px] max-h-[200px] resize-none",
+              "pr-12 pb-6",
+              "text-[15px] leading-relaxed",
+              "focus-visible:ring-2 focus-visible:ring-ring"
+            )}
+          />
+
+          {/* Character Count */}
+          {charCount > 0 && (
+            <div
+              className={cn(
+                "absolute bottom-2 right-2 text-[11px] font-normal",
+                isNearLimit ? "text-destructive" : "text-muted-foreground/60"
+              )}
+            >
+              {charCount} / {maxLength}
+            </div>
+          )}
+        </div>
+
+        {/* Send Button */}
+        <Button
+          onClick={handleSubmit}
+          disabled={!value.trim() || disabled || charCount > maxLength}
+          size="icon"
+          className={cn(
+            "h-11 w-11 shrink-0",
+            "transition-all duration-200",
+            value.trim() && !disabled && charCount <= maxLength
+              ? "bg-foreground text-background hover:bg-foreground/90"
+              : "bg-muted text-muted-foreground cursor-not-allowed"
+          )}
+          aria-label="Send message"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
