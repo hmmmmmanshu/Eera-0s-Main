@@ -83,10 +83,10 @@ Deno.serve(async (req) => {
     // Round to nearest supported duration (4, 6, or 8)
     const finalDuration = veoDuration <= 5 ? 4 : veoDuration <= 7 ? 6 : 8;
     
-    // VEO3 uses generateVideos endpoint (not generateContent)
+    // VEO3 uses :generate endpoint with specific request format
     // Based on: https://developers.googleblog.com/en/veo-3-now-available-gemini-api/
     const generateResponse = await fetch(
-      `${GEMINI_API_BASE}/models/${modelName}:generateVideos?key=${apiKey}`,
+      `${GEMINI_API_BASE}/models/${modelName}:generate?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -94,10 +94,12 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           prompt: prompt,
-          config: {
-            aspectRatio: veoAspectRatio,
-            durationSeconds: finalDuration,
-          }
+          model: modelName,
+          sampleCount: 1,
+          durationSeconds: finalDuration,
+          aspectRatio: veoAspectRatio,
+          generateAudio: true,
+          enhancePrompt: false, // We already have a good prompt
         }),
       }
     );
@@ -108,20 +110,15 @@ Deno.serve(async (req) => {
         status: generateResponse.status,
         statusText: generateResponse.statusText,
         error: errorText,
-        endpoint: `${GEMINI_API_BASE}/models/${modelName}:generateContent`,
+        endpoint: `${GEMINI_API_BASE}/models/${modelName}:generate`,
         requestBody: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }],
-          generationConfig: {
-            responseModalities: ["video"],
-            videoConfig: {
-              aspectRatio: veoAspectRatio,
-              durationSeconds: finalDuration,
-            }
-          }
+          prompt: prompt,
+          model: modelName,
+          sampleCount: 1,
+          durationSeconds: finalDuration,
+          aspectRatio: veoAspectRatio,
+          generateAudio: true,
+          enhancePrompt: false,
         }),
       });
       
@@ -142,8 +139,8 @@ Deno.serve(async (req) => {
         error: errorMessage,
         details: errorDetails,
         status: generateResponse.status,
-        endpoint: `${GEMINI_API_BASE}/models/${modelName}:generateContent`,
-        suggestion: 'VEO3 might require a different endpoint format. Check Google AI Studio documentation.'
+        endpoint: `${GEMINI_API_BASE}/models/${modelName}:generate`,
+        suggestion: 'Check if your API key has VEO3 access (paid preview required). See: https://developers.googleblog.com/en/veo-3-now-available-gemini-api/'
       }), {
         status: 400, // Return 400 to client so they can see the error details
         headers: { ...headers, 'Content-Type': 'application/json' },
