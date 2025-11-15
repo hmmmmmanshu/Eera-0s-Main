@@ -39,7 +39,7 @@ export function ChatTabsBar({
   const canClose = conversations.length > 1;
 
   return (
-    <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-background overflow-x-auto scrollbar-hide">
+    <div className="flex items-center gap-1 px-4 py-1 border-b border-border bg-background overflow-x-auto scrollbar-hide">
       <style>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -53,7 +53,7 @@ export function ChatTabsBar({
           <div
             key={conversation.id}
             className={cn(
-              "flex items-center gap-1 px-4 py-2 rounded-t-lg transition-all duration-200",
+              "flex items-center gap-1 px-3 py-1 rounded-t-lg transition-all duration-200",
               "border-b-2 border-transparent",
               "group relative",
               isActive
@@ -91,20 +91,20 @@ export function ChatTabsBar({
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <button
-                onClick={() => onConversationSelect(conversation.id)}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  if (onRenameConversation) {
-                    setEditingId(conversation.id);
-                    setEditValue(conversation.title || "New Chat");
-                  }
-                }}
-                className={cn(
-                  "text-sm truncate max-w-[200px] text-left",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
-                )}
-              >
+            <button
+              onClick={() => onConversationSelect(conversation.id)}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                if (onRenameConversation) {
+                  setEditingId(conversation.id);
+                  setEditValue(conversation.title || "New Chat");
+                }
+              }}
+              className={cn(
+                "text-xs truncate max-w-[200px] text-left",
+                "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
+              )}
+            >
                 {conversation.title || "New Chat"}
               </button>
             )}
@@ -152,14 +152,14 @@ export function ChatTabsBar({
         variant="ghost"
         size="sm"
         className={cn(
-          "ml-auto shrink-0 h-8 px-3",
+          "ml-auto shrink-0 h-7 px-2",
           "text-muted-foreground hover:text-foreground hover:bg-muted/50",
           "transition-all duration-200"
         )}
         aria-label="New conversation"
       >
-        <Plus className="h-4 w-4 mr-1" />
-        <span className="text-sm">New Chat</span>
+        <Plus className="h-3.5 w-3.5 mr-1" />
+        <span className="text-xs">New Chat</span>
       </Button>
     </div>
   );

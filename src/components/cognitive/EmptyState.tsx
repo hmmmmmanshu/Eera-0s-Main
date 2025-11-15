@@ -19,8 +19,8 @@ export function EmptyState({ botType, onPromptSelect }: EmptyStateProps) {
   const content = getEmptyStateContentData()[botType];
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 py-12 text-center">
-      <div className="max-w-md space-y-8">
+    <div className="flex flex-col items-center justify-center h-full px-6 py-6 text-center">
+      <div className="max-w-md space-y-6">
         {/* Welcome Message */}
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold text-foreground tracking-tight">

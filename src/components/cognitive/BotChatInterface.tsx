@@ -82,22 +82,22 @@ export function BotChatInterface({
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-4 py-1.5 border-b border-border shrink-0">
+        <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden"
+            className="lg:hidden h-8 w-8"
             aria-label="Toggle sidebar"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-4 w-4" />
           </Button>
           <div>
-            <h2 className="text-2xl font-semibold text-foreground tracking-tight">
+            <h2 className="text-xl font-semibold text-foreground tracking-tight leading-tight">
               {config.name}
             </h2>
-            <p className="text-sm text-muted-foreground">{config.subtitle}</p>
+            <p className="text-xs text-muted-foreground leading-tight">{config.subtitle}</p>
           </div>
         </div>
       </div>
