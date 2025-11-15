@@ -136,6 +136,7 @@ export async function generateVideoWithVEO3(
     // Handle errors
     if (error) {
       console.error("[VEO3] Supabase function error:", error);
+      console.error("[VEO3] Error details:", JSON.stringify(error, null, 2));
       if (error.message?.includes("not found") || error.message?.includes("404")) {
         throw new Error(
           "VEO3 Edge Function not found. Please deploy the 'veo3-generate-video' function in Supabase Dashboard."
@@ -144,11 +145,22 @@ export async function generateVideoWithVEO3(
       throw new Error(error.message || "Supabase function error");
     }
 
+    // Log the full response for debugging
+    console.log("[VEO3] Edge Function response:", data);
+
     // Check if response indicates failure
     if (!data || (typeof data === 'object' && !data.success)) {
       const errorMsg = data?.error || data?.message || "Video generation failed";
+      const errorDetails = data?.details || "";
+      const suggestion = data?.suggestion || "";
       console.error("[VEO3] Edge Function returned error:", data);
-      throw new Error(`VEO3 Error: ${errorMsg}${data?.details ? ` - ${data.details}` : ""}`);
+      console.error("[VEO3] Full error details:", {
+        error: errorMsg,
+        details: errorDetails,
+        suggestion: suggestion,
+        fullResponse: JSON.stringify(data, null, 2)
+      });
+      throw new Error(`VEO3 Error: ${errorMsg}${errorDetails ? `\n\nDetails: ${errorDetails}` : ""}${suggestion ? `\n\nSuggestion: ${suggestion}` : ""}`);
     }
 
     if (!data?.video) {
