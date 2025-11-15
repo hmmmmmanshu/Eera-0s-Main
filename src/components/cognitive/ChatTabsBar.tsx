@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { BotType } from "@/lib/bots/types";
 
@@ -18,6 +19,7 @@ interface ChatTabsBarProps {
   onConversationSelect: (id: string) => void;
   onNewConversation: () => void;
   onCloseConversation: (id: string) => void;
+  onRenameConversation?: (id: string, newTitle: string) => void;
   botType: BotType;
 }
 
@@ -27,9 +29,12 @@ export function ChatTabsBar({
   onConversationSelect,
   onNewConversation,
   onCloseConversation,
+  onRenameConversation,
   botType,
 }: ChatTabsBarProps) {
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const canClose = conversations.length > 1;
 
@@ -58,30 +63,84 @@ export function ChatTabsBar({
             onMouseEnter={() => setHoveredTab(conversation.id)}
             onMouseLeave={() => setHoveredTab(null)}
           >
-            <button
-              onClick={() => onConversationSelect(conversation.id)}
-              className={cn(
-                "text-sm truncate max-w-[200px] text-left",
-                "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
-              )}
-            >
-              {conversation.title || "New Chat"}
-            </button>
-
-            {canClose && (isActive || isHovered) && (
+            {editingId === conversation.id ? (
+              <Input
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={() => {
+                  if (editValue.trim() && editValue !== conversation.title && onRenameConversation) {
+                    onRenameConversation(conversation.id, editValue.trim());
+                  }
+                  setEditingId(null);
+                  setEditValue("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    if (editValue.trim() && editValue !== conversation.title && onRenameConversation) {
+                      onRenameConversation(conversation.id, editValue.trim());
+                    }
+                    setEditingId(null);
+                    setEditValue("");
+                  } else if (e.key === "Escape") {
+                    setEditingId(null);
+                    setEditValue("");
+                  }
+                }}
+                className="h-6 text-sm px-2 py-1 max-w-[200px]"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
               <button
-                onClick={(e) => {
+                onClick={() => onConversationSelect(conversation.id)}
+                onDoubleClick={(e) => {
                   e.stopPropagation();
-                  onCloseConversation(conversation.id);
+                  if (onRenameConversation) {
+                    setEditingId(conversation.id);
+                    setEditValue(conversation.title || "New Chat");
+                  }
                 }}
                 className={cn(
-                  "ml-1 p-0.5 rounded hover:bg-muted transition-colors",
-                  "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                  "text-sm truncate max-w-[200px] text-left",
+                  "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded"
                 )}
-                aria-label="Close conversation"
               >
-                <X className="h-3.5 w-3.5" />
+                {conversation.title || "New Chat"}
               </button>
+            )}
+
+            {canClose && (isActive || isHovered) && !editingId && (
+              <div className="flex items-center gap-0.5 ml-1">
+                {onRenameConversation && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingId(conversation.id);
+                      setEditValue(conversation.title || "New Chat");
+                    }}
+                    className={cn(
+                      "p-0.5 rounded hover:bg-muted transition-colors",
+                      "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                    )}
+                    aria-label="Rename conversation"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCloseConversation(conversation.id);
+                  }}
+                  className={cn(
+                    "p-0.5 rounded hover:bg-muted transition-colors",
+                    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                  )}
+                  aria-label="Close conversation"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             )}
           </div>
         );

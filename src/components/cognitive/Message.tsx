@@ -7,6 +7,101 @@ import { MessageTimestamp } from "./MessageTimestamp";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "./MessageList";
 
+// Format structured messages with styled headers (ChatGPT-style)
+function formatStructuredMessage(content: string): React.ReactNode {
+  // Remove markdown asterisks from content
+  let cleanedContent = content.replace(/\*\*(.*?)\*\*/g, "$1");
+  
+  // Common section headers for all bots
+  const sectionHeaders = [
+    "Understanding",
+    "Framework & Analysis",
+    "Real-World Examples",
+    "Action Plan",
+    "Key Considerations",
+    "I Hear You",
+    "What This Might Mean",
+    "You're Not Alone",
+    "What Might Help",
+    "Remember",
+    "Summary",
+    "Action Items",
+    "Priority & Timeline",
+    "Next Steps",
+    "Notes",
+  ];
+
+  // Split content by lines
+  const lines = cleanedContent.split("\n");
+  const formatted: React.ReactNode[] = [];
+  let currentSection: string[] = [];
+  let currentHeader: string | null = null;
+
+  lines.forEach((line) => {
+    const trimmedLine = line.trim();
+    
+    // Check if this line is a section header (exact match, case-sensitive)
+    // Also check for headers with asterisks that might have been missed
+    const headerMatch = sectionHeaders.find(header => 
+      trimmedLine === header || 
+      trimmedLine === `**${header}**` ||
+      trimmedLine.startsWith(header) && trimmedLine.length === header.length
+    );
+    const isHeader = !!headerMatch;
+
+    if (isHeader) {
+      // Use clean header name
+      const cleanHeader = headerMatch || trimmedLine.replace(/\*\*/g, "");
+      // Save previous section before starting new one
+      if (currentHeader && currentSection.length > 0) {
+        const sectionContent = currentSection.join("\n").trim();
+        if (sectionContent) {
+          formatted.push(
+            <div key={`section-${formatted.length}-${currentHeader}`} className="mb-5">
+              <div className="font-semibold text-[16px] mb-2.5 text-foreground leading-tight">
+                {currentHeader}
+              </div>
+              <div className="text-[15px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                {sectionContent}
+              </div>
+            </div>
+          );
+        }
+      }
+      // Start new section
+      currentHeader = cleanHeader;
+      currentSection = [];
+    } else {
+      // Add to current section content
+      currentSection.push(line);
+    }
+  });
+
+  // Add final section
+  if (currentHeader) {
+    const sectionContent = currentSection.join("\n").trim();
+    if (sectionContent) {
+      formatted.push(
+        <div key={`section-${formatted.length}-${currentHeader}`} className="mb-5">
+          <div className="font-semibold text-[16px] mb-2.5 text-foreground leading-tight">
+            {currentHeader}
+          </div>
+          <div className="text-[15px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
+            {sectionContent}
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // If no structured sections found, return cleaned content
+  if (formatted.length === 0) {
+    return <div className="text-[15px] leading-relaxed whitespace-pre-wrap">{cleanedContent}</div>;
+  }
+
+  return <div>{formatted}</div>;
+}
+
 interface MessageProps {
   message: ChatMessage;
   showTimestamp?: boolean;
@@ -28,6 +123,7 @@ export function Message({
   const [editValue, setEditValue] = useState(message.content);
   const isUser = message.role === "user";
   const isStreaming = message.streaming;
+  const isEmpty = !message.content || message.content.trim() === "";
 
   const handleEditStart = () => {
     setEditValue(message.content);
@@ -107,10 +203,23 @@ export function Message({
                 isUser
                   ? "bg-muted text-foreground"
                   : "bg-background border border-border text-foreground",
-                isStreaming && "opacity-70"
+                isStreaming && isEmpty && "min-h-[60px]"
               )}
             >
-              <div className="whitespace-pre-wrap">{message.content}</div>
+              {isEmpty && isStreaming ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                    <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                  </div>
+                  <span className="text-sm italic">Thinking...</span>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap prose prose-sm max-w-none">
+                  {formatStructuredMessage(message.content)}
+                </div>
+              )}
               {message.isEdited && (
                 <span className="text-[11px] text-muted-foreground/60 ml-2">(edited)</span>
               )}

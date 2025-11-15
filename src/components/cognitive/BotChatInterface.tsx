@@ -104,14 +104,15 @@ export function BotChatInterface({
 
       {/* Tabs Bar */}
       {conversations.length > 0 && (
-        <ChatTabsBar
-          conversations={conversations}
-          activeConversationId={activeConversationId}
-          onConversationSelect={onConversationSelect}
-          onNewConversation={onNewConversation}
-          onCloseConversation={onCloseConversation}
-          botType={botType}
-        />
+          <ChatTabsBar
+            conversations={conversations}
+            activeConversationId={activeConversationId}
+            onConversationSelect={onConversationSelect}
+            onNewConversation={onNewConversation}
+            onCloseConversation={onCloseConversation}
+            onRenameConversation={onRenameConversation}
+            botType={botType}
+          />
       )}
 
       {/* Main Chat Area */}
