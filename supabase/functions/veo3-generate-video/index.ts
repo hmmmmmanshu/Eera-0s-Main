@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { prompt, modelName = 'veo-3.0-generate' } = body || {};
+    const { prompt, modelName = 'veo-3.0-generate', aspectRatio = '16:9', durationSeconds = 5 } = body || {};
     
     if (!prompt || typeof prompt !== 'string') {
       return new Response(JSON.stringify({ message: 'prompt is required' }), {
@@ -70,20 +70,39 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Step 1: Initiate video generation (returns an operation)
-    // Note: VEO3 API endpoint format may vary - trying standard format first
+    // Step 1: Initiate video generation using Gemini API format
+    // VEO3 uses generateContent endpoint (same pattern as image generation)
     console.log(`[VEO3] Calling VEO3 API with model: ${modelName}`);
     console.log(`[VEO3] Prompt length: ${prompt.length} characters`);
+    console.log(`[VEO3] Aspect ratio: ${aspectRatio}, Duration: ${durationSeconds}s`);
+    
+    // Map aspect ratio to VEO3 supported formats (16:9 or 9:16 only, not 1:1)
+    const veoAspectRatio = aspectRatio === '9:16' ? '9:16' : '16:9';
+    // Clamp duration to VEO3 supported values (4, 6, or 8 seconds)
+    const veoDuration = Math.min(Math.max(Math.round(durationSeconds), 4), 8);
+    // Round to nearest supported duration (4, 6, or 8)
+    const finalDuration = veoDuration <= 5 ? 4 : veoDuration <= 7 ? 6 : 8;
     
     const generateResponse = await fetch(
-      `${GEMINI_API_BASE}/models/${modelName}:generateVideos?key=${apiKey}`,
+      `${GEMINI_API_BASE}/models/${modelName}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: prompt,
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }],
+          generationConfig: {
+            responseModalities: ["video"],
+            videoConfig: {
+              aspectRatio: veoAspectRatio,
+              durationSeconds: finalDuration,
+            }
+          }
         }),
       }
     );
@@ -137,9 +156,12 @@ Deno.serve(async (req) => {
     while (!operation.done && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
 
-      const statusResponse = await fetch(
-        `${GEMINI_API_BASE}/${operationName}?key=${apiKey}`
-      );
+      // Operation name might be a full path or relative - handle both cases
+      const operationUrl = operationName.startsWith('http') 
+        ? `${operationName}?key=${apiKey}`
+        : `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`;
+      
+      const statusResponse = await fetch(operationUrl);
 
       if (!statusResponse.ok) {
         return new Response(JSON.stringify({ 
