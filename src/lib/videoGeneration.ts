@@ -112,7 +112,7 @@ export async function generateVideoWithVEO3(
     throw new Error("VITE_SUPABASE_URL is required for video generation");
   }
 
-  const modelName = "veo-3.0-generate";
+  const modelName = "veo-3.0-generate-preview";
 
   try {
     // Use Supabase Edge Function to avoid CORS issues (VEO3 API doesn't support CORS)

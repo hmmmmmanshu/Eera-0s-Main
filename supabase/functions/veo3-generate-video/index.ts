@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { prompt, modelName = 'veo-3.0-generate', aspectRatio = '16:9', durationSeconds = 5 } = body || {};
+    const { prompt, modelName = 'veo-3.0-generate-preview', aspectRatio = '16:9', durationSeconds = 5 } = body || {};
     
     if (!prompt || typeof prompt !== 'string') {
       return new Response(JSON.stringify({ message: 'prompt is required' }), {
@@ -83,14 +83,33 @@ Deno.serve(async (req) => {
     // Round to nearest supported duration (4, 6, or 8)
     const finalDuration = veoDuration <= 5 ? 4 : veoDuration <= 7 ? 6 : 8;
     
+    // VEO3 uses generateVideos endpoint (not generateContent)
+    // Based on: https://developers.googleblog.com/en/veo-3-now-available-gemini-api/
     const generateResponse = await fetch(
-      `${GEMINI_API_BASE}/models/${modelName}:generateContent?key=${apiKey}`,
+      `${GEMINI_API_BASE}/models/${modelName}:generateVideos?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          prompt: prompt,
+          config: {
+            aspectRatio: veoAspectRatio,
+            durationSeconds: finalDuration,
+          }
+        }),
+      }
+    );
+
+    if (!generateResponse.ok) {
+      const errorText = await generateResponse.text();
+      console.error('[VEO3] API Error:', {
+        status: generateResponse.status,
+        statusText: generateResponse.statusText,
+        error: errorText,
+        endpoint: `${GEMINI_API_BASE}/models/${modelName}:generateContent`,
+        requestBody: JSON.stringify({
           contents: [{
             parts: [{
               text: prompt
@@ -104,34 +123,29 @@ Deno.serve(async (req) => {
             }
           }
         }),
-      }
-    );
-
-    if (!generateResponse.ok) {
-      const errorText = await generateResponse.text();
-      console.error('[VEO3] API Error:', {
-        status: generateResponse.status,
-        statusText: generateResponse.statusText,
-        error: errorText,
       });
       
       // Try to parse error for better message
       let errorMessage = 'VEO3 API error';
+      let errorDetails = errorText;
       try {
         const errorJson = JSON.parse(errorText);
         errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
+        errorDetails = JSON.stringify(errorJson, null, 2);
       } catch {
-        errorMessage = errorText.substring(0, 200); // Limit error text length
+        errorMessage = errorText.substring(0, 500); // Show more error text
       }
       
       return new Response(JSON.stringify({ 
         success: false,
         message: 'VEO3 API error', 
         error: errorMessage,
+        details: errorDetails,
         status: generateResponse.status,
-        details: 'Check if VEO3 model is available and API key has correct permissions'
+        endpoint: `${GEMINI_API_BASE}/models/${modelName}:generateContent`,
+        suggestion: 'VEO3 might require a different endpoint format. Check Google AI Studio documentation.'
       }), {
-        status: generateResponse.status >= 400 && generateResponse.status < 500 ? generateResponse.status : 500,
+        status: 400, // Return 400 to client so they can see the error details
         headers: { ...headers, 'Content-Type': 'application/json' },
       });
     }
