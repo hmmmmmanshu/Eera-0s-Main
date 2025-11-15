@@ -75,8 +75,8 @@ export function MessageList({
 
   if (loading && messages.length === 0) {
     return (
-      <ScrollArea className="flex-1 px-4">
-        <div className="space-y-4 py-4">
+      <ScrollArea className="h-full w-full px-4">
+        <div className="space-y-4 py-4 pb-24">
           {[1, 2, 3].map((i) => (
             <SkeletonLoader key={i} variant="message" />
           ))}
@@ -86,12 +86,16 @@ export function MessageList({
   }
 
   if (messages.length === 0) {
-    return <EmptyState botType={botType} onPromptSelect={onPromptSelect} />;
+    return (
+      <div className="h-full w-full overflow-y-auto pb-24">
+        <EmptyState botType={botType} onPromptSelect={onPromptSelect} />
+      </div>
+    );
   }
 
   return (
-    <ScrollArea className="flex-1" ref={scrollRef}>
-      <div className="px-4 py-6 space-y-6">
+    <ScrollArea className="h-full w-full" ref={scrollRef}>
+      <div className="px-4 py-6 space-y-6 pb-24">
         {groupedMessages.map((group, groupIndex) => {
           const isLastGroup = groupIndex === groupedMessages.length - 1;
           const lastMessageInGroup = group[group.length - 1];

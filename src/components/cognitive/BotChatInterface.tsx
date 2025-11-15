@@ -80,7 +80,7 @@ export function BotChatInterface({
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-3">
@@ -135,25 +135,30 @@ export function BotChatInterface({
         />
 
         {/* Chat Content */}
-        <div className={cn("flex-1 flex flex-col", sidebarOpen && "lg:ml-[320px]")}>
-          <MessageList
-            messages={messages}
-            botType={botType}
-            loading={loading}
-            onPromptSelect={handlePromptSelect}
-            onMessageCopy={onMessageCopy}
-            onMessageRegenerate={onMessageRegenerate}
-            onMessageEdit={onMessageEdit}
-            onMessageDelete={onMessageDelete}
-          />
+        <div className={cn("flex-1 flex flex-col min-h-0 overflow-hidden", sidebarOpen && "lg:ml-[320px]")}>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <MessageList
+              messages={messages}
+              botType={botType}
+              loading={loading}
+              onPromptSelect={handlePromptSelect}
+              onMessageCopy={onMessageCopy}
+              onMessageRegenerate={onMessageRegenerate}
+              onMessageEdit={onMessageEdit}
+              onMessageDelete={onMessageDelete}
+            />
+          </div>
 
-          <ChatInput
-            botType={botType}
-            value={inputValue}
-            onChange={setInputValue}
-            onSubmit={handleSubmit}
-            disabled={loading}
-          />
+          {/* Fixed Input at Bottom */}
+          <div className="flex-shrink-0 relative z-10 bg-background">
+            <ChatInput
+              botType={botType}
+              value={inputValue}
+              onChange={setInputValue}
+              onSubmit={handleSubmit}
+              disabled={loading}
+            />
+          </div>
         </div>
       </div>
     </div>

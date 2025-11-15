@@ -91,9 +91,9 @@ export function ChatInput({
         : "What can I help you accomplish today?";
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full bg-background border-t border-border">
       {/* Input Container */}
-      <div className="relative flex items-end gap-2 p-4 bg-background border-t border-border">
+      <div className="relative flex items-end gap-2 p-4 max-w-full">
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
@@ -109,10 +109,11 @@ export function ChatInput({
             disabled={disabled}
             rows={1}
             className={cn(
-              "min-h-[44px] max-h-[200px] resize-none",
+              "min-h-[44px] max-h-[200px] resize-none w-full",
               "pr-12 pb-6",
               "text-[15px] leading-relaxed",
-              "focus-visible:ring-2 focus-visible:ring-ring"
+              "focus-visible:ring-2 focus-visible:ring-ring",
+              "bg-background"
             )}
           />
 
