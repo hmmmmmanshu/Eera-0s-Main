@@ -14,6 +14,11 @@ const ChatBubble = () => {
     setOpen(false);
   };
 
+  // Hide ChatBubble on CognitiveHub page
+  if (location.pathname === "/cognitive") {
+    return null;
+  }
+
   return (
     <div className="fixed bottom-4 right-4 z-50">
       {!open && (

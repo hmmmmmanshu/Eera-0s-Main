@@ -93,7 +93,7 @@ export function ChatInput({
   return (
     <div className="relative w-full bg-background">
       {/* Input Container */}
-      <div className="relative flex items-end gap-2 px-4 py-2 max-w-4xl mx-auto">
+      <div className="relative flex items-end gap-2 px-4 py-1 max-w-4xl mx-auto">
         <div className="flex-1 relative">
           <Textarea
             ref={textareaRef}
@@ -109,8 +109,8 @@ export function ChatInput({
             disabled={disabled}
             rows={1}
             className={cn(
-              "min-h-[48px] max-h-[200px] resize-none w-full",
-              "pr-12 pb-1",
+              "min-h-[44px] max-h-[200px] resize-none w-full",
+              "pr-12 pb-0.5",
               "text-[15px] leading-relaxed",
               "focus-visible:ring-2 focus-visible:ring-ring",
               "bg-background"
@@ -136,7 +136,7 @@ export function ChatInput({
           disabled={!value.trim() || disabled || charCount > maxLength}
           size="icon"
           className={cn(
-            "h-[48px] w-[48px] shrink-0",
+            "h-[44px] w-[44px] shrink-0",
             "transition-all duration-200",
             value.trim() && !disabled && charCount <= maxLength
               ? "bg-foreground text-background hover:bg-foreground/90"
